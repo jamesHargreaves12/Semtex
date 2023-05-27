@@ -1,0 +1,49 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+    <PropertyGroup>
+        <TargetFramework>net7.0</TargetFramework>
+        <Nullable>enable</Nullable>
+        <IsPackable>false</IsPackable>
+        <EnableDefaultCompileItems>false</EnableDefaultCompileItems>
+        <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+        <RootNamespace>Semtex.UT</RootNamespace>
+    </PropertyGroup>
+
+    <ItemGroup>
+        <PackageReference Include="FluentAssertions" Version="6.8.0" />
+        <PackageReference Include="Microsoft.CodeAnalysis.CSharp.Features" Version="4.5.0" />
+        <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.1.0" />
+        <PackageReference Include="Moq" Version="4.18.4" />
+        <PackageReference Include="NUnit" Version="3.13.3" />
+        <PackageReference Include="NUnit3TestAdapter" Version="4.2.1" />
+        <PackageReference Include="NUnit.Analyzers" Version="3.3.0" />
+        <PackageReference Include="coverlet.collector" Version="3.1.2" />
+        <PackageReference Include="xunit.extensibility.core" Version="2.4.1" />
+    </ItemGroup>
+    
+    <ItemGroup>
+        <Content Include="SemanticallyEquivalent/**/*">
+            <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+        </Content>
+        <Content Include="NotSemanticallyEquivalent/**/*">
+            <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+        </Content>
+        <Content Include="BasicUtils.cs">
+            <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+        </Content>
+    </ItemGroup>
+    
+    <ItemGroup>
+        <Compile Include="**/*.cs" Exclude="bin\**;obj\**;" />
+    </ItemGroup>
+    
+    <ItemGroup>
+      <ProjectReference Include="..\Semtex\Semtex.csproj" />
+    </ItemGroup>
+
+    <!-- Clear up bin dir first == TODO this doesn't appear to be working-->
+    <Target Name="SpicNSpan">
+        <RemoveDir Directories="$(BaseOutputPath)" />
+    </Target>
+
+</Project>

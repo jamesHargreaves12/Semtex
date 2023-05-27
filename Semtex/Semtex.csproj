@@ -1,0 +1,37 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+    <PropertyGroup>
+        <OutputType>Exe</OutputType>
+        <ImplicitUsings>enable</ImplicitUsings>
+        <Nullable>enable</Nullable>
+        <RootNamespace>Semtex</RootNamespace>
+        <TargetFrameworks>net7.0</TargetFrameworks>
+        <LangVersion>11</LangVersion>
+    </PropertyGroup>
+
+    <ItemGroup>
+        <PackageReference Include="CliWrap" Version="3.6.0" />
+        <PackageReference Include="editorconfig" Version="0.13.0" />
+        <PackageReference Include="Microsoft.CodeAnalysis.Common" Version="4.5.0" />
+        <PackageReference Include="Microsoft.CodeAnalysis.CSharp.Workspaces" Version="4.5.0" />
+        <PackageReference Include="Microsoft.CodeAnalysis.Workspaces.MSBuild" Version="4.5.0" />
+        <PackageReference Include="Microsoft.Build.Locator" Version="1.4.1" />
+        <PackageReference Include="Microsoft.CodeQuality.Analyzers" Version="3.3.2" />
+        <PackageReference Include="Microsoft.Extensions.Logging" Version="7.0.0" />
+        <PackageReference Include="Microsoft.Extensions.Logging.Console" Version="7.0.0" />
+        <PackageReference Include="System.CommandLine" Version="2.0.0-beta4.22272.1" />
+    </ItemGroup>
+    <ItemGroup>
+      <ProjectReference Include="..\..\Roslynator\src\Analyzers.CodeFixes\Analyzers.CodeFixes.csproj" />
+      <ProjectReference Include="..\SemtexAnalyzers\SemtexAnalyzers.csproj" />
+      <ProjectReference Include="..\RoslynatorCsDiagnosticFixers\RoslynatorCsDiagnosticFixers.csproj" />
+      <ProjectReference Include="..\RoslynatorRcsCodeFixes\RoslynatorRcsCodeFixes.csproj" />
+      <ProjectReference Include="..\RoslynCsCodeFixes\RoslynCsCodeFixes.csproj" />
+    </ItemGroup>
+
+    <ItemGroup>
+        <None Include=".analyzerconfig">
+            <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+        </None>
+    </ItemGroup>
+</Project>
