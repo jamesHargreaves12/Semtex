@@ -14,41 +14,23 @@ internal class SemanticSimplifier
     private static readonly ILogger<SemanticSimplifier> Logger =
         SemtexLog.LoggerFactory.CreateLogger<SemanticSimplifier>();
 
-    internal static async Task<(Solution sln, HashSet<string> failedToCompile)> GetSolutionWithFilesSimplified(
-        Solution sln, Dictionary<string, HashSet<string>> projectToFilesMap, string? analyzerConfigPath,
+
+    internal static async Task<Solution> GetSolutionWithFilesSimplified(
+        Solution sln, List<ProjectId> projectIds, Dictionary<string, HashSet<string>> projectToFilesMap, string? analyzerConfigPath,
         Dictionary<string, HashSet<string>> changedMethodsMap)
     {
-        var failedToCompile = new HashSet<string>();
-        var projectIds = sln.Projects
-            .Where(p => p.FilePath != null && projectToFilesMap.ContainsKey(p.FilePath) &&
-                        projectToFilesMap[p.FilePath].Count > 0)
-            .Select(p => p.Id)
-            .ToList();
         foreach (var projId in projectIds) // This could 100% be parallelized for speed - for now won't do this as the logging becomes more difficult.
         {
             var proj = sln.GetProject(projId)!;
             Logger.LogInformation("Processing {ProjName}", proj.Name);
-
-            // Confirm that there are no issues by compiling it once without analyzers.
-            var compileStopWatch = Stopwatch.StartNew();
-            var compilation = await proj.GetCompilationAsync().ConfigureAwait(false);
-            var diagnostics = compilation!.GetDiagnostics();
             var docsToSimplify = projectToFilesMap[proj.FilePath!];
-            if (diagnostics.Any(d => d.Severity == DiagnosticSeverity.Error))
-            {
-                Logger.LogError("Failed to compile before applying simplifications {Message}", diagnostics.First());
-                failedToCompile.UnionWith(docsToSimplify);
-                continue;
-            }
 
-            compileStopWatch.Stop();
-            Logger.LogInformation(SemtexLog.GetPerformanceStr("Initial Compilation", compileStopWatch.ElapsedMilliseconds));
             // Simplify docs
             sln = await SafeAnalyzers.Apply(sln, projId, docsToSimplify, analyzerConfigPath, changedMethodsMap).ConfigureAwait(false);
             sln = await ApplyRewriters(sln, projId, docsToSimplify).ConfigureAwait(false);
         }
 
-        return (sln, failedToCompile);
+        return sln;
     }
     
 

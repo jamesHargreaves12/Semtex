@@ -33,14 +33,55 @@ internal sealed class SolutionUtils
         await workspace.OpenSolutionAsync(slnPath).ConfigureAwait(false);
         return workspace.CurrentSolution;
     }
+    
+    
+    internal static async Task<(Solution sln, List<string> failedToRestore, HashSet<string> failedToCompile)> LoadSolution(List<string> projectPaths)
+    {
+        var stopwatch = Stopwatch.StartNew();
+        var (sln, failedToRestore) = await LoadSolutionImpl(projectPaths);
+        Logger.LogInformation(SemtexLog.GetPerformanceStr(nameof(LoadSolutionImpl), stopwatch.ElapsedMilliseconds));
 
-    internal static async Task<(Solution sln, List<string> failedToRestore)> LoadSolution(List<string> projectPaths)
+        stopwatch.Restart();
+        var failedToCompile = await CheckProjectsCompile(sln, projectPaths);
+        Logger.LogInformation(SemtexLog.GetPerformanceStr(nameof(CheckProjectsCompile), stopwatch.ElapsedMilliseconds));
+        
+        stopwatch.Restart();
+        if (failedToCompile.Any())
+        {
+            Logger.LogWarning("The following projects failed initial compile: {ProjPaths}", string.Join("\n",failedToCompile));
+            Logger.LogInformation("Will attempt to restore project and then try again");
+            foreach (var path in failedToCompile)
+            {
+                await RunDotnetRestore(Path.GetDirectoryName(path)!,Path.GetFileName(path)).ConfigureAwait(false);
+            }
+            Logger.LogInformation("Reloading solution");
+            (sln, var failedToRestore2) = await LoadSolutionImpl(projectPaths).ConfigureAwait(false);
+            
+            failedToRestore.AddRange(failedToRestore2);
+            failedToCompile = await CheckProjectsCompile(sln, projectPaths);
+            if (failedToCompile.Any())
+            {
+                Logger.LogWarning(
+                    "The following projects are still failing to compile and so the files will not be checked: {ProjPaths}",
+                    string.Join("\n", failedToCompile));
+            }
+            else
+            {
+                Logger.LogInformation("All projects now compiling");
+            }
+            Logger.LogInformation(SemtexLog.GetPerformanceStr(nameof(LoadSolution)+"-Reload", stopwatch.ElapsedMilliseconds));
+        }
+
+        return (sln, failedToRestore,failedToCompile);
+    }
+
+    private static async Task<(Solution sln, List<string>failedToRestore)> LoadSolutionImpl(List<string> projectPaths)
     {
         var failedToRestore = await RunDotnetRestoreOnAllProjects(projectPaths).ConfigureAwait(false);
 
         // TODO these first two lines are fairly slow. I assume it is the serial loading perhaps we should just create a very simple solution file upfront and then use that to load workspace in one go and assume that msft has optimized it under the hood?
         var workspace = GetMsBuildWorkspace();
-        
+
         var sln = await LoadSolutionIntoWorkspace(workspace, projectPaths).ConfigureAwait(false);
 
         Logger.LogInformation("Loaded Solution with projects: {Projs}",
@@ -54,7 +95,6 @@ internal sealed class SolutionUtils
                 sln = sln.WithProjectCompilationOptions(proj.Id, proj.CompilationOptions!
                     .WithGeneralDiagnosticOption(ReportDiagnostic.Warn)
                     .WithSpecificDiagnosticOptions(ImmutableDictionary<string, ReportDiagnostic>.Empty)
-
                 );
                 // SpecificDiagnosticOptions
             }
@@ -62,6 +102,36 @@ internal sealed class SolutionUtils
 
         return (sln, failedToRestore);
     }
+
+    internal static async Task<HashSet<string>> CheckProjectsCompile(Solution sln, List<string> projectPaths)
+    {
+        var failedToCompile = new HashSet<string>();
+        var projectIds = sln.Projects
+            .Where(p => p.FilePath != null && projectPaths.Contains(p.FilePath))
+            .Select(p => p.Id)
+            .ToList();
+        foreach (var projId in projectIds) // This could 100% be parallelized for speed - for now won't do this as the logging becomes more difficult.
+        {
+            var proj = sln.GetProject(projId)!;
+            Logger.LogInformation("Processing {ProjName}", proj.Name);
+
+            // Confirm that there are no issues by compiling it once without analyzers.
+            var compileStopWatch = Stopwatch.StartNew();
+            var compilation = await proj.GetCompilationAsync().ConfigureAwait(false);
+            var diagnostics = compilation!.GetDiagnostics();
+            if (diagnostics.Any(d => d.Severity == DiagnosticSeverity.Error))
+            {
+                Logger.LogError("Failed to compile before applying simplifications {Message}", diagnostics.First());
+                failedToCompile.Add(proj.FilePath!);
+            }
+
+            compileStopWatch.Stop();
+            Logger.LogInformation(SemtexLog.GetPerformanceStr("Initial Compilation", compileStopWatch.ElapsedMilliseconds));
+        }
+
+        return failedToCompile;
+    }
+
 
     private static async Task<Solution> LoadSolutionIntoWorkspace(MSBuildWorkspace workspace, List<string> projectPaths)
     {
@@ -131,7 +201,7 @@ internal sealed class SolutionUtils
             // Sometimes we will need to rerun it. Not sure when this is - Could we diff the proj file to find out - doesn't help with dependent projs.?
             if (AlreadyRunDotNetRestoreOnProj.Contains(path))
             {
-                // continue; TODO more thought needed. 
+                continue;
             }
 
             try
@@ -157,7 +227,7 @@ internal sealed class SolutionUtils
         return failedToRestore;
     }
 
-    private static async Task<List<string>> RunDotnetRestore(string location, string filename)
+    internal static async Task<List<string>> RunDotnetRestore(string location, string filename)
     {
         var dotnetRestoreCmd = Cli.Wrap("dotnet")
             .WithArguments(new[]

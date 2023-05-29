@@ -191,16 +191,24 @@ public class CheckSemanticEquivalence
         var filepathsToSimplify = csFilepaths.Except(filepathsWithIfPreprocessor).ToHashSet();
         var (projectToFilesMap, unableToFindProj) = GetProjFinder(rootFolder, projectMappingFilepath).GetProjectToFileMapping(filepathsToSimplify, projFilter);
         
-        var stopwatch = Stopwatch.StartNew();
-        var (slnStart,failedToRestore) = await SolutionUtils.LoadSolution(projectToFilesMap.Keys.ToList()).ConfigureAwait(false);
+        var (slnStart,failedToRestore, failedToCompile) = await SolutionUtils.LoadSolution(projectToFilesMap.Keys.ToList()).ConfigureAwait(false);
         var filepathsInFailedToRestore = failedToRestore.SelectMany(f => projectToFilesMap[f]).ToHashSet();
-        Logger.LogInformation(SemtexLog.GetPerformanceStr(nameof(SolutionUtils.LoadSolution), stopwatch.ElapsedMilliseconds));
-        
-        var (simplifiedSln, filepathFailedToCompile) = await SemanticSimplifier
-                .GetSolutionWithFilesSimplified(slnStart, projectToFilesMap, analyzerConfigPath, changedMethodsMap)
+        var filepathsInFailedToCompile = failedToCompile.SelectMany(f => projectToFilesMap[f]).ToHashSet();
+
+        var projectIds = slnStart.Projects
+            .Where(p => p.FilePath != null 
+                        && projectToFilesMap.ContainsKey(p.FilePath)
+                        && projectToFilesMap[p.FilePath].Count > 0
+                        && !failedToRestore.Contains(p.FilePath)
+                        && !failedToCompile.Contains(p.FilePath))
+            .Select(p => p.Id)
+            .ToList();
+
+        var simplifiedSln = await SemanticSimplifier
+                .GetSolutionWithFilesSimplified(slnStart, projectIds, projectToFilesMap, analyzerConfigPath, changedMethodsMap)
                 .ConfigureAwait(false);
         return (simplifiedSln,
-            new UnsimplifiedFilesSummary(filepathsWithIfPreprocessor, filepathFailedToCompile, unableToFindProj, filepathsInFailedToRestore));
+            new UnsimplifiedFilesSummary(filepathsWithIfPreprocessor, filepathsInFailedToCompile, unableToFindProj, filepathsInFailedToRestore));
     }
     
 

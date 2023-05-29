@@ -16,7 +16,7 @@ public class Right
 
     public static IBase M(A? a)
     {
-        return (IBase?)a ?? new B();
+        return (IBase)a ?? new B();
     }
 
 }
