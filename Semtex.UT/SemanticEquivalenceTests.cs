@@ -207,6 +207,7 @@ public class SemanticEquivalenceTests
         "StringBuilder",
         "StringComparison",
         "StringEmptyCheck",
+        "SuppressNullableWithReadonly",
         "SwitchBraces",
         "SwitchSameContex",
         "ToStringUnneeded",
@@ -393,10 +394,15 @@ public class SemanticEquivalenceTests
             { [ProjectFilepath] = new() { docInfo.FilePath! } };
         // Empty indicates just apply it to the whole solution
         var changeMethodsMap = new Dictionary<string, HashSet<string>>();
-        var (newSln, failedToCompile) = await SemanticSimplifier
-            .GetSolutionWithFilesSimplified(sln, projToFiles, null, changeMethodsMap)
+        
+        var projectIds = sln.Projects
+            .Where(p => p.FilePath == ProjectFilepath)
+            .Select(p => p.Id)
+            .ToList();
+
+        var newSln = await SemanticSimplifier
+            .GetSolutionWithFilesSimplified(sln, projectIds, projToFiles, null, changeMethodsMap)
             .ConfigureAwait(false);
-        failedToCompile.Should().BeEmpty();
         return newSln.Projects.SelectMany(p => p.Documents).First(d => d.FilePath!.EndsWith(filename));
     }
 
