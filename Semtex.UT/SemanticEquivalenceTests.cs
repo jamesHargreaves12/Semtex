@@ -208,6 +208,7 @@ public class SemanticEquivalenceTests
         "StringBuilder",
         "StringComparison",
         "StringEmptyCheck",
+        "SupressNullableWarnings",
         "SwitchBraces",
         "SwitchSameContex",
         "ToStringUnneeded",

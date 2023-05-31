@@ -42,10 +42,11 @@ internal class SemanticSimplifier
 
         foreach (var doc in simplifiedDocs)
         {
-            var rootNode = ((await doc.GetSyntaxRootAsync().ConfigureAwait(false))!);
+            var rootNode = (await doc.GetSyntaxRootAsync().ConfigureAwait(false))!;
             var noTrivia = new RemoveTriviaRewriter().Visit(rootNode);
             var consistentOrder = new ConsistentOrderRewriter().Visit(noTrivia);
-            var normalizedWhiteSpace = consistentOrder!.NormalizeWhitespace();
+            var withoutNullableSupression = new RemoveSuppressNullableWarningRewriter().Visit(consistentOrder);
+            var normalizedWhiteSpace = withoutNullableSupression!.NormalizeWhitespace();
             sln = sln.WithDocumentSyntaxRoot(doc.Id, normalizedWhiteSpace);
         }
 
