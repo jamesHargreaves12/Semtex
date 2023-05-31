@@ -88,6 +88,7 @@ public class SemanticEquivalenceTests
    private static readonly string[] SemanticallyEquivalentDirectories = {
         "AbstractPublicConstructor",
         "AddBraces",
+        "AddingReadonly",
         "AddParentheses",
         "AlwaysFalse",
         "AnonomousFunctionVsMethodGroup",
@@ -207,7 +208,6 @@ public class SemanticEquivalenceTests
         "StringBuilder",
         "StringComparison",
         "StringEmptyCheck",
-        "SuppressNullableWithReadonly",
         "SwitchBraces",
         "SwitchSameContex",
         "ToStringUnneeded",
