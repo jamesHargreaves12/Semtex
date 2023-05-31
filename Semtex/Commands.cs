@@ -16,10 +16,12 @@ public sealed class Commands
 
     private static readonly ILogger<Commands> Logger = SemtexLog.LoggerFactory.CreateLogger<Commands>();
 
-    public static async Task<bool> Run(string repo, string target, string source, string? analyzerConfigPath, string? projFilter, string? explicitProjectFileMap)
+    public static async Task<bool> Run(string repo, string target, string source, AbsolutePath? analyzerConfigPath, string? relativeProjFilter, AbsolutePath? explicitProjectFileMap)
     {
         var gitRepo = await GetGitRepoAndCheckClean(repo).ConfigureAwait(false);
         await gitRepo.CheckoutAndPull(target).ConfigureAwait(false);
+
+        var projFilter = relativeProjFilter == null ? null : new AbsolutePath(Path.Join(gitRepo.RootFolder.Path, relativeProjFilter));
 
         var commits = await gitRepo.ListCommitShasBetween(source, target).ConfigureAwait(false);
 
@@ -46,12 +48,13 @@ public sealed class Commands
         return results.All(r => r.SemanticallyEquivalent);
     }
     
-    public static async Task<bool> RunAllAncestors(string repo, string target, string? analyzerConfigPath,
-        string? projFilter, string? projectMappingFilepath, string outputPath)
+    public static async Task<bool> RunAllAncestors(string repo, string target, AbsolutePath? analyzerConfigPath,
+        string? relativeProjFilter, AbsolutePath? projectMappingFilepath, AbsolutePath outputPath)
     {
         var gitRepo = await GetGitRepoAndCheckClean(repo).ConfigureAwait(false);
         await gitRepo.CheckoutAndPull(target).ConfigureAwait(false);
-        
+        var projFilter = relativeProjFilter == null ? null : new AbsolutePath(Path.Join(gitRepo.RootFolder.Path, relativeProjFilter));
+
         var commits = await gitRepo.GetAllAncestors(target).ConfigureAwait(false);
         // No point doing this for the first commit in the series. Probably could be smarter here about if we hit the limit etc but I think this is good for now.
         commits.RemoveAt(commits.Count - 1);
@@ -96,14 +99,14 @@ public sealed class Commands
             return await SetupGitRepo(pathOrUrl).ConfigureAwait(false);
         }
         
-        var localChangesRepo = await GitRepo.SetupFromExistingFolder(pathOrUrl).ConfigureAwait(false);
+        var localChangesRepo = await GitRepo.SetupFromExistingFolder(new AbsolutePath(pathOrUrl)).ConfigureAwait(false);
         var ghostRepo = await SetupGitRepo(localChangesRepo.RemoteUrl).ConfigureAwait(false);
         return ghostRepo;
     }
 
-    private static async Task<GitRepo> GetGitRepoAndCheckClean(string pathOrUrl)
+    private static async Task<GitRepo> GetGitRepoAndCheckClean(string repoUrl)
     {
-        var gitRepo = await GetGitRepo(pathOrUrl).ConfigureAwait(false);
+        var gitRepo = await GetGitRepo(repoUrl).ConfigureAwait(false);
         var diff = await gitRepo.Diff(true).ConfigureAwait(false) 
                    + await gitRepo.Diff(false).ConfigureAwait(false);
         if (diff.Any())
@@ -114,8 +117,8 @@ public sealed class Commands
         return gitRepo;
     }
 
-    public static async Task<bool> RunModified(string path, string? analyzerConfigPath, bool staged, string? projFilter,
-        string? explicitProjectFileMap)
+    public static async Task<bool> RunModified(AbsolutePath path, AbsolutePath? analyzerConfigPath, bool staged, AbsolutePath? projFilter,
+        AbsolutePath? explicitProjectFileMap)
     {
         // Get a patch from the local version of the repo and grab the commit.
         // Setup a repo in the scratch space at the same base commit.
@@ -124,6 +127,12 @@ public sealed class Commands
         var localChangesRepo = await GitRepo.SetupFromExistingFolder(path).ConfigureAwait(false);
         var currentBaseCommit = await localChangesRepo.GetCurrentCommitSha().ConfigureAwait(false);
         var patchText = await localChangesRepo.Diff(staged).ConfigureAwait(false);
+        if (patchText.Length == 0)
+        {
+            Logger.LogInformation("No changes found, exiting");
+            return true;
+        }
+
         var patchFilepath = Path.Join(ScratchSpacePath, "tmp.patch"); // add a guid here
         await File.WriteAllTextAsync(patchFilepath, patchText).ConfigureAwait(false);
 
@@ -143,9 +152,9 @@ public sealed class Commands
     {
         // Clean / Create the temp directory for the build.
         var repoName = repo.Split("/")[^1].Split(".")[0];
-        var rootFolder = Path.Join(ScratchSpacePath, repoName);
+        var rootFolder = new AbsolutePath(Path.Join(ScratchSpacePath, repoName));
 
-        if(Directory.Exists(rootFolder))
+        if(Directory.Exists(rootFolder.Path))
         {
             Logger.LogInformation("Folder {RootFolder} already exists. Checking if it has the correct origin", rootFolder);
             try
@@ -174,9 +183,10 @@ public sealed class Commands
         return gitRepo;
     }
 
-    public static async Task ComputeProjectMapping(string slnPath, string filepath)
+    public static async Task ComputeProjectMapping(AbsolutePath slnPath, string filepath)
     {
-        var localRepo = await GitRepo.SetupFromExistingFolder(Path.GetDirectoryName(slnPath)!).ConfigureAwait(false);
+        var gitRepoLocation = new AbsolutePath(Path.GetDirectoryName(slnPath.Path)!);
+        var localRepo = await GitRepo.SetupFromExistingFolder(gitRepoLocation).ConfigureAwait(false);
         var sln = await SolutionUtils.LoadSolution(slnPath).ConfigureAwait(false);
         var absoluteMapping = ComputeDocumentToProjMapping.ComputeDocumentToProjectMapping(sln);
         var relativeMapping = new Dictionary<string, string[]>();

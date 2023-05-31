@@ -1,7 +1,9 @@
+using Semtex.Models;
+
 namespace Semtex.ProjectFinder;
 
 public interface IProjFinder
 {
-    public (Dictionary<string, HashSet<string>>, HashSet<string> unableToFindProj) GetProjectToFileMapping(HashSet<string> filepaths, string? projFilter);
+    public (Dictionary<AbsolutePath, HashSet<AbsolutePath>>, HashSet<AbsolutePath> unableToFindProj) GetProjectToFileMapping(HashSet<AbsolutePath> filepaths, AbsolutePath? projFilter);
 
 }

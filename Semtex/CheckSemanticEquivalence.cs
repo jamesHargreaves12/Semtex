@@ -16,7 +16,7 @@ public class CheckSemanticEquivalence
     private static readonly ILogger<CheckSemanticEquivalence> Logger = SemtexLog.LoggerFactory.CreateLogger<CheckSemanticEquivalence>();
 
     internal static async Task<CommitModel> CheckSemanticallyEquivalent(GitRepo gitRepo, string target,
-        string? analyzerConfigPath, string? projFilter, string? projectMappingFilepath)
+        AbsolutePath? analyzerConfigPath, AbsolutePath? projFilter, AbsolutePath? projectMappingFilepath)
     {
         var source = $"{target}~1";
         var stopWatch = Stopwatch.StartNew();
@@ -43,9 +43,8 @@ public class CheckSemanticEquivalence
         {
             // TODO Really would be good to change type here or something to indicate that we are now dealing will full path rather than relative.
             // I think having a config class which we could pass around that offered both a relative and a full path could be useful
-            var fullProjPath = projFilter is not null ? Path.Join(gitRepo.RootFolder, projFilter) : null;
-            var sourceLineChangeMapping = new Dictionary<string, List<LineDiff>>();
-            var targetLineChangeMapping = new Dictionary<string, List<LineDiff>>();
+            var sourceLineChangeMapping = new Dictionary<AbsolutePath, List<LineDiff>>();
+            var targetLineChangeMapping = new Dictionary<AbsolutePath, List<LineDiff>>();
             foreach (var sourceFilepath in diffConfig.SourceCsFilepaths)
             {
                 var lineChanges = await gitRepo.GetLineChanges(source, target, sourceFilepath).ConfigureAwait(false);
@@ -63,7 +62,7 @@ public class CheckSemanticEquivalence
             var sourceChangedMethods =
                 await GetChangesFilter(diffConfig.SourceCsFilepaths, sourceLineChangeMapping).ConfigureAwait(false);
 
-            var changedMethodsMap = new Dictionary<string, HashSet<string>>();
+            var changedMethodsMap = new Dictionary<AbsolutePath, HashSet<string>>();
             foreach (var key in targetChangedMethods.Keys.Union(sourceChangedMethods.Keys))
             {
                 if (!targetChangedMethods.ContainsKey(key)) continue;
@@ -74,10 +73,10 @@ public class CheckSemanticEquivalence
             Logger.LogInformation("We have a method filter for {Percentage}% of methods ({ChangedCount} files)",(int)(changedMethodsMap.Count/(float)diffConfig.SourceCsFilepaths.Count), changedMethodsMap.Count);
             await gitRepo.Checkout(target).ConfigureAwait(false);
             var (targetSln, targetUnsimplifiedFiles) =
-                await GetSimplifiedSolution(analyzerConfigPath, diffConfig.TargetCsFilepaths, fullProjPath, projectMappingFilepath, gitRepo.RootFolder, changedMethodsMap).ConfigureAwait(false);
+                await GetSimplifiedSolution(analyzerConfigPath, diffConfig.TargetCsFilepaths, projFilter, projectMappingFilepath, gitRepo.RootFolder, changedMethodsMap).ConfigureAwait(false);
             await gitRepo.Checkout(source).ConfigureAwait(false);
             var (sourceSln, sourceUnsimplifiedFiles) =
-                await GetSimplifiedSolution(analyzerConfigPath, diffConfig.SourceCsFilepaths, fullProjPath, projectMappingFilepath, gitRepo.RootFolder, changedMethodsMap).ConfigureAwait(false);
+                await GetSimplifiedSolution(analyzerConfigPath, diffConfig.SourceCsFilepaths, projFilter, projectMappingFilepath, gitRepo.RootFolder, changedMethodsMap).ConfigureAwait(false);
             
             var result = await GetFileModels(gitRepo, diffConfig, targetUnsimplifiedFiles, sourceUnsimplifiedFiles, sourceSln, targetSln).ConfigureAwait(false);
             // I am not sure why the GC is not smart enough to do this itself. But these lines prevent a linear increase in memory usage that just kills the process after a while.
@@ -101,7 +100,7 @@ public class CheckSemanticEquivalence
     
     private record DiffConfig
     {
-        public DiffConfig(HashSet<string> addedFilepaths, HashSet<string> removedFilepaths, HashSet<(string Source, string Target)> renamedFilepaths, List<string> allSourceFilePaths, HashSet<string> sourceCsFilepaths, HashSet<string> targetCsFilepaths)
+        public DiffConfig(HashSet<AbsolutePath> addedFilepaths, HashSet<AbsolutePath> removedFilepaths, HashSet<(AbsolutePath Source, AbsolutePath Target)> renamedFilepaths, List<AbsolutePath> allSourceFilePaths, HashSet<AbsolutePath> sourceCsFilepaths, HashSet<AbsolutePath> targetCsFilepaths)
         {
             AddedFilepaths = addedFilepaths;
             RemovedFilepaths = removedFilepaths;
@@ -111,16 +110,16 @@ public class CheckSemanticEquivalence
             TargetCsFilepaths = targetCsFilepaths;
         }
 
-        internal HashSet<string> AddedFilepaths { get; }
-        internal HashSet<string> RemovedFilepaths { get; }
-        internal HashSet<(string Source, string Target)> RenamedFilepaths { get; }
-        internal List<string> AllSourceFilePaths { get; }
-        internal HashSet<string> SourceCsFilepaths { get; }
-        internal HashSet<string> TargetCsFilepaths { get; }
+        internal HashSet<AbsolutePath> AddedFilepaths { get; }
+        internal HashSet<AbsolutePath> RemovedFilepaths { get; }
+        internal HashSet<(AbsolutePath Source, AbsolutePath Target)> RenamedFilepaths { get; }
+        internal List<AbsolutePath> AllSourceFilePaths { get; }
+        internal HashSet<AbsolutePath> SourceCsFilepaths { get; }
+        internal HashSet<AbsolutePath> TargetCsFilepaths { get; }
         
-        internal string GetTargetFilepath(string sourceFilepath)
+        internal AbsolutePath GetTargetFilepath(AbsolutePath sourceFilepath)
         {
-            string targetFilepath;
+            AbsolutePath targetFilepath;
             if (RenamedFilepaths.Any(x => x.Source == sourceFilepath))
             {
                 targetFilepath = RenamedFilepaths.First(x => x.Source == sourceFilepath).Target;
@@ -144,11 +143,11 @@ public class CheckSemanticEquivalence
             .Concat(renamedFilepaths.Select(pair => pair.Source))
             .ToList();
         var sourceCsFilepaths = allSourceFilePaths
-            .Where(f => f.EndsWith(".cs"))
+            .Where(f => f.Path.EndsWith(".cs"))
             .ToHashSet();
         var targetCsFilepaths = modifiedFilepaths
             .Concat(renamedFilepaths.Select(pair => pair.Target))
-            .Where(f => f.EndsWith(".cs"))
+            .Where(f => f.Path.EndsWith(".cs"))
             .ToHashSet();
 
 
@@ -160,7 +159,7 @@ public class CheckSemanticEquivalence
 
     private record UnsimplifiedFilesSummary
     {
-        public UnsimplifiedFilesSummary(HashSet<string> filepathsWithIfPreprocessor, HashSet<string> filepathsInProjThatFailedToCompile, HashSet<string> filepathsWhichUnableToFindProjFor, HashSet<string> filepathsInProjThatFailedToRestore)
+        public UnsimplifiedFilesSummary(HashSet<AbsolutePath> filepathsWithIfPreprocessor, HashSet<AbsolutePath> filepathsInProjThatFailedToCompile, HashSet<AbsolutePath> filepathsWhichUnableToFindProjFor, HashSet<AbsolutePath> filepathsInProjThatFailedToRestore)
         {
             FilepathsWithIfPreprocessor = filepathsWithIfPreprocessor;
             FilepathsInProjThatFailedToCompile = filepathsInProjThatFailedToCompile;
@@ -168,55 +167,63 @@ public class CheckSemanticEquivalence
             FilepathsInProjThatFailedToRestore = filepathsInProjThatFailedToRestore;
         }
 
-        internal HashSet<string> FilepathsWithIfPreprocessor { get; }
-        internal HashSet<string> FilepathsInProjThatFailedToCompile { get; }
-        internal HashSet<string> FilepathsWhichUnableToFindProjFor { get; }
-        public HashSet<string> FilepathsInProjThatFailedToRestore { get; }
+        internal HashSet<AbsolutePath> FilepathsWithIfPreprocessor { get; }
+        internal HashSet<AbsolutePath> FilepathsInProjThatFailedToCompile { get; }
+        internal HashSet<AbsolutePath> FilepathsWhichUnableToFindProjFor { get; }
+        public HashSet<AbsolutePath> FilepathsInProjThatFailedToRestore { get; }
     }
 
     
     // I think this is better done through DI
-    private static IProjFinder GetProjFinder(string rootFolder, string? explicitFilePath)
+    private static IProjFinder GetProjFinder(AbsolutePath rootFolder, AbsolutePath? explicitFilePath)
     {
         if (explicitFilePath is null) return new ClosestAncestorProjHeuristic();
         return new ExplicitFileMapToProj(explicitFilePath, rootFolder);
     }
 
-    private static async Task<(Solution simplifiedSln, UnsimplifiedFilesSummary unsimplifiedFilesSummary)>
-        GetSimplifiedSolution(string? analyzerConfigPath, HashSet<string> csFilepaths, string? projFilter,
-            string? projectMappingFilepath, string rootFolder,
-            Dictionary<string, HashSet<string>> changedMethodsMap)
+    private static async Task<(Solution simplifiedSln, UnsimplifiedFilesSummary unsimplifiedFilesSummary)> GetSimplifiedSolution(
+            AbsolutePath? analyzerConfigPath, 
+            HashSet<AbsolutePath> csFilepaths, 
+            AbsolutePath? projFilter,
+            AbsolutePath? projectMappingFilepath, 
+            AbsolutePath rootFolder,
+            Dictionary<AbsolutePath, HashSet<string>> changedMethodsMap )
     {
         var filepathsWithIfPreprocessor = csFilepaths.Where(HasIfPreprocessor).ToHashSet();
         var filepathsToSimplify = csFilepaths.Except(filepathsWithIfPreprocessor).ToHashSet();
-        var (projectToFilesMap, unableToFindProj) = GetProjFinder(rootFolder, projectMappingFilepath).GetProjectToFileMapping(filepathsToSimplify, projFilter);
-        
-        var (slnStart,failedToRestore, failedToCompile) = await SolutionUtils.LoadSolution(projectToFilesMap.Keys.ToList()).ConfigureAwait(false);
+        var (projectToFilesMap, unableToFindProj) = GetProjFinder(rootFolder, projectMappingFilepath)
+            .GetProjectToFileMapping(filepathsToSimplify, projFilter);
+
+        var (slnStart, failedToRestore, failedToCompile) =
+            await SolutionUtils.LoadSolution(projectToFilesMap.Keys.ToList()).ConfigureAwait(false);
         var filepathsInFailedToRestore = failedToRestore.SelectMany(f => projectToFilesMap[f]).ToHashSet();
         var filepathsInFailedToCompile = failedToCompile.SelectMany(f => projectToFilesMap[f]).ToHashSet();
 
         var projectIds = slnStart.Projects
-            .Where(p => p.FilePath != null 
-                        && projectToFilesMap.ContainsKey(p.FilePath)
-                        && projectToFilesMap[p.FilePath].Count > 0
-                        && !failedToRestore.Contains(p.FilePath)
-                        && !failedToCompile.Contains(p.FilePath))
+            .Where(p => p.FilePath != null)
+            .Select(p=> (p.Id, Path: new AbsolutePath(p.FilePath!)))
+            .Where(p =>projectToFilesMap.ContainsKey(p.Path)
+                        && projectToFilesMap[p.Path].Count > 0
+                        && !failedToRestore.Contains(p.Path)
+                        && !failedToCompile.Contains(p.Path))
             .Select(p => p.Id)
             .ToList();
 
         var simplifiedSln = await SemanticSimplifier
-                .GetSolutionWithFilesSimplified(slnStart, projectIds, projectToFilesMap, analyzerConfigPath, changedMethodsMap)
-                .ConfigureAwait(false);
+            .GetSolutionWithFilesSimplified(slnStart, projectIds, projectToFilesMap, analyzerConfigPath,
+                changedMethodsMap)
+            .ConfigureAwait(false);
         return (simplifiedSln,
-            new UnsimplifiedFilesSummary(filepathsWithIfPreprocessor, filepathsInFailedToCompile, unableToFindProj, filepathsInFailedToRestore));
+            new UnsimplifiedFilesSummary(filepathsWithIfPreprocessor, filepathsInFailedToCompile, unableToFindProj,
+                filepathsInFailedToRestore));
     }
-    
+
 
     // Conditional Preprocessors are difficult with in Roslyn and Roslynator doesn't always handle them correctly so we will just opt out of simplifying these files.
     // Another option would be to only the result of the compile that we applied and just treat anything else as trivia (like roslyn does) but that feels like something that should only be opt in.
-    private static bool HasIfPreprocessor(string documentFilePath)
+    private static bool HasIfPreprocessor(AbsolutePath documentFilePath)
     {
-        var file = new StreamReader(documentFilePath);
+        var file = new StreamReader(documentFilePath.Path);
         while (file.ReadLine() is { } line)
         {
             if (line.Contains("#if"))
@@ -274,8 +281,8 @@ public class CheckSemanticEquivalence
                 fileResults.Add(new FileModel(relativePath, Status.ProjectDidNotRestore));
                 continue;
             }
-            var before = sourceSln.Projects.SelectMany(p => p.Documents).Single(d => d.FilePath == sourceFilepath);
-            var after = targetSln.Projects.SelectMany(p => p.Documents).Single(d => d.FilePath == targetFilepath);
+            var before = sourceSln.Projects.SelectMany(p => p.Documents).Single(d => d.FilePath == sourceFilepath.Path);
+            var after = targetSln.Projects.SelectMany(p => p.Documents).Single(d => d.FilePath == targetFilepath.Path);
             
             (stopwatch ??= new Stopwatch()).Restart();
             var areSemanticallyEqual =
@@ -290,7 +297,7 @@ public class CheckSemanticEquivalence
         return fileResults;
     }
     
-        /// <summary>
+    /// <summary>
     /// If all the changes in a function are within functions then we will only apply the analyzers that are located within those functions.
     /// TODO this does live here
     /// </summary>
@@ -298,15 +305,15 @@ public class CheckSemanticEquivalence
     /// <param name="filepaths"></param>
     /// <param name="lineChangeMapping"></param>
     /// <returns></returns>
-    public static async Task<Dictionary<string, HashSet<string>>> GetChangesFilter(
-        HashSet<string> filepaths, Dictionary<string, List<LineDiff>> lineChangeMapping)
+    public static async Task<Dictionary<AbsolutePath, HashSet<string>>> GetChangesFilter(
+        HashSet<AbsolutePath> filepaths, Dictionary<AbsolutePath, List<LineDiff>> lineChangeMapping)
     {
-        Dictionary<string, HashSet<string>> result = new Dictionary<string, HashSet<string>>();
+        var result = new Dictionary<AbsolutePath, HashSet<string>>();
         foreach (var filepath in filepaths)
         {
             if (!lineChangeMapping.TryGetValue(filepath, out var lineDiffs)) continue;
 
-            var fileText = await File.ReadAllTextAsync(filepath).ConfigureAwait(false);
+            var fileText = await File.ReadAllTextAsync(filepath.Path).ConfigureAwait(false);
             var fileLines = SourceText.From(fileText).Lines;
 
             var root = CSharpSyntaxTree.ParseText(fileText).GetRoot();

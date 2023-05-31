@@ -9,6 +9,7 @@ using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.MSBuild;
 using Microsoft.Extensions.Logging;
 using Semtex.Logging;
+using Semtex.Models;
 
 namespace Semtex.Semantics;
 
@@ -17,11 +18,11 @@ internal sealed class SolutionUtils
     private static readonly ILogger<SolutionUtils> Logger =
         SemtexLog.LoggerFactory.CreateLogger<SolutionUtils>();
 
-    internal static async Task<Solution> LoadSolution(string slnPath)
+    internal static async Task<Solution> LoadSolution(AbsolutePath slnPath)
     {
         try
         {
-            await RunDotnetRestore(Path.GetDirectoryName(slnPath)!, Path.GetFileName(slnPath)).ConfigureAwait(false);
+            await RunDotnetRestore(slnPath).ConfigureAwait(false);
         }
         catch (Exception e)
         {
@@ -30,12 +31,12 @@ internal sealed class SolutionUtils
         }
 
         var workspace = GetMsBuildWorkspace();
-        await workspace.OpenSolutionAsync(slnPath).ConfigureAwait(false);
+        await workspace.OpenSolutionAsync(slnPath.Path).ConfigureAwait(false);
         return workspace.CurrentSolution;
     }
     
     
-    internal static async Task<(Solution sln, List<string> failedToRestore, HashSet<string> failedToCompile)> LoadSolution(List<string> projectPaths)
+    internal static async Task<(Solution sln, List<AbsolutePath> failedToRestore, HashSet<AbsolutePath> failedToCompile)> LoadSolution(List<AbsolutePath> projectPaths)
     {
         var stopwatch = Stopwatch.StartNew();
         var (sln, failedToRestore) = await LoadSolutionImpl(projectPaths);
@@ -52,7 +53,7 @@ internal sealed class SolutionUtils
             Logger.LogInformation("Will attempt to restore project and then try again");
             foreach (var path in failedToCompile)
             {
-                await RunDotnetRestore(Path.GetDirectoryName(path)!,Path.GetFileName(path)).ConfigureAwait(false);
+                await RunDotnetRestore(path).ConfigureAwait(false);
             }
             Logger.LogInformation("Reloading solution");
             (sln, var failedToRestore2) = await LoadSolutionImpl(projectPaths).ConfigureAwait(false);
@@ -72,10 +73,10 @@ internal sealed class SolutionUtils
             Logger.LogInformation(SemtexLog.GetPerformanceStr(nameof(LoadSolution)+"-Reload", stopwatch.ElapsedMilliseconds));
         }
 
-        return (sln, failedToRestore,failedToCompile);
+        return (sln, failedToRestore, failedToCompile);
     }
 
-    private static async Task<(Solution sln, List<string>failedToRestore)> LoadSolutionImpl(List<string> projectPaths)
+    private static async Task<(Solution sln, List<AbsolutePath>failedToRestore)> LoadSolutionImpl(List<AbsolutePath> projectPaths)
     {
         var failedToRestore = await RunDotnetRestoreOnAllProjects(projectPaths).ConfigureAwait(false);
 
@@ -103,11 +104,12 @@ internal sealed class SolutionUtils
         return (sln, failedToRestore);
     }
 
-    internal static async Task<HashSet<string>> CheckProjectsCompile(Solution sln, List<string> projectPaths)
+    internal static async Task<HashSet<AbsolutePath>> CheckProjectsCompile(Solution sln, List<AbsolutePath> projectPaths)
     {
-        var failedToCompile = new HashSet<string>();
+        var stringPaths = projectPaths.Select(p => p.Path).ToHashSet();
+        var failedToCompile = new HashSet<AbsolutePath>();
         var projectIds = sln.Projects
-            .Where(p => p.FilePath != null && projectPaths.Contains(p.FilePath))
+            .Where(p => p.FilePath != null && stringPaths.Contains(p.FilePath))
             .Select(p => p.Id)
             .ToList();
         foreach (var projId in projectIds) // This could 100% be parallelized for speed - for now won't do this as the logging becomes more difficult.
@@ -122,7 +124,7 @@ internal sealed class SolutionUtils
             if (diagnostics.Any(d => d.Severity == DiagnosticSeverity.Error))
             {
                 Logger.LogError("Failed to compile before applying simplifications {Message}", diagnostics.First());
-                failedToCompile.Add(proj.FilePath!);
+                failedToCompile.Add(new AbsolutePath(proj.FilePath!));
             }
 
             compileStopWatch.Stop();
@@ -133,17 +135,17 @@ internal sealed class SolutionUtils
     }
 
 
-    private static async Task<Solution> LoadSolutionIntoWorkspace(MSBuildWorkspace workspace, List<string> projectPaths)
+    private static async Task<Solution> LoadSolutionIntoWorkspace(MSBuildWorkspace workspace, List<AbsolutePath> projectPaths)
     {
         var sw = Stopwatch.StartNew();
         foreach (var projPath in projectPaths)
         {
-            if (workspace.CurrentSolution.Projects.Any(p => p.FilePath == projPath))
+            if (workspace.CurrentSolution.Projects.Any(p => p.FilePath == projPath.Path))
             {
                 continue;
             }
 
-            await workspace.OpenProjectAsync(projPath).ConfigureAwait(false);
+            await workspace.OpenProjectAsync(projPath.Path).ConfigureAwait(false);
         }
 
         var sln = workspace.CurrentSolution;
@@ -189,11 +191,11 @@ internal sealed class SolutionUtils
         return workspace;
     }
 
-    private static readonly HashSet<string> AlreadyRunDotNetRestoreOnProj = new();
+    private static readonly HashSet<AbsolutePath> AlreadyRunDotNetRestoreOnProj = new();
 
-    private static async Task<List<string>> RunDotnetRestoreOnAllProjects(List<string> projectPaths)
+    private static async Task<List<AbsolutePath>> RunDotnetRestoreOnAllProjects(List<AbsolutePath> projectPaths)
     {
-        var failedToRestore = new List<string>() { };
+        var failedToRestore = new List<AbsolutePath>() { };
         var sw = Stopwatch.StartNew();
         foreach (var path in projectPaths)
         {
@@ -206,7 +208,7 @@ internal sealed class SolutionUtils
 
             try
             {
-                var restoredFiles = await RunDotnetRestore(Path.GetDirectoryName(path)!,Path.GetFileName(path)).ConfigureAwait(false);
+                var restoredFiles = await RunDotnetRestore(path).ConfigureAwait(false);
                 if (!restoredFiles.Any())
                 {
                     AlreadyRunDotNetRestoreOnProj.Add(path);
@@ -227,8 +229,10 @@ internal sealed class SolutionUtils
         return failedToRestore;
     }
 
-    internal static async Task<List<string>> RunDotnetRestore(string location, string filename)
+    internal static async Task<List<AbsolutePath>> RunDotnetRestore(AbsolutePath path)
     {
+        string directory = Path.GetDirectoryName(path.Path)!;
+        string filename = Path.GetFileName(path.Path);
         var dotnetRestoreCmd = Cli.Wrap("dotnet")
             .WithArguments(new[]
             {
@@ -241,24 +245,24 @@ internal sealed class SolutionUtils
                         { "MSBuildSDKsPath", null },
                         { "MSBUILD_EXE_PATH", null }
                     })
-            .WithWorkingDirectory(location)
+            .WithWorkingDirectory(directory)
             .WithStandardOutputPipe(PipeTarget.ToDelegate(s => Logger.LogInformation("[dotnet-restore] {S}", s)))
             .WithStandardErrorPipe(PipeTarget.ToDelegate(s => Logger.LogError("[dotnet-restore] {S}", s)));
-        Logger.LogInformation("Executing {DotnetRestoreCmd} @ {Location}", dotnetRestoreCmd, location);
+        Logger.LogInformation("Executing {DotnetRestoreCmd} @ {Location}", dotnetRestoreCmd, directory);
         var cmdResult = await dotnetRestoreCmd.ExecuteBufferedAsync();
         Logger.LogInformation("Finished");
         return ExtractFilePaths(cmdResult.StandardOutput);
     }
 
-    private static List<string> ExtractFilePaths(string text)
+    private static List<AbsolutePath> ExtractFilePaths(string text)
     {
         var regex = new Regex(@"\s(([A-Za-z]:)?(\/|\\)[^()]+\.csproj)");
         var matches = regex.Matches(text);
-        var filePaths = new List<string>();
+        var filePaths = new List<AbsolutePath>();
 
         foreach (Match match in matches)
         {
-            filePaths.Add(match.Groups[1].Value);
+            filePaths.Add(new AbsolutePath(match.Groups[1].Value));
         }
 
         return filePaths;

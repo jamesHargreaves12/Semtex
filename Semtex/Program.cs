@@ -3,6 +3,7 @@ using System.CommandLine.Builder;
 using System.CommandLine.Parsing;
 using Semtex;
 using Semtex.Logging;
+using Semtex.Models;
 
 // Ew but seems to be the way return codes are done https://learn.microsoft.com/en-us/dotnet/standard/commandline/handle-termination
 var returnCode = 0;
@@ -29,16 +30,19 @@ Command GetCheckCommand(){
     checkCommand.SetHandler(async (repo, target, source, allAncestors, analyzerConfigPath, projFilter, explicitProjectMap) =>
     {
         SemtexLog.InitializeLogging(outputPath);
+        var analyzerConfigPathTyped = analyzerConfigPath == null ? null : new AbsolutePath(analyzerConfigPath);
+        var explicitProjectMapTyped = explicitProjectMap == null ? null : new AbsolutePath(explicitProjectMap);
+
         bool passedCheck;
         if (!allAncestors)
         {
-            passedCheck = await Commands.Run(repo, target, source, analyzerConfigPath, projFilter, explicitProjectMap)
+            passedCheck = await Commands.Run(repo, target, source, analyzerConfigPathTyped, projFilter, explicitProjectMapTyped)
                 .ConfigureAwait(false);
         }
         else
         {
             // TODO Check source hasn't been set by the user.
-            passedCheck = await Commands.RunAllAncestors(repo, target, analyzerConfigPath, projFilter, explicitProjectMap, outputPath)
+            passedCheck = await Commands.RunAllAncestors(repo, target, analyzerConfigPathTyped, projFilter, explicitProjectMapTyped, new AbsolutePath(outputPath))
                 .ConfigureAwait(false);
         }
 
@@ -67,7 +71,11 @@ Command GetCheckUncommittedCommand(){
     checkCommand.SetHandler(async (path, staged, analyzerConfigPath, projFilter, explicitProjectMap) =>
     {
         SemtexLog.InitializeLogging(outputPath);
-        var passedCheck = await Commands.RunModified(path, analyzerConfigPath, staged, projFilter, explicitProjectMap)
+        var analyzerConfigPathTyped = analyzerConfigPath == null ? null : new AbsolutePath(analyzerConfigPath);
+        var pathTyped = new AbsolutePath(path);
+        var projFilterTyped = new AbsolutePath(path);
+        var explicitProjectMapTyped = new AbsolutePath(path);
+        var passedCheck = await Commands.RunModified(pathTyped, analyzerConfigPathTyped, staged, projFilterTyped, explicitProjectMapTyped)
             .ConfigureAwait(false);
 
         if (!passedCheck)
@@ -88,7 +96,7 @@ Command GetComputeProjectMappingCommand()
     projMappingCommand.SetHandler(async (slnPath, outPath) =>
     {
         SemtexLog.InitializeLogging(outputPath);
-        await Commands.ComputeProjectMapping(slnPath, outPath).ConfigureAwait(false);
+        await Commands.ComputeProjectMapping(new AbsolutePath(slnPath), outPath).ConfigureAwait(false);
     }, slnPathArg, outPathArg);
     return projMappingCommand;
 }

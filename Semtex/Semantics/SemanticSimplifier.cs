@@ -1,11 +1,9 @@
-using System.Diagnostics;
 using Semtex.Rewriters;
 using Microsoft.CodeAnalysis;
-using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
-using Microsoft.CodeAnalysis.Text;
 using Microsoft.Extensions.Logging;
 using Semtex.Logging;
+using Semtex.Models;
 
 namespace Semtex.Semantics;
 
@@ -16,14 +14,14 @@ internal class SemanticSimplifier
 
 
     internal static async Task<Solution> GetSolutionWithFilesSimplified(
-        Solution sln, List<ProjectId> projectIds, Dictionary<string, HashSet<string>> projectToFilesMap, string? analyzerConfigPath,
-        Dictionary<string, HashSet<string>> changedMethodsMap)
+        Solution sln, List<ProjectId> projectIds, Dictionary<AbsolutePath, HashSet<AbsolutePath>> projectToFilesMap, AbsolutePath? analyzerConfigPath,
+        Dictionary<AbsolutePath, HashSet<string>> changedMethodsMap)
     {
         foreach (var projId in projectIds) // This could 100% be parallelized for speed - for now won't do this as the logging becomes more difficult.
         {
             var proj = sln.GetProject(projId)!;
             Logger.LogInformation("Processing {ProjName}", proj.Name);
-            var docsToSimplify = projectToFilesMap[proj.FilePath!];
+            var docsToSimplify = projectToFilesMap[new AbsolutePath(proj.FilePath!)];
 
             // Simplify docs
             sln = await SafeAnalyzers.Apply(sln, projId, docsToSimplify, analyzerConfigPath, changedMethodsMap).ConfigureAwait(false);
@@ -35,10 +33,11 @@ internal class SemanticSimplifier
     
 
     private static async Task<Solution> ApplyRewriters(Solution sln, ProjectId projectId,
-        HashSet<string> docsToSimplify)
+        HashSet<AbsolutePath> docsToSimplify)
     {
+        var stingDocsToSimplify = docsToSimplify.Select(d => d.Path).ToHashSet(); 
         var simplifiedDocs = sln.GetProject(projectId)!.Documents
-            .Where(d => docsToSimplify.Contains(d.FilePath!));
+            .Where(d => stingDocsToSimplify.Contains(d.FilePath!));
 
         foreach (var doc in simplifiedDocs)
         {

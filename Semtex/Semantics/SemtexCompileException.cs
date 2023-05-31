@@ -1,10 +1,12 @@
+using Semtex.Models;
+
 namespace Semtex.Semantics;
 
 public class SemtexCompileException : Exception
 {
-    public string ProjectPath { get; }
+    public AbsolutePath ProjectPath { get; }
 
-    public SemtexCompileException(string projectPath, string message) : base(message)
+    public SemtexCompileException(AbsolutePath projectPath, string message) : base(message)
     {
         ProjectPath = projectPath;
     }

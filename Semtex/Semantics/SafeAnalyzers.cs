@@ -17,6 +17,7 @@ using RoslynatorCsDiagnosticFixers;
 using RoslynatorRcsCodeFixes;
 using RoslynCsCodeFixes;
 using Semtex.Logging;
+using Semtex.Models;
 using SemtexAnalyzers;
 
 namespace Semtex.Semantics;
@@ -164,11 +165,11 @@ public sealed class SafeAnalyzers
     {
         "RCS1213", // Unused Member
     };
-    internal static async Task<Solution> Apply(Solution sln, ProjectId projId, HashSet<string> documentFilepaths,
-        string? analyzerConfigPath, Dictionary<string, HashSet<string>> changedMethodsMap)
+    internal static async Task<Solution> Apply(Solution sln, ProjectId projId, HashSet<AbsolutePath> documentFilepaths,
+        AbsolutePath? analyzerConfigPath, Dictionary<AbsolutePath, HashSet<string>> changedMethodsMap)
     {
         // Clone the set so that any edits don't effect caller.
-        documentFilepaths = new HashSet<string>(documentFilepaths, documentFilepaths.Comparer);
+        documentFilepaths = new HashSet<AbsolutePath>(documentFilepaths, documentFilepaths.Comparer);
         var currentSolution = await AnalyzerConfigOverwrite.ReplaceAnyAnalyzerConfigDocuments(sln, projId, documentFilepaths, analyzerConfigPath).ConfigureAwait(false);
         
         Logger.LogInformation("Starting Applying Diagnostic Fixes");
@@ -203,11 +204,11 @@ public sealed class SafeAnalyzers
                 var document = currentSolution
                     .GetProject(projId)!
                     .Documents
-                    .First(d => d.FilePath == documentFilepath);
+                    .First(d => d.FilePath == documentFilepath.Path);
                 var root = await document.GetSyntaxRootAsync().ConfigureAwait(false);
 
                 var groupedDiagnostics = relevantDiagnostics
-                    .Where(d => documentFilepath == d.Location.GetLineSpan().Path)
+                    .Where(d => documentFilepath.Path == d.Location.GetLineSpan().Path)
                     .Where(d=> !changedMethodsMap.ContainsKey(documentFilepath) 
                                || IsDiagnosticsInChangedMethod(root, d, changedMethodsMap[documentFilepath]) 
                                || DiagnosticToApplyEvenIfNotInChangeMap.Contains(d.Descriptor.Id))
@@ -240,7 +241,7 @@ public sealed class SafeAnalyzers
                 }
                 else
                 {
-                    diagnosticsThatDidntMakeFix.Add((documentFilepath, descriptorId));
+                    diagnosticsThatDidntMakeFix.Add((documentFilepath.Path, descriptorId));
                 }
             }
             // Surely there is an easy way to filter these by file and then we can compile each time rather than this horrible method.
@@ -272,7 +273,7 @@ public sealed class SafeAnalyzers
 
     private static readonly ImmutableArray<AdditionalText> EmptyAdditionalFiles = Array.Empty<AdditionalText>().ToImmutableArray();
     private static async Task<IEnumerable<Diagnostic>> CompileAndGetRelevantDiagnostics(Project proj,
-        HashSet<string> documentFilePaths, AnalyzerOptions analyzerOptions)
+        HashSet<AbsolutePath> documentFilePaths, AnalyzerOptions analyzerOptions)
     {
         var compilation = await proj.GetCompilationAsync().ConfigureAwait(false);
         var stopwatch = Stopwatch.StartNew();
@@ -287,8 +288,9 @@ public sealed class SafeAnalyzers
 
         // These diagnostics come from the manually added Analyzers.
         var stopwatch2 = Stopwatch.StartNew();
+        var stringDocumentFilePaths = documentFilePaths.Select(s => s.Path).ToHashSet();
         var tasks = proj.Documents
-            .Where(x => documentFilePaths.Contains(x.FilePath!))
+            .Where(x => stringDocumentFilePaths.Contains(x.FilePath!))
             .Select(d => GetManuallyAddedAnalyzerDiagnostics(d, compilationWithAnalyzers, compilation));
         var finishedTasks = await Task.WhenAll(tasks);
         foreach (var ds in finishedTasks)
@@ -312,7 +314,7 @@ public sealed class SafeAnalyzers
                 Logger.LogError(e);
             }
 
-            throw new SemtexCompileException(proj.FilePath!, $"Analyzer execution threw exception {analyzerErrors.First()}");
+            throw new SemtexCompileException(new AbsolutePath(proj.FilePath!), $"Analyzer execution threw exception {analyzerErrors.First()}");
         }
 
         if (diagnostics.Any(d => d.Severity == DiagnosticSeverity.Error))
@@ -326,11 +328,11 @@ public sealed class SafeAnalyzers
             var firstIssue = diagnostics.First(d => d.Severity == DiagnosticSeverity.Error);
             var sourceWithIssue = firstIssue.Location.SourceTree;
             Logger.LogError(sourceWithIssue!.ToString());
-            throw new SemtexCompileException(proj.FilePath!,$"Compile Failed {firstIssue}");
+            throw new SemtexCompileException(new AbsolutePath(proj.FilePath!),$"Compile Failed {firstIssue}");
         }
         
         return diagnostics
-            .Where(d => documentFilePaths.Contains(d.Location.GetLineSpan().Path));
+            .Where(d => stringDocumentFilePaths.Contains(d.Location.GetLineSpan().Path));
     }
 
     private static async Task<ImmutableArray<Diagnostic>> GetManuallyAddedAnalyzerDiagnostics(Document document,

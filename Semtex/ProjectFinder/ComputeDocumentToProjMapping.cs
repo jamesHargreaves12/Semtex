@@ -1,12 +1,13 @@
 using Microsoft.CodeAnalysis;
+using Semtex.Models;
 
 namespace Semtex.ProjectFinder;
 
 public class ComputeDocumentToProjMapping
 {
-    public static Dictionary<string, string[]> ComputeDocumentToProjectMapping(Solution sln)
+    public static Dictionary<AbsolutePath, AbsolutePath[]> ComputeDocumentToProjectMapping(Solution sln)
     {
-        var result = new Dictionary<string, string[]>();
+        var result = new Dictionary<AbsolutePath, AbsolutePath[]>();
         foreach (var proj in sln.Projects)
         {
             if (proj.FilePath is null) continue;
@@ -15,10 +16,13 @@ public class ComputeDocumentToProjMapping
             {
                 if(doc.FilePath is null) continue;
 
-                if (result.ContainsKey(doc.FilePath))
-                    result[doc.FilePath] = result[doc.FilePath].Append(proj.FilePath).ToArray();
+                var docFilePath = new AbsolutePath(doc.FilePath);
+                var projFilePath = new AbsolutePath(proj.FilePath);
 
-                result[doc.FilePath] = new string[]{ proj.FilePath };
+                if (result.ContainsKey(docFilePath))
+                    result[docFilePath] = result[docFilePath].Append(projFilePath).ToArray();
+
+                result[docFilePath] = new[] { projFilePath };
             }
         }
 

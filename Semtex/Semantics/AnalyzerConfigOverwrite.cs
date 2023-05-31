@@ -4,6 +4,7 @@ using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.Text;
 using Microsoft.Extensions.Logging;
 using Semtex.Logging;
+using Semtex.Models;
 
 namespace Semtex.Semantics;
 
@@ -20,7 +21,7 @@ public sealed class AnalyzerConfigOverwrite
     /// in. This is done through the analyzer config file.
     /// </summary>
 
-    internal static async Task<Solution> ReplaceAnyAnalyzerConfigDocuments(Solution sln, ProjectId projId, IEnumerable<string> filesThatChanged, string? analyzerConfigPath)
+    internal static async Task<Solution> ReplaceAnyAnalyzerConfigDocuments(Solution sln, ProjectId projId, IEnumerable<AbsolutePath> filesThatChanged, AbsolutePath? analyzerConfigPath)
     {
         var project = sln.GetProject(projId)!;
         // Strip out all existing config docs. TODO perhaps it would be better to try do some kinda merge here? But this is better then letting it be overriden by actual editor config files.
@@ -33,7 +34,7 @@ public sealed class AnalyzerConfigOverwrite
         if (analyzerConfigPath is not null)
         {
             Logger.LogInformation("Adding {AnalyzerConfigPath} to the proj", analyzerConfigPath);
-            configText = await File.ReadAllTextAsync(analyzerConfigPath).ConfigureAwait(false);
+            configText = await File.ReadAllTextAsync(analyzerConfigPath.Path).ConfigureAwait(false);
         }
         else
         {
@@ -41,16 +42,16 @@ public sealed class AnalyzerConfigOverwrite
             var analyzerConfigFolder = Directory.GetParent(typeof(AnalyzerConfigOverwrite).Assembly.Location)!.ToString();
             configText = await File.ReadAllTextAsync(Path.Join(analyzerConfigFolder, ".analyzerconfig")).ConfigureAwait(false);
 
-            analyzerConfigPath = Path.Join(Path.GetDirectoryName(project.FilePath), ".analyzerconfig"); 
+            analyzerConfigPath = new AbsolutePath(Path.Join(Path.GetDirectoryName(project.FilePath), ".analyzerconfig")); 
             configText += GetAnalyzerConfigOnlyForFilesThatChanged(filesThatChanged);
         }
 
         // Add in a the analyzer config as if it was in the same folder as the project.
-        newSln = newSln.AddAnalyzerConfigDocument(DocumentId.CreateNewId(projId), ".analyzerconfig", SourceText.From(configText), filePath: analyzerConfigPath);
+        newSln = newSln.AddAnalyzerConfigDocument(DocumentId.CreateNewId(projId), ".analyzerconfig", SourceText.From(configText), filePath: analyzerConfigPath.Path);
         return newSln;
     }
 
-    private static string GetAnalyzerConfigOnlyForFilesThatChanged(IEnumerable<string> filesThatChanged)
+    private static string GetAnalyzerConfigOnlyForFilesThatChanged(IEnumerable<AbsolutePath> filesThatChanged)
     {
         var suppressAnalyzerLines = GetAnalyzerConfigLines("none");
         var warningLines = GetAnalyzerConfigLines("warning");
@@ -59,7 +60,7 @@ public sealed class AnalyzerConfigOverwrite
         result.AppendLine();
         foreach (var fp in filesThatChanged)
         {
-            result.AppendLine($"[{fp}]");
+            result.AppendLine($"[{fp.Path}]");
             result.Append((string?)warningLines);
             result.AppendLine();
         }

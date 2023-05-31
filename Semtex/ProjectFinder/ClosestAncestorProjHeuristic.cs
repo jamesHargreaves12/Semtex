@@ -1,5 +1,6 @@
 using Microsoft.Extensions.Logging;
 using Semtex.Logging;
+using Semtex.Models;
 
 namespace Semtex.ProjectFinder;
 
@@ -8,45 +9,45 @@ public sealed class ClosestAncestorProjHeuristic : IProjFinder
 {
     private static readonly ILogger<ClosestAncestorProjHeuristic> Logger = SemtexLog.LoggerFactory.CreateLogger<ClosestAncestorProjHeuristic>();
 
-    public (Dictionary<string, HashSet<string>>, HashSet<string> unableToFindProj) GetProjectToFileMapping(HashSet<string> filepaths, string? projFilter)
+    public (Dictionary<AbsolutePath, HashSet<AbsolutePath>>, HashSet<AbsolutePath> unableToFindProj) GetProjectToFileMapping(HashSet<AbsolutePath> filepaths, AbsolutePath? projFilter)
     {
-        var fileToProj = new List<(string filename, string projName)>();
-        var unableToFindProj = new HashSet<string>();
+        var fileToProj = new List<(AbsolutePath Path, AbsolutePath projPath)>();
+        var unableToFindProj = new HashSet<AbsolutePath>();
         foreach (var filepath in filepaths)
         {
-            Logger.LogInformation("Finding .csproj file for {FilePath}", filepath);
+            Logger.LogInformation("Finding .csproj file for {FilePath}", filepath.Path);
             try
             {
-                var projName = GetProjByClosestAncestorHeuristic(filepath);
-                if (projFilter == null || projName == projFilter)
+                var projPath = GetProjByClosestAncestorHeuristic(filepath);
+                if (projFilter == null || projPath == projFilter)
                 {
-                    fileToProj.Add((filepath, projName));
+                    fileToProj.Add((filepath, projPath));
                 }
                 else
                 {
-                    Logger.LogWarning("Skipping {Filepath} due to the project filter", filepath);
+                    Logger.LogWarning("Skipping {Filepath} due to the project filter", filepath.Path);
                     unableToFindProj.Add(filepath);
                 }
             }
             catch (UnableToFindProjectException)
             {
-                Logger.LogError("Unable to find project for {Filepath}", filepath);
+                Logger.LogError("Unable to find project for {Filepath}", filepath.Path);
                 unableToFindProj.Add(filepath);
             }
         }
 
         var projToFiles = fileToProj
-            .GroupBy(pair => pair.projName)
+            .GroupBy(pair => pair.projPath)
             .ToDictionary(
                 group => group.Key,
-                group => group.Select(x => x.filename).ToHashSet()
+                group => group.Select(x => x.Path).ToHashSet()
             );
         return (projToFiles,unableToFindProj);
     }
 
-    private static string GetProjByClosestAncestorHeuristic(string filepath)
+    private static AbsolutePath GetProjByClosestAncestorHeuristic(AbsolutePath filepath)
     {
-        var curDir = Directory.GetParent(filepath);
+        var curDir = Directory.GetParent(filepath.Path);
         const int maxNumberOfLoops = 100;
         foreach (var _ in Enumerable.Range(0, maxNumberOfLoops))
         {
@@ -61,7 +62,7 @@ public sealed class ClosestAncestorProjHeuristic : IProjFinder
                 case 1:
                     var projFile = csProjFilesInDir.Single();
                     Logger.LogInformation("Project {ProjFile} is closest ancestor of {Filepath}", projFile, filepath);
-                    return projFile;
+                    return new AbsolutePath(projFile);
                 default:
                     throw new UnableToFindProjectException(
                         $"{filepath} has multiple most recent ancestors {string.Join(", ", csProjFilesInDir)}");

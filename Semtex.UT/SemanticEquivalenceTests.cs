@@ -10,6 +10,7 @@ using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.Text;
 using Semtex.Logging;
+using Semtex.Models;
 
 namespace Semtex.UT;
 
@@ -206,6 +207,7 @@ public class SemanticEquivalenceTests
         "SortEnum",
         "SplitVarDecleration",
         "StringBuilder",
+        "StringBuilderPlusFormatting",
         "StringComparison",
         "StringEmptyCheck",
         "SupressNullableWarnings",
@@ -391,10 +393,10 @@ public class SemanticEquivalenceTests
         var docInfo = GetDocumentInfo(folderName, filename, BaseProjectId);
         var sln = BaseSolution
             .AddDocument(docInfo);
-        var projToFiles = new Dictionary<string, HashSet<string>>()
-            { [ProjectFilepath] = new() { docInfo.FilePath! } };
+        var projToFiles = new Dictionary<AbsolutePath, HashSet<AbsolutePath>>()
+            { [new AbsolutePath(ProjectFilepath)] = new() { new AbsolutePath(docInfo.FilePath!) } };
         // Empty indicates just apply it to the whole solution
-        var changeMethodsMap = new Dictionary<string, HashSet<string>>();
+        var changeMethodsMap = new Dictionary<AbsolutePath, HashSet<string>>();
         
         var projectIds = sln.Projects
             .Where(p => p.FilePath == ProjectFilepath)
