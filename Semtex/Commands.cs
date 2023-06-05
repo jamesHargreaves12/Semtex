@@ -70,7 +70,7 @@ public sealed class Commands
             Logger.LogInformation("\n\n{PrettySummary}",prettySummary);
 
             var jsonSummaries = results.Select(res => JsonSerializer.Serialize(res));
-            await File.WriteAllLinesAsync($"{outputPath}/Results.jsonl", jsonSummaries).ConfigureAwait(false);
+            await File.WriteAllLinesAsync($"{outputPath.Path}/Results.jsonl", jsonSummaries).ConfigureAwait(false);
             var sw = Stopwatch.StartNew();
             // TODO Test without these
             GC.Collect();
