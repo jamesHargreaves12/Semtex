@@ -59,14 +59,10 @@ internal class GitRepo
         return new GitRepo(rootFolder, cmdResult.StandardOutput.Replace("\n", ""));
     }
 
+    // TODO does this need to exist any more?
     internal string GetRelativePath(AbsolutePath fullPath)
     {
-        if (!fullPath.Path.StartsWith(RootFolder.Path))
-        {
-            throw new ArgumentException($"{fullPath.Path} not in repo rooted at {RootFolder.Path}");
-        }
-
-        return fullPath.Path.Replace(RootFolder + "/", "");
+        return RootFolder.GetRelativePath(fullPath);
     }
 
     internal static async Task<GitRepo> Clone(string repo, AbsolutePath rootFolder)
@@ -111,18 +107,18 @@ internal class GitRepo
 
         var modifiedFilepaths = diffResults["M"]
             .Select(c => c[1])
-            .Select(f => new AbsolutePath(Path.Join(RootFolder.Path, f)))
+            .Select(f => RootFolder.Join(f))
             .ToHashSet();
         var addedFilepaths = diffResults["A"]
             .Select(c => c[1])
-            .Select(f => new AbsolutePath(Path.Join(RootFolder.Path, f)))
+            .Select(f => RootFolder.Join(f))
             .ToHashSet();
         var removedFilepaths = diffResults["D"]
             .Select(c => c[1])
-            .Select(f => new AbsolutePath(Path.Join(RootFolder.Path, f)))
+            .Select(f => RootFolder.Join(f))
             .ToHashSet();
         var renamedFilepaths = diffResults["R"]
-            .Select(c => ( new AbsolutePath(Path.Join(RootFolder.Path, c[1])),  new AbsolutePath(Path.Join(RootFolder.Path, c[2]))))
+            .Select(c => (RootFolder.Join(c[1]),  RootFolder.Join(c[2])))
             .ToHashSet();
         // We should report the similarity because if they are R100 then we should not bother doing processing them.
         // However keeping them in for development is probably good as it means that we can assert nothing funny is going on.

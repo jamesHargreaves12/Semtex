@@ -21,7 +21,7 @@ public sealed class Commands
         var gitRepo = await GetGitRepoAndCheckClean(repo).ConfigureAwait(false);
         await gitRepo.CheckoutAndPull(target).ConfigureAwait(false);
 
-        var projFilter = relativeProjFilter == null ? null : new AbsolutePath(Path.Join(gitRepo.RootFolder.Path, relativeProjFilter));
+        var projFilter = relativeProjFilter == null ? null : gitRepo.RootFolder.Join(relativeProjFilter);
 
         var commits = await gitRepo.ListCommitShasBetween(source, target).ConfigureAwait(false);
 
@@ -53,7 +53,7 @@ public sealed class Commands
     {
         var gitRepo = await GetGitRepoAndCheckClean(repo).ConfigureAwait(false);
         await gitRepo.CheckoutAndPull(target).ConfigureAwait(false);
-        var projFilter = relativeProjFilter == null ? null : new AbsolutePath(Path.Join(gitRepo.RootFolder.Path, relativeProjFilter));
+        var projFilter = relativeProjFilter == null ? null : gitRepo.RootFolder.Join(relativeProjFilter);
 
         var commits = await gitRepo.GetAllAncestors(target).ConfigureAwait(false);
         // No point doing this for the first commit in the series. Probably could be smarter here about if we hit the limit etc but I think this is good for now.

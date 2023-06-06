@@ -61,7 +61,7 @@ public sealed class ClosestAncestorProjHeuristic : IProjFinder
                     continue;
                 case 1:
                     var projFile = csProjFilesInDir.Single();
-                    Logger.LogInformation("Project {ProjFile} is closest ancestor of {Filepath}", projFile, filepath);
+                    Logger.LogInformation("Project {ProjFile} is closest ancestor of {Filepath}", projFile, filepath.Path);
                     return new AbsolutePath(projFile);
                 default:
                     throw new UnableToFindProjectException(

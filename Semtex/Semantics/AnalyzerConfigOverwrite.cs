@@ -33,7 +33,7 @@ public sealed class AnalyzerConfigOverwrite
         string configText;
         if (analyzerConfigPath is not null)
         {
-            Logger.LogInformation("Adding {AnalyzerConfigPath} to the proj", analyzerConfigPath);
+            Logger.LogInformation("Adding {AnalyzerConfigPath} to the proj", analyzerConfigPath.Path);
             configText = await File.ReadAllTextAsync(analyzerConfigPath.Path).ConfigureAwait(false);
         }
         else

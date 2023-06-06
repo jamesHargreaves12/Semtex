@@ -215,7 +215,7 @@ internal sealed class SolutionUtils
                     continue;
                 }
 
-                Logger.LogInformation("Restored {RestoredFilesFirst} and {OtherProjCount} other projects",restoredFiles[0], restoredFiles.Count-1);
+                Logger.LogInformation("Restored {RestoredFilesFirst} and {OtherProjCount} other projects",restoredFiles[0].Path, restoredFiles.Count-1);
                 AlreadyRunDotNetRestoreOnProj.UnionWith(restoredFiles);
 
             }

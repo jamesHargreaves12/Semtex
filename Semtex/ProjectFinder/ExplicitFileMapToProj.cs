@@ -18,10 +18,10 @@ public class ExplicitFileMapToProj: IProjFinder
     {
         var result = new Dictionary<AbsolutePath, HashSet<AbsolutePath>>();
         var unableToFindProj = new HashSet<AbsolutePath>();
-        var relativeProjFilter = projFilter?.Path.Replace(_rootFolder + "/", "");
+        var relativeProjFilter = projFilter is not null ? _rootFolder.GetRelativePath(projFilter) : null;
         foreach (var absoluteFilepath in filepaths)
         {
-            var relativeFilepath = absoluteFilepath.Path.Replace(_rootFolder +"/", "");
+            var relativeFilepath = _rootFolder.GetRelativePath(absoluteFilepath);
             if (!_fileMap.ContainsKey(relativeFilepath))
             {
                 unableToFindProj.Add(absoluteFilepath);
@@ -38,7 +38,7 @@ public class ExplicitFileMapToProj: IProjFinder
             }
             foreach (var projFp in projPaths)
             {
-                var fullProjPath = new AbsolutePath(Path.Join(_rootFolder.Path, projFp));
+                var fullProjPath = _rootFolder.Join(projFp);
                 if (result.ContainsKey(fullProjPath))
                 {
                     result[fullProjPath].Add(absoluteFilepath);

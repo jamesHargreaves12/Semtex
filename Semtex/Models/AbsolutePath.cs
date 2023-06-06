@@ -8,4 +8,24 @@ public record AbsolutePath
     {
         Path = System.IO.Path.GetFullPath(path);
     }
-};
+
+    public AbsolutePath Join(string relativePath)
+    {
+        return new AbsolutePath(System.IO.Path.Join(Path, relativePath));
+    }
+
+    public string GetRelativePath(string childPath)
+    {
+        if (!childPath.StartsWith(Path))
+        {
+            throw new ArgumentException($"{childPath} not rooted at {Path}");
+        }
+
+        return childPath.Replace(Path + "/", "");
+    }
+
+    public string GetRelativePath(AbsolutePath childPath)
+    {
+        return GetRelativePath(childPath.Path);
+    }
+}
