@@ -84,7 +84,7 @@ internal class GitRepo
     }
 
     // TODO check what other statuses there are
-    internal async Task<(HashSet<AbsolutePath> modifiedFilepaths, HashSet<AbsolutePath> addedFilepaths, HashSet<AbsolutePath> removedFilepaths, HashSet<(AbsolutePath Source, AbsolutePath Target)> renamedFilepaths)> DiffFiles(string sourceSha, string targetSha)
+    internal async Task<(HashSet<AbsolutePath> modifiedFilepaths, HashSet<AbsolutePath> addedFilepaths, HashSet<AbsolutePath> removedFilepaths, HashSet<(AbsolutePath Source, AbsolutePath Target, int Similarity)> renamedFilepaths)> DiffFiles(string sourceSha, string targetSha)
     {
         var gitDiffCmd = Cli.Wrap("git")
             .WithArguments(new[]
@@ -102,32 +102,34 @@ internal class GitRepo
         var diffResults = cmdResult.StandardOutput
             .Split("\n")
             .Where(c => !string.IsNullOrEmpty(c))
-            .Select(c => c.Split("\t"))
-            .ToLookup(c => c[0].StartsWith("R") ? "R" : c[0]); // Renamings have a similarity score as well.
+            .Select(c => c.Split("\t"));
+       var diffResultsLookup = diffResults
+            .ToLookup(c => c[0]); // Renamings have a similarity score as well.
 
-        var modifiedFilepaths = diffResults["M"]
+        var modifiedFilepaths = diffResultsLookup["M"]
             .Select(c => c[1])
             .Select(f => RootFolder.Join(f))
             .ToHashSet();
-        var addedFilepaths = diffResults["A"]
+        var addedFilepaths = diffResultsLookup["A"]
             .Select(c => c[1])
             .Select(f => RootFolder.Join(f))
             .ToHashSet();
-        var removedFilepaths = diffResults["D"]
+        var removedFilepaths = diffResultsLookup["D"]
             .Select(c => c[1])
             .Select(f => RootFolder.Join(f))
             .ToHashSet();
-        var renamedFilepaths = diffResults["R"]
-            .Select(c => (RootFolder.Join(c[1]),  RootFolder.Join(c[2])))
+        var renamedFilepaths = diffResults
+            .Where(c=>c[0].StartsWith("R"))
+            .Select(c => (RootFolder.Join(c[1]),  RootFolder.Join(c[2]), int.Parse(c[0].Substring(1))))
             .ToHashSet();
         // We should report the similarity because if they are R100 then we should not bother doing processing them.
         // However keeping them in for development is probably good as it means that we can assert nothing funny is going on.
 
-        if (diffResults.Select(k => k.Count()).Sum() !=
+        if (diffResultsLookup.Select(k => k.Count()).Sum() !=
             modifiedFilepaths.Count + addedFilepaths.Count + removedFilepaths.Count + renamedFilepaths.Count)
         {
             throw new Exception(
-                $"Unknown type of Diff - Types of diff: {string.Join(",", diffResults.Select(k => k.Key).ToList())}");
+                $"Unknown type of Diff - Types of diff: {string.Join(",", diffResultsLookup.Select(k => k.Key).ToList())}");
         }
 
         return (modifiedFilepaths, addedFilepaths, removedFilepaths, renamedFilepaths);

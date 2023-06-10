@@ -10,5 +10,6 @@ public enum Status
     Added = 5, 
     Removed = 6,
     UnableToFindProj = 7,
-    ProjectDidNotRestore = 8
+    ProjectDidNotRestore = 8,
+    OnlyRename = 9
 }

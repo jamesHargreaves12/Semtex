@@ -115,6 +115,7 @@ public class SemanticEquivalenceTests
         "DebuggerDisplayAttribute",
         "DefaultLastInSwitch",
         "DefaultParam",
+        "DoubleUsing",
         "DuplicateEnumVal",
         "ElementAccess",
         "EmptyDestructor",

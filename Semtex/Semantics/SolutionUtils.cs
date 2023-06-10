@@ -49,7 +49,7 @@ internal sealed class SolutionUtils
         stopwatch.Restart();
         if (failedToCompile.Any())
         {
-            Logger.LogWarning("The following projects failed initial compile: {ProjPaths}", string.Join("\n",failedToCompile));
+            Logger.LogWarning("The following projects failed initial compile: {ProjPaths}", string.Join("\n",failedToCompile.Select(p=> p.Path)));
             Logger.LogInformation("Will attempt to restore project and then try again");
             foreach (var path in failedToCompile)
             {
@@ -64,7 +64,7 @@ internal sealed class SolutionUtils
             {
                 Logger.LogWarning(
                     "The following projects are still failing to compile and so the files will not be checked: {ProjPaths}",
-                    string.Join("\n", failedToCompile));
+                    string.Join("\n", failedToCompile.Select(p=> p.Path)));
             }
             else
             {

@@ -7,6 +7,13 @@ from utils import read_summaries
 import argparse
 
 
+def make_commit_simple_for_snapshotting(commit):
+    del commit["ElapsedMilliseconds"]
+    for filemodel in commit["FileModels"]:
+        if filemodel["Status"] == 9:
+            filemodel["Status"] = 0
+
+
 def write_snapshot_files(left_path: Path, right_path: Path):
     print(f"{left_path=} {right_path=}")
     left_commits = read_summaries(left_path)
@@ -28,7 +35,7 @@ def write_snapshot_files(left_path: Path, right_path: Path):
     with open(left_snapshot_path, "w+") as left_out:
         for commit in left_commits:
             if commit["CommitHash"] in common:
-                del commit["ElapsedMilliseconds"]
+                make_commit_simple_for_snapshotting(commit)
                 json.dump(commit, left_out)
                 left_out.write("\n")
 
@@ -37,7 +44,7 @@ def write_snapshot_files(left_path: Path, right_path: Path):
     with open(right_snapshot_path, "w+") as right_out:
         for commit in right_commits:
             if commit["CommitHash"] in common:
-                del commit["ElapsedMilliseconds"]
+                make_commit_simple_for_snapshotting(commit)
                 json.dump(commit, right_out)
                 right_out.write("\n")
 

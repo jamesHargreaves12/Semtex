@@ -6,6 +6,7 @@ using Microsoft.CodeAnalysis.Text;
 using Semtex.ProjectFinder;
 using Semtex.Semantics;
 using Microsoft.Extensions.Logging;
+using Roslynator;
 using Semtex.Logging;
 using Semtex.Models;
 
@@ -41,11 +42,15 @@ public class CheckSemanticEquivalence
 
         try
         {
-            // TODO Really would be good to change type here or something to indicate that we are now dealing will full path rather than relative.
-            // I think having a config class which we could pass around that offered both a relative and a full path could be useful
             var sourceLineChangeMapping = new Dictionary<AbsolutePath, List<LineDiff>>();
             var targetLineChangeMapping = new Dictionary<AbsolutePath, List<LineDiff>>();
-            foreach (var sourceFilepath in diffConfig.SourceCsFilepaths)
+            // If the git diff is R100 then we don't need to bother simplifying as both sides will match.
+            var sourceFilesToSimplify = diffConfig.SourceCsFilepaths
+                .Where(sourceFilepath => !diffConfig.RenamedFilepaths.Any(renamedConfig => renamedConfig.Source == sourceFilepath && renamedConfig.Similarity == 100))
+                .ToHashSet();
+            var targetFilesToSimplify = sourceFilesToSimplify.Select(sourceFp => diffConfig.GetTargetFilepath(sourceFp))
+                .ToHashSet();
+            foreach (var sourceFilepath in sourceFilesToSimplify)
             {
                 var lineChanges = await gitRepo.GetLineChanges(source, target, sourceFilepath).ConfigureAwait(false);
                 sourceLineChangeMapping[sourceFilepath] = lineChanges.Select(l => l.Item1).ToList();
@@ -56,27 +61,30 @@ public class CheckSemanticEquivalence
             // TODO can this be done without an additional sourceChangedCheck
             await gitRepo.Checkout(target).ConfigureAwait(false);
             var targetChangedMethods =
-                await GetChangesFilter(diffConfig.SourceCsFilepaths, targetLineChangeMapping).ConfigureAwait(false);
+                    await GetChangesFilter(targetFilesToSimplify, targetLineChangeMapping).ConfigureAwait(false);
             
             await gitRepo.Checkout(source).ConfigureAwait(false);
             var sourceChangedMethods =
-                await GetChangesFilter(diffConfig.SourceCsFilepaths, sourceLineChangeMapping).ConfigureAwait(false);
+                await GetChangesFilter(sourceFilesToSimplify, sourceLineChangeMapping).ConfigureAwait(false);
 
-            var changedMethodsMap = new Dictionary<AbsolutePath, HashSet<string>>();
-            foreach (var key in targetChangedMethods.Keys.Union(sourceChangedMethods.Keys))
+            var sourceChangedMethodsMap = new Dictionary<AbsolutePath, HashSet<string>>();
+            var targetChangedMethodsMap = new Dictionary<AbsolutePath, HashSet<string>>();
+            foreach (var key in sourceChangedMethods.Keys)
             {
-                if (!targetChangedMethods.ContainsKey(key)) continue;
-                if(!sourceChangedMethods.ContainsKey(key))continue;
-                changedMethodsMap[key] = targetChangedMethods[key].Union(sourceChangedMethods[key]).ToHashSet();
+                var targetKey = diffConfig.GetTargetFilepath(key);
+                if (!targetChangedMethods.ContainsKey(targetKey)) continue;
+                var toCheck = targetChangedMethods[targetKey].Union(sourceChangedMethods[key]).ToHashSet();
+                sourceChangedMethodsMap[key] = toCheck;
+                targetChangedMethodsMap[targetKey] = toCheck;
             }
 
-            Logger.LogInformation("We have a method filter for {Percentage}% of methods ({ChangedCount} files)",(int)(changedMethodsMap.Count/(float)diffConfig.SourceCsFilepaths.Count), changedMethodsMap.Count);
+            Logger.LogInformation("We have a method filter for {Percentage}% of methods ({ChangedCount} files)",(int)(sourceChangedMethodsMap.Count/(float)sourceFilesToSimplify.Count), sourceChangedMethodsMap.Count);
             await gitRepo.Checkout(target).ConfigureAwait(false);
             var (targetSln, targetUnsimplifiedFiles) =
-                await GetSimplifiedSolution(analyzerConfigPath, diffConfig.TargetCsFilepaths, projFilter, projectMappingFilepath, gitRepo.RootFolder, changedMethodsMap).ConfigureAwait(false);
+                await GetSimplifiedSolution(analyzerConfigPath, targetFilesToSimplify, projFilter, projectMappingFilepath, gitRepo.RootFolder, sourceChangedMethodsMap).ConfigureAwait(false);
             await gitRepo.Checkout(source).ConfigureAwait(false);
             var (sourceSln, sourceUnsimplifiedFiles) =
-                await GetSimplifiedSolution(analyzerConfigPath, diffConfig.SourceCsFilepaths, projFilter, projectMappingFilepath, gitRepo.RootFolder, changedMethodsMap).ConfigureAwait(false);
+                await GetSimplifiedSolution(analyzerConfigPath, sourceFilesToSimplify, projFilter, projectMappingFilepath, gitRepo.RootFolder, targetChangedMethodsMap).ConfigureAwait(false);
             
             var result = await GetFileModels(gitRepo, diffConfig, targetUnsimplifiedFiles, sourceUnsimplifiedFiles, sourceSln, targetSln).ConfigureAwait(false);
             // I am not sure why the GC is not smart enough to do this itself. But these lines prevent a linear increase in memory usage that just kills the process after a while.
@@ -100,7 +108,7 @@ public class CheckSemanticEquivalence
     
     private record DiffConfig
     {
-        public DiffConfig(HashSet<AbsolutePath> addedFilepaths, HashSet<AbsolutePath> removedFilepaths, HashSet<(AbsolutePath Source, AbsolutePath Target)> renamedFilepaths, List<AbsolutePath> allSourceFilePaths, HashSet<AbsolutePath> sourceCsFilepaths, HashSet<AbsolutePath> targetCsFilepaths)
+        public DiffConfig(HashSet<AbsolutePath> addedFilepaths, HashSet<AbsolutePath> removedFilepaths, HashSet<(AbsolutePath Source, AbsolutePath Target, int Similarity)> renamedFilepaths, List<AbsolutePath> allSourceFilePaths, HashSet<AbsolutePath> sourceCsFilepaths, HashSet<AbsolutePath> targetCsFilepaths)
         {
             AddedFilepaths = addedFilepaths;
             RemovedFilepaths = removedFilepaths;
@@ -112,7 +120,7 @@ public class CheckSemanticEquivalence
 
         internal HashSet<AbsolutePath> AddedFilepaths { get; }
         internal HashSet<AbsolutePath> RemovedFilepaths { get; }
-        internal HashSet<(AbsolutePath Source, AbsolutePath Target)> RenamedFilepaths { get; }
+        internal HashSet<(AbsolutePath Source, AbsolutePath Target, int Similarity)> RenamedFilepaths { get; }
         internal List<AbsolutePath> AllSourceFilePaths { get; }
         internal HashSet<AbsolutePath> SourceCsFilepaths { get; }
         internal HashSet<AbsolutePath> TargetCsFilepaths { get; }
@@ -254,6 +262,13 @@ public class CheckSemanticEquivalence
                 continue;
             }
 
+            if (diffConfig.RenamedFilepaths.Any(
+                    renamed => renamed.Source == sourceFilepath && renamed.Similarity == 100))
+            {
+                fileResults.Add(new FileModel(relativePath, Status.OnlyRename));
+                continue;
+            }
+            
             if (targetUnsimplified.FilepathsWhichUnableToFindProjFor.Contains(targetFilepath)
                 || sourceUnsimplified.FilepathsWhichUnableToFindProjFor.Contains(sourceFilepath))
             {

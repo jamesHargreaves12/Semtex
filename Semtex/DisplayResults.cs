@@ -23,7 +23,17 @@ public static class DisplayResults
             "✅",
             "Semantically equivalent:"
         );
-        
+
+        var onlyRename = result.FileModels
+            .Where(f => f.Status == Status.OnlyRename)
+            .ToList();
+        AddSectionIfNotEmpty(
+            resultSummary,
+            onlyRename,
+            "✅",
+            "Only Renamed:"
+        );
+
         var notEquiv = result.FileModels   
             .Where(f => f.Status == Status.ContainsSemanticChanges)
             .ToList();
