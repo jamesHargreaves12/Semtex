@@ -122,7 +122,7 @@ public static class RoslynatorRcsCodeFixProviders
             ["RCS1238"] = new ConditionalExpressionCodeFixProvider(),
             ["RCS1239"] = new WhileStatementCodeFixProvider(),
             ["RCS1240"] = new BinaryExpressionCodeFixProvider(),
-            ["RCS1242"] = new ParameterCodeFixProvider(),
+            // ["RCS1242"] = new ParameterCodeFixProvider(), doesn't fix the calls to the method 
             ["RCS1244"] = new DefaultExpressionCodeFixProvider(),
             ["RCS1246"] = new OptimizeLinqMethodCallCodeFixProvider(),
             ["RCS1249"] = new TokenCodeFixProvider(),

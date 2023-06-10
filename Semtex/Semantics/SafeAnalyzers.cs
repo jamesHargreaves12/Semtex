@@ -372,6 +372,11 @@ public sealed class SafeAnalyzers
 
     }
 
+
+    private static List<string> CannotFixAllDiagnosticIds = new List<string>()
+    {
+        "RCS1056" // Since fixing the first might change the fix you need to apply for the second its just safest to ignore this for now.
+    };
     private static async Task<Solution> MakeCodeFixForAllDiagnostic(Document document,
         // this arg should not exist = simplify the interface
         string diagnosticDescriptorId, IEnumerable<Diagnostic> diagnostics, CodeFixProvider fixProvider)
@@ -385,50 +390,54 @@ public sealed class SafeAnalyzers
             nonOverlappingDiagnostic.Add(diag);
         }
 
-        // Compute the equivalence key of the first diagnostic
-        var codeActions = new List<CodeAction>();
-        var context = new CodeFixContext(
-            document,
-            nonOverlappingDiagnostic.First(),
-            (a, d) => codeActions.Add(a),
-            default
-        );
-        await fixProvider.RegisterCodeFixesAsync(context).ConfigureAwait(false);
-
-        if (!codeActions.Any())
+        if (!CannotFixAllDiagnosticIds.Contains(diagnosticDescriptorId))
         {
-            Logger.LogWarning($"The code fix for diagnostic with Id {diagnosticDescriptorId} did not raise any CodeActions");
-            return document.Project.Solution;
+            // Compute the equivalence key of the first diagnostic
+            var codeActions = new List<CodeAction>();
+            var context = new CodeFixContext(
+                document,
+                nonOverlappingDiagnostic.First(),
+                (a, d) => codeActions.Add(a),
+                default
+            );
+            await fixProvider.RegisterCodeFixesAsync(context).ConfigureAwait(false);
+
+            if (!codeActions.Any())
+            {
+                Logger.LogWarning(
+                    $"The code fix for diagnostic with Id {diagnosticDescriptorId} did not raise any CodeActions");
+                return document.Project.Solution;
+            }
+
+            var equivalenceKey = codeActions.First().EquivalenceKey!;
+
+            // Apply the all diagnostic with the same the equivalence key
+            // This causes issues. https://github.com/dotnet/roslyn/issues/59130 need to have a think about what the best solution is here. Step 1 should be learning more about this DocumentBasedCodeFixProvider.
+            var fixAllProvider = fixProvider.GetFixAllProvider() ?? WellKnownFixAllProviders.BatchFixer;
+            var fixAllContext = new FixAllContext(
+                document,
+                fixProvider,
+                FixAllScope.Document,
+                equivalenceKey,
+                new[] { diagnosticDescriptorId },
+                new SingleDocumentFixAllDiagnosticProvider(nonOverlappingDiagnostic, document.Id),
+                default);
+
+            var fixAll = await fixAllProvider.GetFixAsync(fixAllContext).ConfigureAwait(false);
+
+            if (fixAll != null)
+            {
+                var operations =
+                    await fixAll.GetOperationsAsync(CancellationToken.None).ConfigureAwait(false);
+
+                return operations
+                    .OfType<ApplyChangesOperation>()
+                    .Single()
+                    .ChangedSolution;
+            }
+
+            Logger.LogWarning("Unable to FixAll falling back to just fixing the first");
         }
-
-        var equivalenceKey = codeActions.First().EquivalenceKey!;
-        
-        // Apply the all diagnostic with the same the equivalence key
-        // This causes issues. https://github.com/dotnet/roslyn/issues/59130 need to have a think about what the best solution is here. Step 1 should be learning more about this DocumentBasedCodeFixProvider.
-        var fixAllProvider = fixProvider.GetFixAllProvider() ?? WellKnownFixAllProviders.BatchFixer;
-        var fixAllContext = new FixAllContext(
-            document,
-            fixProvider,
-            FixAllScope.Document,
-            equivalenceKey,
-            new[] { diagnosticDescriptorId },
-            new SingleDocumentFixAllDiagnosticProvider(nonOverlappingDiagnostic, document.Id),
-            default);
-
-        var fixAll = await fixAllProvider.GetFixAsync(fixAllContext).ConfigureAwait(false);
-
-        if (fixAll != null)
-        {
-            var operations =
-                await fixAll.GetOperationsAsync(CancellationToken.None).ConfigureAwait(false);
-
-            return operations
-                .OfType<ApplyChangesOperation>()
-                .Single()
-                .ChangedSolution;
-        }
-
-        Logger.LogWarning("Unable to FixAll falling back to just fixing the first");
 
         return await MakeCodeFixForDiagnostic(document, nonOverlappingDiagnostic.First(d => d.Descriptor.Id == diagnosticDescriptorId),
             fixProvider).ConfigureAwait(false);
