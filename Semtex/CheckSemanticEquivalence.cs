@@ -80,13 +80,13 @@ public class CheckSemanticEquivalence
 
             Logger.LogInformation("We have a method filter for {Percentage}% of methods ({ChangedCount} files)",(int)(sourceChangedMethodsMap.Count/(float)sourceFilesToSimplify.Count), sourceChangedMethodsMap.Count);
             await gitRepo.Checkout(target).ConfigureAwait(false);
-            var (targetSln, targetUnsimplifiedFiles) =
+            var (targetSln, targetUnsimplifiedFiles, targetSimplifiedProjects) =
                 await GetSimplifiedSolution(analyzerConfigPath, targetFilesToSimplify, projFilter, projectMappingFilepath, gitRepo.RootFolder, sourceChangedMethodsMap).ConfigureAwait(false);
             await gitRepo.Checkout(source).ConfigureAwait(false);
-            var (sourceSln, sourceUnsimplifiedFiles) =
+            var (sourceSln, sourceUnsimplifiedFiles, srcSimplifiedProjects) =
                 await GetSimplifiedSolution(analyzerConfigPath, sourceFilesToSimplify, projFilter, projectMappingFilepath, gitRepo.RootFolder, targetChangedMethodsMap).ConfigureAwait(false);
             
-            var result = await GetFileModels(gitRepo, diffConfig, targetUnsimplifiedFiles, sourceUnsimplifiedFiles, sourceSln, targetSln).ConfigureAwait(false);
+            var result = await GetFileModels(gitRepo, diffConfig, targetUnsimplifiedFiles, sourceUnsimplifiedFiles, srcSimplifiedProjects, targetSimplifiedProjects).ConfigureAwait(false);
             // I am not sure why the GC is not smart enough to do this itself. But these lines prevent a linear increase in memory usage that just kills the process after a while.
             // Could it be the caching within Roslyn is holding references to some nodes which are then causing the reference to the wholue workspace to be held.  
             sourceSln.Workspace.Dispose();
@@ -188,8 +188,60 @@ public class CheckSemanticEquivalence
         if (explicitFilePath is null) return new ClosestAncestorProjHeuristic();
         return new ExplicitFileMapToProj(explicitFilePath, rootFolder);
     }
+    
+    private static readonly string[] FrameworkPreferenceOrder = new[] {
+        "net11",
+        "net20",
+        "net35",
+        "net40",
+        "net403",
+        "net45",
+        "net451",
+        "net452",
+        "net46",
+        "net461",
+        "net462",
+        "net47",
+        "net471",
+        "net472",
+        "net48",
+        "netcoreapp1.0",
+        "netcoreapp1.1",
+        "netcoreapp2.0",
+        "netcoreapp2.1",
+        "netcoreapp2.2",
+        "netcoreapp3.0",
+        "netcoreapp3.1",
+        "netstandard1.0",
+        "netstandard1.1",
+        "netstandard1.2",
+        "netstandard1.3",
+        "netstandard1.4",
+        "netstandard1.5",
+        "netstandard1.6",
+        "netstandard2.0",
+        "netstandard2.1",
+        "net5.0",
+        "net6.0",
+        "net7.0",
+    };
 
-    private static async Task<(Solution simplifiedSln, UnsimplifiedFilesSummary unsimplifiedFilesSummary)> GetSimplifiedSolution(
+
+    private static Project GetHighestTargetVersion(IReadOnlyCollection<Project> projects)
+    {
+        if (projects.Count == 1)
+            return projects.Single();
+
+        var monikerPairs = projects.Select(proj => (ProjectNameParser.GetMoniker(proj.Name), proj));
+        var result = monikerPairs.MaxBy(pair =>
+            (Array.IndexOf(FrameworkPreferenceOrder, pair.Item1.Split("-")[0]), // index in the framework list above ignoring environment specific modifiers
+                pair.Item1.Contains("-") ? 0 : 1) // non environment specific should be higher.
+        ).proj; 
+        Logger.LogInformation("Multiple versions of project, chose {Name}", result.Name);
+        return result;
+    }
+
+    private static async Task<(Solution simplifiedSln, UnsimplifiedFilesSummary unsimplifiedFilesSummary, List<Project> simplifiedProjects)> GetSimplifiedSolution(
             AbsolutePath? analyzerConfigPath, 
             HashSet<AbsolutePath> csFilepaths, 
             AbsolutePath? projFilter,
@@ -207,23 +259,25 @@ public class CheckSemanticEquivalence
         var filepathsInFailedToRestore = failedToRestore.SelectMany(f => projectToFilesMap[f]).ToHashSet();
         var filepathsInFailedToCompile = failedToCompile.SelectMany(f => projectToFilesMap[f]).ToHashSet();
 
-        var projectIds = slnStart.Projects
+        // Because a single project can appear multiple times in a solution if it has multiple target frameworks then we should only pick one.
+        var projectsToSimplify = slnStart.Projects
             .Where(p => p.FilePath != null)
-            .Select(p=> (p.Id, Path: new AbsolutePath(p.FilePath!)))
-            .Where(p =>projectToFilesMap.ContainsKey(p.Path)
+            .Select(proj => (proj, Path: new AbsolutePath(proj.FilePath!)))
+            .Where(p => projectToFilesMap.ContainsKey(p.Path)
                         && projectToFilesMap[p.Path].Count > 0
                         && !failedToRestore.Contains(p.Path)
                         && !failedToCompile.Contains(p.Path))
-            .Select(p => p.Id)
+            .GroupBy(p => p.Path)
+            .Select(g => GetHighestTargetVersion(g.Select(pair => pair.proj).ToList()))
             .ToList();
 
         var simplifiedSln = await SemanticSimplifier
-            .GetSolutionWithFilesSimplified(slnStart, projectIds, projectToFilesMap, analyzerConfigPath,
+            .GetSolutionWithFilesSimplified(slnStart, projectsToSimplify.Select(s=>s.Id).ToList(), projectToFilesMap, analyzerConfigPath,
                 changedMethodsMap)
             .ConfigureAwait(false);
         return (simplifiedSln,
             new UnsimplifiedFilesSummary(filepathsWithIfPreprocessor, filepathsInFailedToCompile, unableToFindProj,
-                filepathsInFailedToRestore));
+                filepathsInFailedToRestore), projectsToSimplify);
     }
 
 
@@ -243,8 +297,8 @@ public class CheckSemanticEquivalence
     
     // This needs a better name
     private static async Task<List<FileModel>> GetFileModels(GitRepo gitRepo, DiffConfig diffConfig,
-        UnsimplifiedFilesSummary targetUnsimplified, UnsimplifiedFilesSummary sourceUnsimplified, Solution sourceSln,
-        Solution targetSln)
+        UnsimplifiedFilesSummary targetUnsimplified, UnsimplifiedFilesSummary sourceUnsimplified, List<Project> simplifiedSrcProjects,
+        List<Project> simplifiedTargetProjects)
     {
         Stopwatch? stopwatch = null;
         var fileResults = diffConfig.AddedFilepaths.Select(addedFp => new FileModel(gitRepo.GetRelativePath(addedFp), Status.Added))
@@ -297,13 +351,15 @@ public class CheckSemanticEquivalence
                 continue;
             }
 
-            var sourceDocs = sourceSln.Projects.SelectMany(p => p.Documents)
+            var sourceDocs = simplifiedSrcProjects.SelectMany(p => p.Documents)
                 .Where(d => d.FilePath == sourceFilepath.Path).ToList();
-            var targetDocs = targetSln.Projects.SelectMany(p => p.Documents)
+            var targetDocs = simplifiedTargetProjects.SelectMany(p => p.Documents)
                 .Where(d => d.FilePath == targetFilepath.Path).ToList();
             if (sourceDocs.Count > 1 || targetDocs.Count > 1)
             {
                 // This indicates that the same document is in multiple projects. Something that is not worth supporting.
+                Logger.LogWarning("Source document in multiple projects, reporting unable to find project {Path}",
+                    sourceFilepath.Path);
                 fileResults.Add(new FileModel(relativePath, Status.UnableToFindProj));
                 continue;
             }
