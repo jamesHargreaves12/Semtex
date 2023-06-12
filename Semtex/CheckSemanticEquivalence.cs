@@ -296,12 +296,22 @@ public class CheckSemanticEquivalence
                 fileResults.Add(new FileModel(relativePath, Status.ProjectDidNotRestore));
                 continue;
             }
-            var before = sourceSln.Projects.SelectMany(p => p.Documents).Single(d => d.FilePath == sourceFilepath.Path);
-            var after = targetSln.Projects.SelectMany(p => p.Documents).Single(d => d.FilePath == targetFilepath.Path);
+
+            var sourceDocs = sourceSln.Projects.SelectMany(p => p.Documents)
+                .Where(d => d.FilePath == sourceFilepath.Path).ToList();
+            var targetDocs = targetSln.Projects.SelectMany(p => p.Documents)
+                .Where(d => d.FilePath == targetFilepath.Path).ToList();
+            if (sourceDocs.Count > 1 || targetDocs.Count > 1)
+            {
+                // This indicates that the same document is in multiple projects. Something that is not worth supporting.
+                fileResults.Add(new FileModel(relativePath, Status.UnableToFindProj));
+                continue;
+            }
+
             
             (stopwatch ??= new Stopwatch()).Restart();
             var areSemanticallyEqual =
-                await SemanticsAwareEquality.SemanticallyEqual(before, after).ConfigureAwait(false);
+                await SemanticsAwareEquality.SemanticallyEqual(sourceDocs.Single(), targetDocs.Single()).ConfigureAwait(false);
             Logger.LogInformation(SemtexLog.GetPerformanceStr(nameof(SemanticsAwareEquality.SemanticallyEqual), stopwatch.ElapsedMilliseconds));
             
             fileResults.Add(areSemanticallyEqual
