@@ -1,3 +1,5 @@
+using System;
+
 namespace Semtex.UT.SemanticallyEquivalent.Maths;
 
 public class Right
@@ -39,6 +41,16 @@ public class Right
     public static double ECube()
     {
         return 2.7*2.7*2.7;
+    }
+    
+    public static double Value(double d)
+    {
+        if (d == Double.NaN)
+        {
+            return 3;
+        }
+
+        return d;
     }
 
 }

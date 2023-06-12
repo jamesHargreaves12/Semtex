@@ -1,3 +1,5 @@
+using System;
+
 namespace Semtex.UT.SemanticallyEquivalent.Maths;
 
 public class Left
@@ -43,6 +45,15 @@ public class Left
     {
         return E*E*E;
     }
-    
+
+    public static double Value(double d)
+    {
+        if (d == Double.NaN)
+        {
+            return 3;
+        }
+
+        return d;
+    }
 
 }

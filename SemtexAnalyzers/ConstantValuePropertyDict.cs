@@ -17,11 +17,11 @@ public static class ConstantValuePropertyDict
         {
             string s => new Dictionary<string, string?> { [StringValue] = s }.ToImmutableDictionary(),
             int i => new Dictionary<string, string?> { [IntValue] = i.ToString() }.ToImmutableDictionary(),
-            float f => float.IsInfinity(f)
+            float f => float.IsInfinity(f) || float.IsNaN(f)
                 ? null
                 : new Dictionary<string, string?> { [FloatValue] = f.ToString(CultureInfo.InvariantCulture) }
                     .ToImmutableDictionary(),
-            double d => double.IsInfinity(d)
+            double d => double.IsInfinity(d) || double.IsNaN(d)
                 ? null
                 : new Dictionary<string, string?> { [DoubleValue] = d.ToString(CultureInfo.InvariantCulture) }
                     .ToImmutableDictionary(),
