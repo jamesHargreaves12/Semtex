@@ -231,8 +231,8 @@ internal sealed class SolutionUtils
 
     internal static async Task<List<AbsolutePath>> RunDotnetRestore(AbsolutePath path)
     {
-        string directory = Path.GetDirectoryName(path.Path)!;
-        string filename = Path.GetFileName(path.Path);
+        var directory = Path.GetDirectoryName(path.Path)!;
+        var filename = Path.GetFileName(path.Path);
         var dotnetRestoreCmd = Cli.Wrap("dotnet")
             .WithArguments(new[]
             {
@@ -249,9 +249,18 @@ internal sealed class SolutionUtils
             .WithStandardOutputPipe(PipeTarget.ToDelegate(s => Logger.LogInformation("[dotnet-restore] {S}", s)))
             .WithStandardErrorPipe(PipeTarget.ToDelegate(s => Logger.LogError("[dotnet-restore] {S}", s)));
         Logger.LogInformation("Executing {DotnetRestoreCmd} @ {Location}", dotnetRestoreCmd, directory);
-        var cmdResult = await dotnetRestoreCmd.ExecuteBufferedAsync();
-        Logger.LogInformation("Finished");
-        return ExtractFilePaths(cmdResult.StandardOutput);
+        try
+        {
+            var cmdResult = await dotnetRestoreCmd.ExecuteBufferedAsync();
+            Logger.LogInformation("Finished");
+            return ExtractFilePaths(cmdResult.StandardOutput);
+        }
+        catch (Exception e)
+        {
+            Logger.LogError("Dotnet restore failed for {Path}", path.Path);
+            // Not much that we can do here so lets just return anyway.
+            return new List<AbsolutePath>();
+        }
     }
 
     private static List<AbsolutePath> ExtractFilePaths(string text)
