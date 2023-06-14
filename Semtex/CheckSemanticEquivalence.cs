@@ -309,7 +309,8 @@ public class CheckSemanticEquivalence
 
             var targetFilepath = diffConfig.GetTargetFilepath(sourceFilepath);
 
-            if (!diffConfig.SourceCsFilepaths.Contains(sourceFilepath) || !diffConfig.TargetCsFilepaths.Contains(targetFilepath))
+            if (!diffConfig.SourceCsFilepaths.Contains(sourceFilepath) ||
+                !diffConfig.TargetCsFilepaths.Contains(targetFilepath))
             {
                 fileResults.Add(new FileModel(relativePath, Status.NotCSharp));
                 continue;
@@ -321,7 +322,7 @@ public class CheckSemanticEquivalence
                 fileResults.Add(new FileModel(relativePath, Status.OnlyRename));
                 continue;
             }
-            
+
             if (targetUnsimplified.FilepathsWhichUnableToFindProjFor.Contains(targetFilepath)
                 || sourceUnsimplified.FilepathsWhichUnableToFindProjFor.Contains(sourceFilepath))
             {
@@ -342,7 +343,7 @@ public class CheckSemanticEquivalence
                 fileResults.Add(new FileModel(relativePath, Status.HasConditionalPreprocessor));
                 continue;
             }
-            
+
             if (targetUnsimplified.FilepathsInProjThatFailedToRestore.Contains(targetFilepath)
                 || sourceUnsimplified.FilepathsInProjThatFailedToRestore.Contains(sourceFilepath))
             {
@@ -354,6 +355,18 @@ public class CheckSemanticEquivalence
                 .Where(d => d.FilePath == sourceFilepath.Path).ToList();
             var targetDocs = simplifiedTargetProjects.SelectMany(p => p.Documents)
                 .Where(d => d.FilePath == targetFilepath.Path).ToList();
+
+            if (sourceDocs.Count == 0)
+            {
+                Logger.LogWarning("Document not found in source simplified projects {Path}", sourceFilepath.Path);
+                // TODO raise
+            }
+            if (targetDocs.Count == 0)
+            {
+                Logger.LogWarning("Document not found in target simplified projects {Path}", targetFilepath.Path);
+                // TODO raise
+            }
+
             if (sourceDocs.Count > 1 || targetDocs.Count > 1)
             {
                 // This indicates that the same document is in multiple projects. Something that is not worth supporting.

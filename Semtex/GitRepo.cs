@@ -72,9 +72,9 @@ internal class GitRepo
         }
     }
     
-    public async Task<bool> CreatePatchFileOfLocalChanges(AbsolutePath patchFilepath)
+    public async Task<bool> CreatePatchFileOfLocalChanges(AbsolutePath patchFilepath, IncludeUncommittedChanges includeUncommittedChanges)
     {
-        var patchText = await DiffUncommitted(false).ConfigureAwait(false);
+        var patchText = await DiffUncommitted(includeUncommittedChanges == IncludeUncommittedChanges.Staged).ConfigureAwait(false);
         if (patchText.Length == 0)
         {
             return false;

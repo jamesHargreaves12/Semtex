@@ -109,16 +109,18 @@ Command GetSplitCommand()
     var repoArg = new Argument<string>("repo", "local path / url of repo");
     var sourceArg = new Argument<string>("source", "Branch or sha to compare against");
     var targetOption = new Option<string?>("--target", "Used to specify a different branch or sha to compare against.");
-    var projectMapOption = new Option<string?>("--project-map", "Path to file -> project mapping. See computeProjectFileMap command for more information");
+    var includeUncommittedOption = new Option<IncludeUncommittedChanges>("--includeUncommitted", ()=>IncludeUncommittedChanges.None, "Include uncommitted changes");
+    var projectMapOption = new Option<string?>("--project-map", "Location of the file -> project mapping. See the computeProjectFileMap command for more information");
     splitCommand.AddArgument(repoArg);
     splitCommand.AddArgument(sourceArg);
     splitCommand.AddOption(targetOption);
+    splitCommand.AddOption(includeUncommittedOption);
     splitCommand.AddOption(projectMapOption);
-    splitCommand.SetHandler(async (repo, source, projectMap, target) =>
+    splitCommand.SetHandler(async (repo, source, target, includeUncommited, projectMap) =>
     {
         SemtexLog.InitializeLogging(outputPath);
-        await Commands.Split(repo, source, target, projectMap).ConfigureAwait(false);
-    }, repoArg, sourceArg, projectMapOption, targetOption);
+        await Commands.Split(repo, source, target, includeUncommited, projectMap).ConfigureAwait(false);
+    }, repoArg, sourceArg, targetOption,includeUncommittedOption,projectMapOption);
     return splitCommand;
 }
 

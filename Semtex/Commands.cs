@@ -119,7 +119,7 @@ public sealed class Commands
         AbsolutePath? projFilter,
         AbsolutePath? explicitProjectFileMap)
     {
-        var gitRepo = await CreateGitRepoWithLocalChangesCommitted(path);
+        var gitRepo = await CreateGitRepoWithLocalChangesCommitted(path, staged ? IncludeUncommittedChanges.Staged : IncludeUncommittedChanges.Unstaged);
         var commitSha = await gitRepo.GetCurrentCommitSha().ConfigureAwait(false);
         
         var result = await CheckSemanticEquivalence.CheckSemanticallyEquivalent(gitRepo, commitSha, analyzerConfigPath, projFilter, explicitProjectFileMap)
@@ -146,13 +146,14 @@ public sealed class Commands
         await File.WriteAllTextAsync(filepath, JsonSerializer.Serialize(relativeMapping)).ConfigureAwait(false);
     }
 
-    public static async Task Split(string repoPathOrUrl, string source, string? target ,string? projectMap)
+    public static async Task Split(string repoPathOrUrl, string source, string? target,
+        IncludeUncommittedChanges includeUncommitted, string? projectMap)
     {
         GitRepo gitRepo;
         // This could be slow since git clone can be slow.
         if (Path.Exists(repoPathOrUrl))
         {
-            gitRepo = await CreateGitRepoWithLocalChangesCommitted(new AbsolutePath(repoPathOrUrl));
+            gitRepo = await CreateGitRepoWithLocalChangesCommitted(new AbsolutePath(repoPathOrUrl), includeUncommitted);
         }
         else
         {
@@ -189,7 +190,7 @@ public sealed class Commands
         // Create a patch of the difference between target and source and then apply that.
     }
     
-    private static async Task<GitRepo> CreateGitRepoWithLocalChangesCommitted(AbsolutePath path)
+    private static async Task<GitRepo> CreateGitRepoWithLocalChangesCommitted(AbsolutePath path, IncludeUncommittedChanges includeUncommittedChanges)
     {
         // Get a patch from the local version of the repo and grab the commit.
         // Setup a repo in the scratch space at the same base commit.
@@ -200,9 +201,11 @@ public sealed class Commands
         var currentBaseCommit = await localChangesRepo.GetCurrentCommitSha().ConfigureAwait(false);
         await ghostRepo.Checkout(currentBaseCommit).ConfigureAwait(false);
 
+        if (includeUncommittedChanges == IncludeUncommittedChanges.None) return ghostRepo;
+        
         var patchFilepath = new AbsolutePath(Path.Join(ScratchSpacePath, "tmp.patch")); //TODO add a guid here
 
-        var hasLocalChanges = await localChangesRepo.CreatePatchFileOfLocalChanges(patchFilepath);
+        var hasLocalChanges = await localChangesRepo.CreatePatchFileOfLocalChanges(patchFilepath, includeUncommittedChanges);
 
         if (!hasLocalChanges) return ghostRepo;
         
