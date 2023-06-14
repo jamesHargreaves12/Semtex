@@ -358,13 +358,9 @@ public class CheckSemanticEquivalence
 
             if (sourceDocs.Count == 0)
             {
-                Logger.LogWarning("Document not found in source simplified projects {Path}", sourceFilepath.Path);
-                // TODO raise
-            }
-            if (targetDocs.Count == 0)
-            {
-                Logger.LogWarning("Document not found in target simplified projects {Path}", targetFilepath.Path);
-                // TODO raise
+                Logger.LogWarning("Document not found in source or target projects {Path}", sourceFilepath.Path);
+                fileResults.Add(new FileModel(relativePath, Status.UnableToFindProj));
+                continue;
             }
 
             if (sourceDocs.Count > 1 || targetDocs.Count > 1)
