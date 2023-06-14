@@ -7,6 +7,7 @@ using Semtex.Models;
 
 // Ew but seems to be the way return codes are done https://learn.microsoft.com/en-us/dotnet/standard/commandline/handle-termination
 var returnCode = 0;
+// This should be a tmp dir by default.
 var homeDir = Environment.GetEnvironmentVariable("HOME");
 var outputPath = $"{homeDir}/dev/Semtex/Semtex/Out";
 
@@ -101,10 +102,31 @@ Command GetComputeProjectMappingCommand()
     return projMappingCommand;
 }
 
+
+Command GetSplitCommand()
+{
+    var splitCommand = new Command("split");
+    var repoArg = new Argument<string>("repo", "local path / url of repo");
+    var sourceArg = new Argument<string>("source", "Branch or sha to compare against");
+    var targetOption = new Option<string?>("--target", "Used to specify a different branch or sha to compare against.");
+    var projectMapOption = new Option<string?>("--project-map", "Path to file -> project mapping. See computeProjectFileMap command for more information");
+    splitCommand.AddArgument(repoArg);
+    splitCommand.AddArgument(sourceArg);
+    splitCommand.AddOption(targetOption);
+    splitCommand.AddOption(projectMapOption);
+    splitCommand.SetHandler(async (repo, source, projectMap, target) =>
+    {
+        SemtexLog.InitializeLogging(outputPath);
+        await Commands.Split(repo, source, target, projectMap).ConfigureAwait(false);
+    }, repoArg, sourceArg, projectMapOption, targetOption);
+    return splitCommand;
+}
+
 var rootCommand = new RootCommand("Semtex - Remove the Git friction that is discouraging you from making improvements to your C# codebase");
 rootCommand.AddCommand(GetCheckCommand());
 rootCommand.AddCommand(GetCheckUncommittedCommand());
 rootCommand.AddCommand(GetComputeProjectMappingCommand());
+rootCommand.AddCommand(GetSplitCommand());
 await new CommandLineBuilder(rootCommand)
     .UseDefaults()
     .Build()

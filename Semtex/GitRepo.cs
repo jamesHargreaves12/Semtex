@@ -1,6 +1,8 @@
 using CliWrap;
 using CliWrap.Buffered;
+using CliWrap.Exceptions;
 using Microsoft.Extensions.Logging;
+using Roslynator.CSharp.Analysis;
 using Semtex.Logging;
 using Semtex.Models;
 
@@ -12,6 +14,8 @@ internal class GitRepo
 {
     private static readonly ILogger<GitRepo> Logger = SemtexLog.LoggerFactory.CreateLogger<GitRepo>();
     public readonly AbsolutePath RootFolder;
+    private static readonly string ScratchSpacePath = Path.Join(Path.GetTempPath(), "Semtex");
+
     public string RemoteUrl { get; }
     private static Func<string,string> FormatOutputString = s => $"[git] {s}";
     private static readonly PipeTarget StdOutPipe = PipeTarget.ToDelegate(s => Logger.LogInformation(FormatOutputString(s)));
@@ -38,7 +42,6 @@ internal class GitRepo
         var cmdResult = await gitConfigCmd.ExecuteBufferedAsync();
         Logger.LogInformation("Finished");
         return new AbsolutePath(cmdResult.StandardOutput.Replace("\n", ""));
-
     }
 
     public static async Task<GitRepo> SetupFromExistingFolder(AbsolutePath path)
@@ -59,6 +62,66 @@ internal class GitRepo
         return new GitRepo(rootFolder, cmdResult.StandardOutput.Replace("\n", ""));
     }
 
+    public async Task AssertClean()
+    {
+        var diff = await DiffUncommitted(true).ConfigureAwait(false) 
+                   + await DiffUncommitted(false).ConfigureAwait(false);
+        if (diff.Any())
+        {
+            throw new Exception($"Expected {RootFolder} to be clean but it is not");
+        }
+    }
+    
+    public async Task<bool> CreatePatchFileOfLocalChanges(AbsolutePath patchFilepath)
+    {
+        var patchText = await DiffUncommitted(false).ConfigureAwait(false);
+        if (patchText.Length == 0)
+        {
+            return false;
+        }
+        
+        await File.WriteAllTextAsync(patchFilepath.Path, patchText).ConfigureAwait(false);
+        return true;
+    }
+    
+    
+    public static async Task<GitRepo> CreateGitRepoFromUrl(string repoUrl)
+    {
+        // Clean / Create the temp directory for the build.
+        var repoName = repoUrl.Split("/")[^1].Split(".")[0];
+        var rootFolder = new AbsolutePath(Path.Join(ScratchSpacePath, repoName));
+
+        if(Directory.Exists(rootFolder.Path))
+        {
+            Logger.LogInformation("Folder {RootFolder} already exists. Checking if it has the correct origin", rootFolder.Path);
+            try
+            {
+
+                var existingRepo = await SetupFromExistingFolder(rootFolder).ConfigureAwait(false);
+                // TODO Probably should do some clean here etc for sanity sake.
+                if (existingRepo.RemoteUrl.Replace(".git","") == repoUrl.Replace(".git",""))
+                {
+                    await existingRepo.Fetch().ConfigureAwait(false);
+                    return existingRepo;
+                }
+            }
+            catch (CommandExecutionException e) // TODO exception type
+            {
+                Logger.LogWarning($"Failed to load repo from existing folder with message {e}");
+                // Will just continue and check it out from scratch.
+            }
+        }
+    
+        // Should be clever here and just check if it is the same repo and just git clean if so.
+        Utils.EnsureDirectoryExistsAndEmpty(rootFolder);
+
+        // Clone the repo into the temp directory 
+        var gitRepo = await Clone(repoUrl, rootFolder).ConfigureAwait(false);
+        return gitRepo;
+    }
+
+
+
     // TODO does this need to exist any more?
     internal string GetRelativePath(AbsolutePath fullPath)
     {
@@ -67,7 +130,7 @@ internal class GitRepo
 
     internal static async Task<GitRepo> Clone(string repo, AbsolutePath rootFolder)
     {
-        Logger.LogInformation("Cloning {Repo} at into {RootFolder}",repo,rootFolder);
+        Logger.LogInformation("Cloning {Repo} at into {RootFolder}", repo, rootFolder.Path);
         var gitCloneCmd = Cli.Wrap("git")
             .WithArguments(new[]
             {
@@ -256,7 +319,7 @@ internal class GitRepo
         Logger.LogInformation("Executing {GitLogCmd}",gitLogCmd);
         var cmdResult = await gitLogCmd.ExecuteBufferedAsync();
         Logger.LogInformation("Finished");
-        return cmdResult.StandardOutput;
+        return cmdResult.StandardOutput.Trim();
     }
     internal async Task<string> GetCurrentBranchName()
     {
@@ -289,7 +352,25 @@ internal class GitRepo
         Logger.LogInformation("Finished pull");
     }
 
-    internal async Task<string> Diff(bool stagedChanges)
+    internal async Task<string> Diff(string left, string right)
+    {
+        var gitDiffCommand = Cli.Wrap("git")
+            .WithArguments(new[]
+            {
+                "diff",
+                left, 
+                right
+            })
+            .WithWorkingDirectory(RootFolder.Path)
+            .WithStandardOutputPipe(StdOutPipe)
+            .WithStandardErrorPipe(StdErrPipe);
+        Logger.LogInformation("Executing {GitDiffCommand}", gitDiffCommand);
+        var cmdResult = await gitDiffCommand.ExecuteBufferedAsync();
+        Logger.LogInformation("Finished diff");
+        return cmdResult.StandardOutput;
+    }
+
+    internal async Task<string> DiffUncommitted(bool stagedChanges)
     {
         var gitDiffCommand = Cli.Wrap("git")
             .WithArguments(new[]
@@ -306,13 +387,13 @@ internal class GitRepo
         return cmdResult.StandardOutput;
     }
     
-    public async Task ApplyPatch(string patchFilepath)
+    public async Task ApplyPatch(AbsolutePath patchFilepath)
     {
         var gitDiffCommand = Cli.Wrap("git")
             .WithArguments(new[]
             {
                 "apply",
-                patchFilepath
+                patchFilepath.Path
             })
             .WithWorkingDirectory(RootFolder.Path)
             .WithStandardOutputPipe(StdOutPipe)
@@ -322,7 +403,7 @@ internal class GitRepo
         Logger.LogInformation("Finished diff");
     }
 
-    public async Task<string> AddAllAndCommit()
+    public async Task AddAllAndCommit()
     {
         var gitAddCommand = Cli.Wrap("git")
             .WithArguments(new[]
@@ -349,9 +430,6 @@ internal class GitRepo
         Logger.LogInformation("Executing {GitCommitCmd}", gitCommitCmd);
         await gitCommitCmd.ExecuteAsync();
         Logger.LogInformation("Finished diff");
-
-        // Im sure that I should be able to parse this from the output of the previous command TODO
-        return await GetCurrentCommitSha().ConfigureAwait(false);
     }
     
     public async Task<List<(LineDiff, LineDiff)>> GetLineChanges(string sourceSha, string targetSha, AbsolutePath sourceFileName)
@@ -386,6 +464,24 @@ internal class GitRepo
         }
 
         return result;
+    }
+
+    public async Task<string> GetMergeBase(string left, string right)
+    {
+        var gitMergeBaseCmd = Cli.Wrap("git")
+            .WithArguments(new[]
+            {
+                "merge-base",
+                left,
+                right
+            })
+            .WithWorkingDirectory(RootFolder.Path)
+            .WithStandardOutputPipe(StdOutPipe)
+            .WithStandardErrorPipe(StdErrPipe);
+        Logger.LogInformation("Executing {GitCommitCmd}", gitMergeBaseCmd);
+        var cmdResult = await gitMergeBaseCmd.ExecuteBufferedAsync();
+        Logger.LogInformation("Finished diff");
+        return cmdResult.StandardOutput.Trim();
     }
 
     private static LineDiff GetLineDiff(string gitDescriptionOfDiff)

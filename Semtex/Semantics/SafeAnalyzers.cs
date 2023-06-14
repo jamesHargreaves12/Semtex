@@ -423,17 +423,27 @@ public sealed class SafeAnalyzers
                 new SingleDocumentFixAllDiagnosticProvider(nonOverlappingDiagnostic, document.Id),
                 default);
 
-            var fixAll = await fixAllProvider.GetFixAsync(fixAllContext).ConfigureAwait(false);
-
-            if (fixAll != null)
+            try
             {
-                var operations =
-                    await fixAll.GetOperationsAsync(CancellationToken.None).ConfigureAwait(false);
+                var fixAll = await fixAllProvider.GetFixAsync(fixAllContext).ConfigureAwait(false);
 
-                return operations
-                    .OfType<ApplyChangesOperation>()
-                    .Single()
-                    .ChangedSolution;
+                if (fixAll != null)
+                {
+                    var operations =
+                        await fixAll.GetOperationsAsync(CancellationToken.None).ConfigureAwait(false);
+
+                    return operations
+                        .OfType<ApplyChangesOperation>()
+                        .Single()
+                        .ChangedSolution;
+                }
+            }
+            catch (Exception e)
+            {
+                Logger.LogError("Failed to apply fixes. {E}", e);
+                var source = await document.GetSyntaxTreeAsync();
+                Logger.LogInformation(source!.ToString());
+                throw;
             }
 
             Logger.LogWarning("Unable to FixAll falling back to just fixing the first");

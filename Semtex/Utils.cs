@@ -10,7 +10,7 @@ internal sealed class Utils
     private static readonly ILogger<Utils> Logger = SemtexLog.LoggerFactory.CreateLogger<Utils>();
     public static void EnsureDirectoryExistsAndEmpty(AbsolutePath directoryPath)
     {
-        Logger.LogInformation("Using temporary path {DirectoryPath}", directoryPath);
+        Logger.LogInformation("Using temporary path {DirectoryPath}", directoryPath.Path);
         if (!Directory.Exists(directoryPath.Path))
         {
             Logger.LogInformation("Directory doesn't exist, creating it");

@@ -6,7 +6,6 @@ using Microsoft.CodeAnalysis.Text;
 using Semtex.ProjectFinder;
 using Semtex.Semantics;
 using Microsoft.Extensions.Logging;
-using Roslynator;
 using Semtex.Logging;
 using Semtex.Models;
 
