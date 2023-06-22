@@ -84,7 +84,7 @@ public class CheckSemanticEquivalence
             await gitRepo.Checkout(source).ConfigureAwait(false);
             var (sourceSln, sourceUnsimplifiedFiles, srcSimplifiedProjects) =
                 await GetSimplifiedSolution(analyzerConfigPath, sourceFilesToSimplify, projFilter, projectMappingFilepath, gitRepo.RootFolder, targetChangedMethodsMap).ConfigureAwait(false);
-            
+
             var result = await GetFileModels(gitRepo, diffConfig, targetUnsimplifiedFiles, sourceUnsimplifiedFiles, srcSimplifiedProjects, targetSimplifiedProjects).ConfigureAwait(false);
             // I am not sure why the GC is not smart enough to do this itself. But these lines prevent a linear increase in memory usage that just kills the process after a while.
             // Could it be the caching within Roslyn is holding references to some nodes which are then causing the reference to the wholue workspace to be held.  
@@ -274,9 +274,11 @@ public class CheckSemanticEquivalence
             .GetSolutionWithFilesSimplified(slnStart, projectsToSimplify.Select(s=>s.Id).ToList(), projectToFilesMap, analyzerConfigPath,
                 changedMethodsMap)
             .ConfigureAwait(false);
+        var simplifiedProjectIds = projectsToSimplify.Select(p => p.Id).ToHashSet();
+        var simplifiedProjects = simplifiedSln.Projects.Where(p => simplifiedProjectIds.Contains(p.Id)).ToList();
         return (simplifiedSln,
             new UnsimplifiedFilesSummary(filepathsWithIfPreprocessor, filepathsInFailedToCompile, unableToFindProj,
-                filepathsInFailedToRestore), projectsToSimplify);
+                filepathsInFailedToRestore), simplifiedProjects);
     }
 
 

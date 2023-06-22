@@ -204,7 +204,13 @@ public sealed class SafeAnalyzers
                 var document = currentSolution
                     .GetProject(projId)!
                     .Documents
-                    .First(d => d.FilePath == documentFilepath.Path);
+                    .FirstOrDefault(d => d.FilePath == documentFilepath.Path);
+                if (document is null)
+                {
+                    Logger.LogWarning("Unable to find {documetFilePath} in project, skipping", documentFilepath.Path);
+                    continue; // The .cs file is not actually compiled by the project this can happen if the file is a test case for something that acts on .cs files
+                }
+
                 var root = await document.GetSyntaxRootAsync().ConfigureAwait(false);
 
                 var groupedDiagnostics = relevantDiagnostics
