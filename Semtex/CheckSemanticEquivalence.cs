@@ -27,10 +27,8 @@ public class CheckSemanticEquivalence
         {
             Logger.LogInformation("Skipping commit {Target} as it has no c# diffs",target);
             // Todo improve this early exit
-            var fileModels = diffConfig.AllSourceFilePaths.Select(fp=>new FileModel(gitRepo.GetRelativePath(fp), Status.NotCSharp))
-                .Concat(diffConfig.AddedFilepaths.Select(addedFp=> new FileModel(gitRepo.GetRelativePath(addedFp), Status.Added)))
-                    .Concat(diffConfig.RemovedFilepaths.Select(removedFp=> new FileModel(gitRepo.GetRelativePath(removedFp), Status.Removed)))
-                .ToList();
+            var fileModels = await GetFileModels(gitRepo, diffConfig, UnsimplifiedFilesSummary.Empty() , UnsimplifiedFilesSummary.Empty(), new List<Project>(), new List<Project>()).ConfigureAwait(false);
+
             return new CommitModel(target, fileModels, stopWatch.ElapsedMilliseconds)
             {
                 CommitHash = target
@@ -162,11 +160,14 @@ public class CheckSemanticEquivalence
             addedFilepaths, removedFilepaths, renamedFilepaths, allSourceFilePaths, sourceCsFilepaths,
             targetCsFilepaths);
     }
-    
+
 
     private record UnsimplifiedFilesSummary
     {
-        public UnsimplifiedFilesSummary(HashSet<AbsolutePath> filepathsWithIfPreprocessor, HashSet<AbsolutePath> filepathsInProjThatFailedToCompile, HashSet<AbsolutePath> filepathsWhichUnableToFindProjFor, HashSet<AbsolutePath> filepathsInProjThatFailedToRestore)
+        public UnsimplifiedFilesSummary(HashSet<AbsolutePath> filepathsWithIfPreprocessor,
+            HashSet<AbsolutePath> filepathsInProjThatFailedToCompile,
+            HashSet<AbsolutePath> filepathsWhichUnableToFindProjFor,
+            HashSet<AbsolutePath> filepathsInProjThatFailedToRestore)
         {
             FilepathsWithIfPreprocessor = filepathsWithIfPreprocessor;
             FilepathsInProjThatFailedToCompile = filepathsInProjThatFailedToCompile;
@@ -178,6 +179,16 @@ public class CheckSemanticEquivalence
         internal HashSet<AbsolutePath> FilepathsInProjThatFailedToCompile { get; }
         internal HashSet<AbsolutePath> FilepathsWhichUnableToFindProjFor { get; }
         public HashSet<AbsolutePath> FilepathsInProjThatFailedToRestore { get; }
+
+        public static UnsimplifiedFilesSummary Empty()
+        {
+            return new UnsimplifiedFilesSummary(
+                new HashSet<AbsolutePath>(),
+                new HashSet<AbsolutePath>(),
+                new HashSet<AbsolutePath>(),
+                new HashSet<AbsolutePath>()
+            );
+        }
     }
 
     
@@ -296,20 +307,64 @@ public class CheckSemanticEquivalence
         return false;
     }
     
+
+    private static readonly HashSet<string> CommonSafeFilenames = new HashSet<string>()
+    {
+        "README.md",
+        "CONTRIBUTING.md",
+        "LICENSE.md",
+        "LICENSE.txt",
+        "CHANGELOG.md",
+        "HISTORY.md",
+        "CODE_OF_CONDUCT.md",
+        "ISSUE_TEMPLATE.md",
+        "PULL_REQUEST_TEMPLATE.md",
+        "FAQ.md",
+        "FAQ.txt",
+        "TODO.md",
+        "TODO.txt",
+        "AUTHORS.md",
+        "AUTHORS.txt",
+        "INSTALL.md",
+        "DEPRECATED.md",
+        "CONFIGURATION.md",
+        "CONFIGURATION.txt",
+        "ROADMAP.md",
+        "TESTS.md",
+        "STYLEGUIDE.md",
+        "CODING_STANDARDS.md",
+        "SECURITY.md",
+        "MAINTAINERS.md",
+        "BUILDING.md",
+        "API_REFERENCE.md",
+        "GLOSSARY.md",
+        "TROUBLESHOOTING.md",
+        "DEPENDENCIES.md",
+        ".editorconfig",
+        ".gitignore"
+    };
     // This needs a better name
     private static async Task<List<FileModel>> GetFileModels(GitRepo gitRepo, DiffConfig diffConfig,
         UnsimplifiedFilesSummary targetUnsimplified, UnsimplifiedFilesSummary sourceUnsimplified, List<Project> simplifiedSrcProjects,
         List<Project> simplifiedTargetProjects)
     {
         Stopwatch? stopwatch = null;
-        var fileResults = diffConfig.AddedFilepaths.Select(addedFp => new FileModel(gitRepo.GetRelativePath(addedFp), Status.Added))
-            .Concat(diffConfig.RemovedFilepaths.Select(removedFp => new FileModel(gitRepo.GetRelativePath(removedFp), Status.Removed)))
+        var fileResults = diffConfig.AddedFilepaths.Select(addedFp => 
+                new FileModel(gitRepo.GetRelativePath(addedFp), CommonSafeFilenames.Contains(Path.GetFileName(addedFp.Path)) ? Status.SafeFile : Status.Added)
+            )
+            .Concat(diffConfig.RemovedFilepaths.Select(removedFp => 
+                new FileModel(gitRepo.GetRelativePath(removedFp), CommonSafeFilenames.Contains(Path.GetFileName(removedFp.Path)) ? Status.SafeFile : Status.Removed)))
             .ToList();
         foreach (var sourceFilepath in diffConfig.AllSourceFilePaths)
         {
             var relativePath = gitRepo.GetRelativePath(sourceFilepath);
 
             var targetFilepath = diffConfig.GetTargetFilepath(sourceFilepath);
+
+            if (CommonSafeFilenames.Contains(Path.GetFileName(sourceFilepath.Path)) && CommonSafeFilenames.Contains(Path.GetFileName(targetFilepath.Path)))
+            {
+                fileResults.Add(new FileModel(relativePath, Status.SafeFile));
+            }
 
             if (!diffConfig.SourceCsFilepaths.Contains(sourceFilepath) ||
                 !diffConfig.TargetCsFilepaths.Contains(targetFilepath))

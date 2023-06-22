@@ -11,5 +11,6 @@ public enum Status
     Removed = 6,
     UnableToFindProj = 7,
     ProjectDidNotRestore = 8,
-    OnlyRename = 9
+    OnlyRename = 9,
+    SafeFile = 10
 }

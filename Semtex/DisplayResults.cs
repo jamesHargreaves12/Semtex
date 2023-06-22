@@ -34,6 +34,16 @@ public static class DisplayResults
             "Only Renamed:"
         );
 
+        var knownSafe = result.FileModels
+            .Where(f => f.Status == Status.SafeFile)
+            .ToList();
+        AddSectionIfNotEmpty(
+            resultSummary,
+            knownSafe,
+            "✅",
+            "Files that are known not to effect execution:"
+        );
+
         var notEquiv = result.FileModels   
             .Where(f => f.Status == Status.ContainsSemanticChanges)
             .ToList();
