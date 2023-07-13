@@ -24,7 +24,7 @@ semtex check . master --all-ancestors
 ```
 Coming soon - a command that splits a change into 2 diffs one semantic and unsemantic.
 ```sh
-semtex split . 
+semtex split
 ```
 
 ## How Semtex Works:
