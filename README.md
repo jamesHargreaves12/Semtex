@@ -1,10 +1,11 @@
 # Semtex
+Development in progress -- interface may change. 
 Remove the Git friction that is discouraging you from making improvements to your C# codebase.
 
 Semtex uses semantic understanding of C# to classify changes that won't affect the semantics of your production system. This makes it easier to make improvements to your codebase without worrying about breaking anything. Plus, reviewing these changes becomes trivial!
 
 ## Features:
-- Semtex is great for identifying changes that won't impact your production system. Use the following command to split your uncommitted changes into semantic and non-semantic changes:
+- Semtex is great for identifying changes that won't impact your production system. Use the following classify your uncommitted changes into semantic and non-semantic changes:
 ```sh
 semtex modified .
 ```
@@ -20,6 +21,10 @@ semtex check https://github.com/url.git feature-branch --source origin/master
 - Not sure if Semtex is right for you? Try running it against all recent commits in your repository:
 ```sh
 semtex check . master --all-ancestors
+```
+Coming soon - a command that splits a change into 2 diffs one semantic and unsemantic.
+```sh
+semtex split
 ```
 
 ## How Semtex Works:
