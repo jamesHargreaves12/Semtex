@@ -12,5 +12,6 @@ public enum Status
     UnableToFindProj = 7,
     ProjectDidNotRestore = 8,
     OnlyRename = 9,
-    SafeFile = 10
+    SafeFile = 10,
+    SomeMethodsEquivalent = 11,
 }

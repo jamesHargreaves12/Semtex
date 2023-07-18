@@ -1,8 +1,6 @@
+using System.Collections.Immutable;
 using System.Diagnostics;
 using Microsoft.CodeAnalysis;
-using Microsoft.CodeAnalysis.CSharp;
-using Microsoft.CodeAnalysis.CSharp.Syntax;
-using Microsoft.CodeAnalysis.Text;
 using Semtex.ProjectFinder;
 using Semtex.Semantics;
 using Microsoft.Extensions.Logging;
@@ -27,9 +25,9 @@ public class CheckSemanticEquivalence
         {
             Logger.LogInformation("Skipping commit {Target} as it has no c# diffs",target);
             // Todo improve this early exit
-            var fileModels = await GetFileModels(gitRepo, diffConfig, UnsimplifiedFilesSummary.Empty() , UnsimplifiedFilesSummary.Empty(), new List<Project>(), new List<Project>()).ConfigureAwait(false);
+            var fileModels = await GetFileModels(gitRepo, diffConfig, UnsimplifiedFilesSummary.Empty() , UnsimplifiedFilesSummary.Empty(), new List<Project>(), new List<Project>(), new Dictionary<AbsolutePath, HashSet<string>>()).ConfigureAwait(false);
 
-            return new CommitModel(target, fileModels, stopWatch.ElapsedMilliseconds)
+            return new CommitModel(target, fileModels, stopWatch.ElapsedMilliseconds, diffConfig)
             {
                 CommitHash = target
             };
@@ -58,11 +56,11 @@ public class CheckSemanticEquivalence
             // TODO can this be done without an additional sourceChangedCheck
             await gitRepo.Checkout(target).ConfigureAwait(false);
             var targetChangedMethods =
-                    await GetChangesFilter(targetFilesToSimplify, targetLineChangeMapping).ConfigureAwait(false);
+                    await DiffToMethods.GetChangesFilter(targetFilesToSimplify, targetLineChangeMapping).ConfigureAwait(false);
             
             await gitRepo.Checkout(source).ConfigureAwait(false);
             var sourceChangedMethods =
-                await GetChangesFilter(sourceFilesToSimplify, sourceLineChangeMapping).ConfigureAwait(false);
+                await DiffToMethods.GetChangesFilter(sourceFilesToSimplify, sourceLineChangeMapping).ConfigureAwait(false);
 
             var sourceChangedMethodsMap = new Dictionary<AbsolutePath, HashSet<string>>();
             var targetChangedMethodsMap = new Dictionary<AbsolutePath, HashSet<string>>();
@@ -83,13 +81,13 @@ public class CheckSemanticEquivalence
             var (sourceSln, sourceUnsimplifiedFiles, srcSimplifiedProjects) =
                 await GetSimplifiedSolution(analyzerConfigPath, sourceFilesToSimplify, projFilter, projectMappingFilepath, gitRepo.RootFolder, targetChangedMethodsMap).ConfigureAwait(false);
 
-            var result = await GetFileModels(gitRepo, diffConfig, targetUnsimplifiedFiles, sourceUnsimplifiedFiles, srcSimplifiedProjects, targetSimplifiedProjects).ConfigureAwait(false);
+            var result = await GetFileModels(gitRepo, diffConfig, targetUnsimplifiedFiles, sourceUnsimplifiedFiles, srcSimplifiedProjects, targetSimplifiedProjects, sourceChangedMethodsMap).ConfigureAwait(false);
             // I am not sure why the GC is not smart enough to do this itself. But these lines prevent a linear increase in memory usage that just kills the process after a while.
             // Could it be the caching within Roslyn is holding references to some nodes which are then causing the reference to the wholue workspace to be held.  
             sourceSln.Workspace.Dispose();
             targetSln.Workspace.Dispose();
             
-            return new CommitModel(target, result, stopWatch.ElapsedMilliseconds)
+            return new CommitModel(target, result, stopWatch.ElapsedMilliseconds, diffConfig)
             {
                 CommitHash = target
             };
@@ -102,43 +100,7 @@ public class CheckSemanticEquivalence
         }
         
     }
-    
-    private record DiffConfig
-    {
-        public DiffConfig(HashSet<AbsolutePath> addedFilepaths, HashSet<AbsolutePath> removedFilepaths, HashSet<(AbsolutePath Source, AbsolutePath Target, int Similarity)> renamedFilepaths, List<AbsolutePath> allSourceFilePaths, HashSet<AbsolutePath> sourceCsFilepaths, HashSet<AbsolutePath> targetCsFilepaths)
-        {
-            AddedFilepaths = addedFilepaths;
-            RemovedFilepaths = removedFilepaths;
-            RenamedFilepaths = renamedFilepaths;
-            AllSourceFilePaths = allSourceFilePaths;
-            SourceCsFilepaths = sourceCsFilepaths;
-            TargetCsFilepaths = targetCsFilepaths;
-        }
 
-        internal HashSet<AbsolutePath> AddedFilepaths { get; }
-        internal HashSet<AbsolutePath> RemovedFilepaths { get; }
-        internal HashSet<(AbsolutePath Source, AbsolutePath Target, int Similarity)> RenamedFilepaths { get; }
-        internal List<AbsolutePath> AllSourceFilePaths { get; }
-        internal HashSet<AbsolutePath> SourceCsFilepaths { get; }
-        internal HashSet<AbsolutePath> TargetCsFilepaths { get; }
-        
-        internal AbsolutePath GetTargetFilepath(AbsolutePath sourceFilepath)
-        {
-            AbsolutePath targetFilepath;
-            if (RenamedFilepaths.Any(x => x.Source == sourceFilepath))
-            {
-                targetFilepath = RenamedFilepaths.First(x => x.Source == sourceFilepath).Target;
-            }
-            else
-            {
-                targetFilepath = sourceFilepath;
-            }
-
-            return targetFilepath;
-        }
-
-    }
-    
     private static async Task<DiffConfig> GetDiffConfig(GitRepo gitRepo, string target, string source)
     {
        var( modifiedFilepaths, addedFilepaths, removedFilepaths, renamedFilepaths) =
@@ -345,8 +307,9 @@ public class CheckSemanticEquivalence
     };
     // This needs a better name
     private static async Task<List<FileModel>> GetFileModels(GitRepo gitRepo, DiffConfig diffConfig,
-        UnsimplifiedFilesSummary targetUnsimplified, UnsimplifiedFilesSummary sourceUnsimplified, List<Project> simplifiedSrcProjects,
-        List<Project> simplifiedTargetProjects)
+        UnsimplifiedFilesSummary targetUnsimplified, UnsimplifiedFilesSummary sourceUnsimplified,
+        List<Project> simplifiedSrcProjects, List<Project> simplifiedTargetProjects,
+        Dictionary<AbsolutePath, HashSet<string>> changedMethods)
     {
         Stopwatch? stopwatch = null;
         var fileResults = diffConfig.AddedFilepaths.Select(addedFp => 
@@ -364,6 +327,7 @@ public class CheckSemanticEquivalence
             if (CommonSafeFilenames.Contains(Path.GetFileName(sourceFilepath.Path)) && CommonSafeFilenames.Contains(Path.GetFileName(targetFilepath.Path)))
             {
                 fileResults.Add(new FileModel(relativePath, Status.SafeFile));
+                continue;
             }
 
             if (!diffConfig.SourceCsFilepaths.Contains(sourceFilepath) ||
@@ -431,79 +395,37 @@ public class CheckSemanticEquivalence
 
             
             (stopwatch ??= new Stopwatch()).Restart();
-            var areSemanticallyEqual =
-                await SemanticsAwareEquality.SemanticallyEqual(sourceDocs.Single(), targetDocs.Single()).ConfigureAwait(false);
+            var semanticallyUnequal =
+                await SemanticEqualBreakdownFinder.GetSemanticallyUnequal(sourceDocs.Single(), targetDocs.Single()).ConfigureAwait(false);
             Logger.LogInformation(SemtexLog.GetPerformanceStr(nameof(SemanticsAwareEquality.SemanticallyEqual), stopwatch.ElapsedMilliseconds));
-            
-            fileResults.Add(areSemanticallyEqual
-                ? new FileModel(relativePath, Status.SemanticallyEquivalent)
-                : new FileModel(relativePath, Status.ContainsSemanticChanges));
+
+            var result = semanticallyUnequal.Match(
+                functions =>
+                {
+                    if (!functions.FunctionNames.Any())
+                        return new FileModel(relativePath, Status.SemanticallyEquivalent);
+
+                    if (!changedMethods.ContainsKey(sourceFilepath)) // Indicates that couldn't filter down diff to small set of changes
+                        return new FileModel(relativePath, Status.ContainsSemanticChanges);
+
+                    // If functionNames is a proper subset then some of the methods that were changed then this indicates that the methods are a subset.
+                    if (functions.FunctionNames.ToHashSet().IsProperSubsetOf(changedMethods[sourceFilepath]))
+                    {
+                        return new FileModel(relativePath, Status.SomeMethodsEquivalent, functions.FunctionNames.ToHashSet());
+                    }
+
+                    if (functions.FunctionNames.Count != changedMethods[sourceFilepath].Count ||
+                        functions.FunctionNames.Any(x => !changedMethods[sourceFilepath].Contains(x)))
+                    {
+                        Logger.LogInformation("Functions is not a subset of the input methods for file {Filepath}", sourceFilepath);
+                    }
+
+                    return new FileModel(relativePath, Status.ContainsSemanticChanges);
+                },
+                _ => new FileModel(relativePath, Status.ContainsSemanticChanges));
+            fileResults.Add(result);
         }
 
         return fileResults;
     }
-    
-    /// <summary>
-    /// If all the changes in a function are within functions then we will only apply the analyzers that are located within those functions.
-    /// TODO this does live here
-    /// </summary>
-    /// <param name="project"></param>
-    /// <param name="filepaths"></param>
-    /// <param name="lineChangeMapping"></param>
-    /// <returns></returns>
-    public static async Task<Dictionary<AbsolutePath, HashSet<string>>> GetChangesFilter(
-        HashSet<AbsolutePath> filepaths, Dictionary<AbsolutePath, List<LineDiff>> lineChangeMapping)
-    {
-        var result = new Dictionary<AbsolutePath, HashSet<string>>();
-        foreach (var filepath in filepaths)
-        {
-            if (!lineChangeMapping.TryGetValue(filepath, out var lineDiffs)) continue;
-
-            var fileText = await File.ReadAllTextAsync(filepath.Path).ConfigureAwait(false);
-            var fileLines = SourceText.From(fileText).Lines;
-
-            var root = CSharpSyntaxTree.ParseText(fileText).GetRoot();
-            var changedMethods = new HashSet<string>();
-            var changeOutsideMethod = false;
-            foreach (var lineDiff in lineDiffs)
-            {
-                var startI = Math.Max(0, lineDiff.Start - 1);
-                var start = fileLines[startI].Start;
-                var endI = Math.Max(lineDiff.Start + lineDiff.Count - 2,startI); //count is inclusive of first line, 0 indicates insert
-                var end = fileLines[endI].EndIncludingLineBreak;
-                var span = new TextSpan(start, end - start);
-                var node = root!.FindNode(span);
-                while (true)
-                {
-                    if (node is MethodDeclarationSyntax methodDeclarationSyntax) // need other cases here e.g. getters
-                    {
-                        changedMethods.Add(SemanticSimplifier.GetMethodIdentifier(methodDeclarationSyntax));
-                        break;
-                    }
-
-                    if (node is ClassDeclarationSyntax or CompilationUnitSyntax or NamespaceDeclarationSyntax)
-                    {
-                        changeOutsideMethod = true;
-                        break;
-                    }
-
-                    node = node.Parent;
-                }
-
-                if (changeOutsideMethod)
-                {
-                    break;
-                }
-            }
-
-            if (!changeOutsideMethod)
-            {
-                result[filepath] = changedMethods;
-            }
-
-        }
-
-        return result;
     }
-
-}

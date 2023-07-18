@@ -1,4 +1,3 @@
-using CliWrap;
 using Microsoft.Extensions.Logging;
 using Semtex.Logging;
 using Semtex.Models;

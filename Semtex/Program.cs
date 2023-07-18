@@ -102,33 +102,52 @@ Command GetComputeProjectMappingCommand()
     return projMappingCommand;
 }
 
-
+// TODO test
 Command GetSplitCommand()
 {
     var splitCommand = new Command("split");
-    var repoArg = new Argument<string>("repo", "local path / url of repo");
-    var sourceArg = new Argument<string>("source", "Branch or sha to compare against");
-    var targetOption = new Option<string?>("--target", "Used to specify a different branch or sha to compare against.");
-    var includeUncommittedOption = new Option<IncludeUncommittedChanges>("--includeUncommitted", ()=>IncludeUncommittedChanges.None, "Include uncommitted changes");
+    var repoArg = new Argument<string>("repo_path", "local path");
+    var baseArg = new Argument<string>("base", () => "HEAD", "branch or sha to compare against");
+    var includeUncommittedOption = new Option<IncludeUncommittedChanges>("--includeUncommitted", ()=>IncludeUncommittedChanges.Staged, "Include uncommitted changes");
     var projectMapOption = new Option<string?>("--project-map", "Location of the file -> project mapping. See the computeProjectFileMap command for more information");
     splitCommand.AddArgument(repoArg);
-    splitCommand.AddArgument(sourceArg);
-    splitCommand.AddOption(targetOption);
+    splitCommand.AddArgument(baseArg);
     splitCommand.AddOption(includeUncommittedOption);
     splitCommand.AddOption(projectMapOption);
-    splitCommand.SetHandler(async (repo, source, target, includeUncommited, projectMap) =>
+    splitCommand.SetHandler(async (repoPath, baseValue, includeUncommited, projectMap) =>
     {
         SemtexLog.InitializeLogging(outputPath);
-        await Commands.Split(repo, source, target, includeUncommited, projectMap).ConfigureAwait(false);
-    }, repoArg, sourceArg, targetOption,includeUncommittedOption,projectMapOption);
+        await Commands.Split(repoPath, baseValue, includeUncommited, projectMap).ConfigureAwait(false);
+    }, repoArg, baseArg,includeUncommittedOption,projectMapOption);
     return splitCommand;
 }
+
+Command GetSplitRemoteCommand()
+{
+    var splitCommand = new Command("split_remote");
+    var repoArg = new Argument<string>("repo_url", "url of repo");
+    var targetArg = new Argument<string>("target", "branch or sha to compare against");
+    var baseOption = new Option<string>("--base", () => "master", "base branch or sha");
+    var projectMapOption = new Option<string?>("--project-map", "Location of the file -> project mapping. See the computeProjectFileMap command for more information");
+    splitCommand.AddArgument(repoArg);
+    splitCommand.AddArgument(targetArg);
+    splitCommand.AddOption(baseOption);
+    splitCommand.AddOption(projectMapOption);
+    splitCommand.SetHandler(async (repo, target, baseCommit, projectMap) =>
+    {
+        SemtexLog.InitializeLogging(outputPath);
+        await Commands.SplitRemote(repo, target, baseCommit, projectMap).ConfigureAwait(false);
+    }, repoArg, targetArg, baseOption, projectMapOption);
+    return splitCommand;
+}
+
 
 var rootCommand = new RootCommand("Semtex - Remove the Git friction that is discouraging you from making improvements to your C# codebase");
 rootCommand.AddCommand(GetCheckCommand());
 rootCommand.AddCommand(GetCheckUncommittedCommand());
 rootCommand.AddCommand(GetComputeProjectMappingCommand());
 rootCommand.AddCommand(GetSplitCommand());
+rootCommand.AddCommand(GetSplitRemoteCommand());
 await new CommandLineBuilder(rootCommand)
     .UseDefaults()
     .Build()

@@ -1,12 +1,10 @@
 using System.Collections.Immutable;
 using System.Diagnostics;
-using System.Security.Policy;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CodeActions;
 using Microsoft.CodeAnalysis.CodeFixes;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
 using Microsoft.CodeAnalysis.Diagnostics;
-using Microsoft.CodeAnalysis.Text;
 using Microsoft.Extensions.Logging;
 using Roslynator.CSharp.Analysis;
 using Roslynator.CSharp.Analysis.MakeMemberReadOnly;

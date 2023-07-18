@@ -44,6 +44,16 @@ public static class DisplayResults
             "Files that are known not to effect execution:"
         );
 
+        var halfSafe = result.FileModels
+            .Where(f => f.Status == Status.SomeMethodsEquivalent)
+            .ToList();
+        AddSectionIfNotEmpty(
+            resultSummary,
+            halfSafe,
+            "✅❌",
+            "Files that have some changes which effect execution and some that don't"
+        );
+
         var notEquiv = result.FileModels   
             .Where(f => f.Status == Status.ContainsSemanticChanges)
             .ToList();

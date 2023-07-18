@@ -6,6 +6,7 @@ public record AbsolutePath
 
     public AbsolutePath(string path)
     {
+        // Perhaps this should be an opt in feature rather than the default behaviour.
         Path = System.IO.Path.GetFullPath(path);
     }
 
