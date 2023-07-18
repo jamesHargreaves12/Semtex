@@ -1,3 +1,5 @@
+using System.Text.Json.Serialization;
+
 namespace Semtex.Models;
 
 public class CommitModel
@@ -14,5 +16,7 @@ public class CommitModel
     public bool SemanticallyEquivalent => FileModels.All(f => f.Status == Status.SemanticallyEquivalent);
     public List<FileModel> FileModels { get; }
     public long ElapsedMilliseconds { get; }
+    
+    [JsonIgnore]
     public DiffConfig DiffConfig { get; }
 }

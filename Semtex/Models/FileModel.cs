@@ -1,8 +1,11 @@
 
+using System.Text.Json.Serialization;
+
 namespace Semtex.Models;
 
 public class FileModel
 {
+    [JsonIgnore]
     public readonly HashSet<string>? SubsetOfMethodsThatAreNotEquivalent;
 
     public FileModel(string filepath, Status status, HashSet<string>? subsetOfMethodsThatAreNotEquivalent=default)
