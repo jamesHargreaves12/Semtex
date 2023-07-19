@@ -47,7 +47,7 @@ public static class LocalStatementsEquality
                 simpleBlockLeft.Select(l => (StatementSyntax)localVariableRenameRewriter.Visit(l));
             if (simpleBlockLeft.Count == 1)
             {
-                if (renamedLeftSimpleBlock.Single().ToString() != simpleBlockRight.Single().ToString()) return false;
+                if (renamedLeftSimpleBlock.Single().NormalizeWhitespace().ToString() != simpleBlockRight.Single().NormalizeWhitespace().ToString()) return false;
             }
             else
             {
@@ -80,8 +80,8 @@ public static class LocalStatementsEquality
 
     private static bool IsReorderSemanticallyEquivalent(List<StatementSyntax> simpleBlockLeft, List<StatementSyntax> simpleBlockRight)
     {
-        var rightTexts = simpleBlockRight.Select(s => s.ToString()).ToList();
-        var leftTexts = simpleBlockLeft.Select(s => s.ToString()).ToList();
+        var rightTexts = simpleBlockRight.Select(s => s.NormalizeWhitespace().ToString()).ToList();
+        var leftTexts = simpleBlockLeft.Select(s => s.NormalizeWhitespace().ToString()).ToList();
         
         // 3. From description
         if (leftTexts.Any(s => !rightTexts.Contains(s)) || leftTexts.Count != rightTexts.Count)

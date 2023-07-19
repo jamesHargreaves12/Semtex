@@ -277,6 +277,8 @@ public class CheckSemanticEquivalence
         "LICENSE.md",
         "LICENSE.txt",
         "CHANGELOG.md",
+        "ChangeLog.md",
+        "Donations.md",
         "HISTORY.md",
         "CODE_OF_CONDUCT.md",
         "ISSUE_TEMPLATE.md",

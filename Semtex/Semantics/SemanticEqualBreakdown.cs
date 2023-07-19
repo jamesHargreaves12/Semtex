@@ -46,6 +46,7 @@ public class SemanticEqualBreakdownFinder
         var rightCompilation = await right.Project.GetCompilationAsync().ConfigureAwait(false);
         var rightSemanticModel = rightCompilation!.GetSemanticModel(rightTree!);
         Logger.LogInformation("Evaluating Equality");
+        
         return await GetSemanticallyUnequal(leftRoot, rightRoot, leftSemanticModel, rightSemanticModel, left, right).ConfigureAwait(false); // We can just push down the semantic model getting now that we are passing down the document.
     }
 
@@ -58,19 +59,35 @@ public class SemanticEqualBreakdownFinder
             (BaseNamespaceDeclarationSyntax l, BaseNamespaceDeclarationSyntax r) => await GetSemanticallyUnequalNamespace(l, r, leftSemanticModel, rightSemanticModel, leftDocument, rightDocument).ConfigureAwait(false),
             (ClassDeclarationSyntax l, ClassDeclarationSyntax r) => await GetSemanticallyUnequalClassDeclaration(l, r, leftSemanticModel, rightSemanticModel, leftDocument, rightDocument).ConfigureAwait(false),
             (MethodDeclarationSyntax l, MethodDeclarationSyntax r) => await GetSemanticallyUnequalMethodDeclaration(l, r, leftSemanticModel, rightSemanticModel, leftDocument, rightDocument).ConfigureAwait(false),
-            _ => left.ToString() == right.ToString() ? OneOf<UnequalFunctions, WholeFile>.FromT0(new UnequalFunctions()) : OneOf<UnequalFunctions, WholeFile>.FromT1(new WholeFile())
+            _ => StringEqual(left, right) ? OneOf<UnequalFunctions, WholeFile>.FromT0(new UnequalFunctions()) : OneOf<UnequalFunctions, WholeFile>.FromT1(new WholeFile())
         };
     }
     
     private static bool SemanticallyEqualSyntaxList<T>(SyntaxList<T> left, SyntaxList<T> right) where T : SyntaxNode
     {
-        return left.ToString() == right.ToString();
+        if (left.Count != right.Count)
+            return false;
+        foreach (var (l, r) in left.Zip(right))
+        {
+            if (!StringEqual(l, r))
+                return false;
+        }
+
+        return true;
     }
 
     private static bool SemanticallyEqualSyntaxTokenList(SyntaxTokenList left, SyntaxTokenList right)
     {
-        return left.ToString() == right.ToString();
+        if (left.Count != right.Count)
+            return false;
+        foreach (var (l,r) in left.Zip(right))
+        {
+            if (l.ToString() != r.ToString())
+                return false;
+        }
+        return true;
     }
+    
     private static bool SemanticallyEqualBaseList(BaseListSyntax? left, BaseListSyntax? right)
     {
         // If both null return true if one is null return false
@@ -84,7 +101,7 @@ public class SemanticEqualBreakdownFinder
             return false;
         }
 
-        return left.ToString() == right.ToString();
+        return left.NormalizeWhitespace().ToString() == right.NormalizeWhitespace().ToString();
     }
 
     private static async Task<OneOf<UnequalFunctions, WholeFile>> GetSemanticallyUnequalCompilationUnit(CompilationUnitSyntax left, CompilationUnitSyntax right, SemanticModel leftSemanticModel, SemanticModel rightSemanticModel, Document leftDocument, Document rightDocument)
@@ -134,16 +151,22 @@ public class SemanticEqualBreakdownFinder
             !StringEqual(left.ReturnType, right.ReturnType) ||
             !NullableStringEqual(left.TypeParameterList, right.TypeParameterList) // Not checkint arity as it is covered by TypeParameterList
            )
-            return new UnequalFunctions(new List<string>(){SemanticSimplifier.GetMethodIdentifier(left)});
+            return new UnequalFunctions(new List<string> {SemanticSimplifier.GetMethodIdentifier(left)});
+
+        if (left.Body == null && right.Body == null)
+        {
+            return new UnequalFunctions();
+        }
+        
         // Check the body for equality
         if (left.Body == null && right.Body != null)
         {
-            return new UnequalFunctions(new List<string>(){SemanticSimplifier.GetMethodIdentifier(left)});
+            return new UnequalFunctions(new List<string> {SemanticSimplifier.GetMethodIdentifier(left)});
         }
 
-        if (right.Body == null)
+        if (left.Body != null && right.Body == null)
         {
-            return new UnequalFunctions(new List<string>(){SemanticSimplifier.GetMethodIdentifier(left)});
+            return new UnequalFunctions(new List<string> {SemanticSimplifier.GetMethodIdentifier(left)});
         }
         
         // Calculating Renames is more expensive so lets only do it for methods that are not equal before renaming:
@@ -158,16 +181,23 @@ public class SemanticEqualBreakdownFinder
             leftDocument, rightDocument).ConfigureAwait(false);
         Logger.LogInformation(SemtexLog.GetPerformanceStr(nameof(LocalVariableRenamer.GetProposedLocalVariableRenames), sw.ElapsedMilliseconds));
 
-        return LocalStatementsEquality.SemanticallyEqualLocalStatements(left.Body.Statements, right.Body.Statements, leftSemanticModel, rightSemanticModel, proposedRenames)
-            ? new UnequalFunctions()
-            : new UnequalFunctions(new List<string>() { SemanticSimplifier.GetMethodIdentifier(left) });
+        if(LocalStatementsEquality.SemanticallyEqualLocalStatements(left.Body.Statements, right.Body.Statements, leftSemanticModel, rightSemanticModel, proposedRenames))
+            return new UnequalFunctions();
+
+        var leftId = SemanticSimplifier.GetMethodIdentifier(left);
+        var rightId = SemanticSimplifier.GetMethodIdentifier(right);
+        // TODO is this logic correct? should it be just the name or do we care about the params etc. Also need to apply it above.
+        if (leftId == rightId)
+            return new UnequalFunctions(new List<string> { SemanticSimplifier.GetMethodIdentifier(left) });
+        
+        return new WholeFile();
     }
     
     private static bool SemanticallyEqualUsings(SyntaxList<UsingDirectiveSyntax> left, SyntaxList<UsingDirectiveSyntax> right)
     {        
         // Allow reordering of using directives.
-        var leftUsings = left.Select(u => u.ToString()).ToHashSet();
-        return leftUsings.SetEquals(right.Select(u => u.ToString()));
+        var leftUsings = left.Select(u => u.NormalizeWhitespace().ToString()).ToHashSet();
+        return leftUsings.SetEquals(right.Select(u => u.NormalizeWhitespace().ToString()));
     }
     private static async Task<OneOf<UnequalFunctions, WholeFile>> SemanticallyEqualMembers(SyntaxList<MemberDeclarationSyntax> left, SyntaxList<MemberDeclarationSyntax> right, SemanticModel leftSemanticModel, SemanticModel rightSemanticModel, Document leftDocument, Document rightDocument)
     {
@@ -191,8 +221,9 @@ public class SemanticEqualBreakdownFinder
 
     private static bool StringEqual(SyntaxNode left, SyntaxNode right)
     {
-        return left.ToString() == right.ToString();
+        return left.NormalizeWhitespace().ToString() == right.NormalizeWhitespace().ToString();
     }
+
     private static bool NullableStringEqual(SyntaxNode? left, SyntaxNode? right)
     {
         if (left == null)
@@ -205,6 +236,6 @@ public class SemanticEqualBreakdownFinder
             return false;
         }
 
-        return left.ToString() == right.ToString();
+        return left.NormalizeWhitespace().ToString() == right.NormalizeWhitespace().ToString();
     }
 }
