@@ -29,7 +29,7 @@ public class DiffToMethods
 
             var fileLines = SourceText.From(fileText).Lines;
 
-            var root = CSharpSyntaxTree.ParseText(fileText).GetRoot();
+            var root = await CSharpSyntaxTree.ParseText(fileText).GetRootAsync();
             var changeOutsideMethod = false;
             foreach (var lineDiff in lineDiffs)
             {

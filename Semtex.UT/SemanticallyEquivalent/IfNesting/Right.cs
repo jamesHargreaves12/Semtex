@@ -22,15 +22,36 @@ public class Right
         {
             int x;
         }
-
+    
         if (flag)
         {
             var x = 1;
             return true;
         }
-
+    
         return false;
-
+    
     }
+    
+    public void Log3(bool flag, bool flag2, int z, bool flag3)
+    {
+        if (!flag3)
+        {
+            return;
+        }
+
+        if (flag2)
+        {
+            int x = 1 + z;
+            Console.Write(x + 1);
+        }
+
+        if (flag)
+        {
+            var x = z;
+            Console.Write(x + 1);
+        }
+    }
+
 
 }
