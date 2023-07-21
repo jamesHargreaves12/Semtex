@@ -1,4 +1,3 @@
-using System.Collections.Immutable;
 using System.Diagnostics;
 using Microsoft.CodeAnalysis;
 using Semtex.ProjectFinder;
@@ -25,7 +24,10 @@ public class CheckSemanticEquivalence
         {
             Logger.LogInformation("Skipping commit {Target} as it has no c# diffs",target);
             // Todo improve this early exit
-            var fileModels = await GetFileModels(gitRepo, diffConfig, UnsimplifiedFilesSummary.Empty() , UnsimplifiedFilesSummary.Empty(), new List<Project>(), new List<Project>(), new Dictionary<AbsolutePath, HashSet<string>>()).ConfigureAwait(false);
+            var fileModels = await GetFileModels(gitRepo, diffConfig, UnsimplifiedFilesSummary.Empty(),
+                    UnsimplifiedFilesSummary.Empty(), new List<Project>(), new List<Project>(),
+                    new Dictionary<AbsolutePath, HashSet<string>>(), new Dictionary<AbsolutePath, HashSet<string>>())
+                .ConfigureAwait(false);
 
             return new CommitModel(target, fileModels, stopWatch.ElapsedMilliseconds, diffConfig)
             {
@@ -81,7 +83,7 @@ public class CheckSemanticEquivalence
             var (sourceSln, sourceUnsimplifiedFiles, srcSimplifiedProjects) =
                 await GetSimplifiedSolution(analyzerConfigPath, sourceFilesToSimplify, projFilter, projectMappingFilepath, gitRepo.RootFolder, targetChangedMethodsMap).ConfigureAwait(false);
 
-            var result = await GetFileModels(gitRepo, diffConfig, targetUnsimplifiedFiles, sourceUnsimplifiedFiles, srcSimplifiedProjects, targetSimplifiedProjects, sourceChangedMethodsMap).ConfigureAwait(false);
+            var result = await GetFileModels(gitRepo, diffConfig, targetUnsimplifiedFiles, sourceUnsimplifiedFiles, srcSimplifiedProjects, targetSimplifiedProjects, sourceChangedMethods, targetChangedMethods).ConfigureAwait(false);
             // I am not sure why the GC is not smart enough to do this itself. But these lines prevent a linear increase in memory usage that just kills the process after a while.
             // Could it be the caching within Roslyn is holding references to some nodes which are then causing the reference to the wholue workspace to be held.  
             sourceSln.Workspace.Dispose();
@@ -311,7 +313,8 @@ public class CheckSemanticEquivalence
     private static async Task<List<FileModel>> GetFileModels(GitRepo gitRepo, DiffConfig diffConfig,
         UnsimplifiedFilesSummary targetUnsimplified, UnsimplifiedFilesSummary sourceUnsimplified,
         List<Project> simplifiedSrcProjects, List<Project> simplifiedTargetProjects,
-        Dictionary<AbsolutePath, HashSet<string>> changedMethods)
+        Dictionary<AbsolutePath, HashSet<string>> sourceChangedMethods
+        ,Dictionary<AbsolutePath, HashSet<string>> targetChangedMethods )
     {
         Stopwatch? stopwatch = null;
         var fileResults = diffConfig.AddedFilepaths.Select(addedFp => 
@@ -407,17 +410,21 @@ public class CheckSemanticEquivalence
                     if (!functions.FunctionNames.Any())
                         return new FileModel(relativePath, Status.SemanticallyEquivalent);
 
-                    if (!changedMethods.ContainsKey(sourceFilepath)) // Indicates that couldn't filter down diff to small set of changes
+                    if (!sourceChangedMethods.ContainsKey(sourceFilepath)) // Indicates that couldn't filter down diff to small set of changes
+                        return new FileModel(relativePath, Status.ContainsSemanticChanges);
+                    
+                    if (!targetChangedMethods.ContainsKey(sourceFilepath)) // Indicates that couldn't filter down diff to small set of changes
                         return new FileModel(relativePath, Status.ContainsSemanticChanges);
 
                     // If functionNames is a proper subset then some of the methods that were changed then this indicates that the methods are a subset.
-                    if (functions.FunctionNames.ToHashSet().IsProperSubsetOf(changedMethods[sourceFilepath]))
+                    if (functions.FunctionNames.ToHashSet().IsProperSubsetOf(sourceChangedMethods[sourceFilepath])
+                        && functions.FunctionNames.ToHashSet().IsProperSubsetOf(targetChangedMethods[targetFilepath]))
                     {
                         return new FileModel(relativePath, Status.SomeMethodsEquivalent, functions.FunctionNames.ToHashSet());
                     }
 
-                    if (functions.FunctionNames.Count != changedMethods[sourceFilepath].Count ||
-                        functions.FunctionNames.Any(x => !changedMethods[sourceFilepath].Contains(x)))
+                    if (functions.FunctionNames.Count != sourceChangedMethods[sourceFilepath].Count ||
+                        functions.FunctionNames.Any(x => !sourceChangedMethods[sourceFilepath].Contains(x)))
                     {
                         Logger.LogInformation("Functions is not a subset of the input methods for file {Filepath}", sourceFilepath);
                     }

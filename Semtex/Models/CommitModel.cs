@@ -4,6 +4,8 @@ namespace Semtex.Models;
 
 public class CommitModel
 {
+    private static readonly List<Status> SafeStatuses = new() { Status.SemanticallyEquivalent, Status.SafeFile };
+
     public CommitModel(string commitHash, List<FileModel> fileModels, long elapsedMilliseconds,DiffConfig diffConfig )
     {
         CommitHash = commitHash;
@@ -13,7 +15,7 @@ public class CommitModel
     }
     
     public required string CommitHash { get; init; }
-    public bool SemanticallyEquivalent => FileModels.All(f => f.Status == Status.SemanticallyEquivalent);
+    public bool SemanticallyEquivalent => FileModels.All(f => SafeStatuses.Contains(f.Status));
     public List<FileModel> FileModels { get; }
     public long ElapsedMilliseconds { get; }
     
