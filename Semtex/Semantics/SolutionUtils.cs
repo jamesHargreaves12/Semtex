@@ -43,7 +43,17 @@ internal sealed class SolutionUtils
         Logger.LogInformation(SemtexLog.GetPerformanceStr(nameof(LoadSolutionImpl), stopwatch.ElapsedMilliseconds));
 
         stopwatch.Restart();
-        var failedToCompile = await CheckProjectsCompile(sln, projectPaths);
+        HashSet<AbsolutePath> failedToCompile;
+        try
+        {
+            failedToCompile = await CheckProjectsCompile(sln, projectPaths);
+        }
+        catch (Exception e)
+        {
+            Logger.LogWarning("Failure in CheckProjectsCompile: {E}",e);
+            failedToCompile = projectPaths.ToHashSet();
+        }
+
         Logger.LogInformation(SemtexLog.GetPerformanceStr(nameof(CheckProjectsCompile), stopwatch.ElapsedMilliseconds));
         
         stopwatch.Restart();
