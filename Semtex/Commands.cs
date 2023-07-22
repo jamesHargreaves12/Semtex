@@ -82,9 +82,9 @@ public sealed class Commands
         commits.RemoveAt(commits.Count - 1);
 
         var results = new List<CommitModel>();
-        foreach (var c in commits)
+        foreach (var (c,i) in commits.Select((x,i)=> (x,i)))
         {
-            Logger.LogInformation("Checking {C}",c);
+            Logger.LogInformation("Progress = {Pct}, Now checking {C} ", i*100/commits.Count , c);
             var result = await CheckSemanticEquivalence.CheckSemanticallyEquivalent(gitRepo, c, analyzerConfigPath, projFilter, projectMappingFilepath)
                 .ConfigureAwait(false);
             var prettySummary = await DisplayResults.GetPrettySummaryOfResultsAsync(result, gitRepo).ConfigureAwait(false);
@@ -156,7 +156,6 @@ public sealed class Commands
         var patchText = await gitRepo.Diff(baseCommit, "HEAD");
         
         await SplitPatch(gitRepo, baseCommit, patchText, projectMapPath);
-
     }
     
     public static async Task SplitRemote(string repoUrl, string target, string baseCommit, string? projectMap)
