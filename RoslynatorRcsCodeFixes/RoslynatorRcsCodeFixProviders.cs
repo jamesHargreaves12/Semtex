@@ -90,7 +90,9 @@ public static class RoslynatorRcsCodeFixProviders
             ["RCS1188"] = new PropertyDeclarationCodeFixProvider(),
             ["RCS1190"] = new BinaryExpressionCodeFixProvider(),
             ["RCS1192"] = new UnnecessaryUsageOfVerbatimStringLiteralCodeFixProvider(),
-            ["RCS1194"] = new ClassDeclarationCodeFixProvider(),
+            // ["RCS1194"] = new ClassDeclarationCodeFixProvider(), // Here I think the best thing to do for now is turn this off as it doesn't work when you have a constructor
+            // that is ambiguous to call with null values. TODO fix the analyzer.
+            // check https://github.com/kgrzybek/modular-monolith-with-ddd.git ab2c7832f38f4332cc2746c44a8c5b2bb26d02f6 --source ab2c7832f38f4332cc2746c44a8c5b2bb26d02f6~1
             ["RCS1195"] = new BinaryExpressionCodeFixProvider(),
             ["RCS1196"] = new InvocationExpressionCodeFixProvider(),
             ["RCS1197"] = new OptimizeStringBuilderAppendCallCodeFixProvider(),
