@@ -401,7 +401,7 @@ public class CheckSemanticEquivalence
             
             (stopwatch ??= new Stopwatch()).Restart();
             var semanticallyUnequal =
-                await SemanticEqualBreakdownFinder.GetSemanticallyUnequal(sourceDocs.Single(), targetDocs.Single()).ConfigureAwait(false);
+                await SemanticEqualBreakdown.GetSemanticallyUnequal(sourceDocs.Single(), targetDocs.Single()).ConfigureAwait(false);
             Logger.LogInformation(SemtexLog.GetPerformanceStr(nameof(SemanticsAwareEquality.SemanticallyEqual), stopwatch.ElapsedMilliseconds));
 
             var result = semanticallyUnequal.Match(

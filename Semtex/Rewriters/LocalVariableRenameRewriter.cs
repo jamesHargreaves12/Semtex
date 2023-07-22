@@ -34,6 +34,7 @@ public class LocalVariableRenameRewriter: CSharpSyntaxRewriter
                 break;
             case FromClauseSyntax:
                 return SyntaxFactory.Identifier(token.LeadingTrivia, _mapping[token.ValueText], token.TrailingTrivia);
+            case SingleVariableDesignationSyntax:
             case VariableDeclaratorSyntax:
             case ParameterSyntax: 
                 return SyntaxFactory.Identifier(token.LeadingTrivia, _mapping[token.ValueText], token.TrailingTrivia);

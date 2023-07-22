@@ -25,9 +25,9 @@ public struct UnequalFunctions
     }
 }
 
-public class SemanticEqualBreakdownFinder
+public class SemanticEqualBreakdown
 {
-    private static readonly ILogger<SemanticEqualBreakdownFinder> Logger = SemtexLog.LoggerFactory.CreateLogger<SemanticEqualBreakdownFinder>();
+    private static readonly ILogger<SemanticEqualBreakdown> Logger = SemtexLog.LoggerFactory.CreateLogger<SemanticEqualBreakdown>();
 
 
     internal static async Task<OneOf<UnequalFunctions, WholeFile>> GetSemanticallyUnequal(Document left, Document right)

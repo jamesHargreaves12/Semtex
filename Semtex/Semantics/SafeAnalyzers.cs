@@ -379,7 +379,8 @@ public sealed class SafeAnalyzers
 
     private static List<string> CannotFixAllDiagnosticIds = new List<string>()
     {
-        "RCS1056" // Since fixing the first might change the fix you need to apply for the second its just safest to ignore this for now.
+        "RCS1056", // Since fixing the first might change the fix you need to apply for the second its just safest to ignore this for now.
+        "RCS1220" // Adds variables and is not smart enough to ensure they are distinct, TODO fix the code fix provider.
     };
     private static async Task<Solution> MakeCodeFixForAllDiagnostic(Document document,
         // this arg should not exist = simplify the interface
