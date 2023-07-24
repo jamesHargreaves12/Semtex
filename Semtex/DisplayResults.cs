@@ -45,7 +45,7 @@ public static class DisplayResults
         );
 
         var halfSafe = result.FileModels
-            .Where(f => f.Status == Status.SomeMethodsEquivalent)
+            .Where(f => f.Status == Status.SubsetOfDiffEquivalent)
             .ToList();
         AddSectionIfNotEmpty(
             resultSummary,

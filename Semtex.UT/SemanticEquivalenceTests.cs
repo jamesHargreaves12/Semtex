@@ -385,15 +385,27 @@ public class SemanticEquivalenceTests
 
         var leftSimplified = await GetSimplifiedDocument(folderPath,"Left.cs").ConfigureAwait(false);
         var rightSimplified = await GetSimplifiedDocument(folderPath, "Right.cs").ConfigureAwait(false);
-        var result = await SemanticsAwareEquality.SemanticallyEqual(leftSimplified, rightSimplified).ConfigureAwait(false);
+        var result = await SemanticEqualBreakdown.GetSemanticallyUnequal(leftSimplified, rightSimplified).ConfigureAwait(false);
+        
+        
         var leftRaw = await leftSimplified.GetSyntaxRootAsync().ConfigureAwait(false);
         var rightRaw = await rightSimplified.GetSyntaxRootAsync().ConfigureAwait(false);
 
+        var equal = result.Match(
+            x => x.FunctionNames.Count == 0,
+            x => false
+        );
+        // this is slightly weird when all we care about is the result of match for test pass / fail but gives us a nicer output with the simplified form
+        if (equal)
+        {
+            Console.WriteLine(leftRaw!.ToFullString());
+            Assert.Fail();
+        }
+        
         Console.WriteLine(leftRaw!.ToFullString());
         Console.WriteLine("**************************");
         Console.WriteLine(rightRaw!.ToFullString());
 
-        result.Should().BeFalse();
     }
 
 

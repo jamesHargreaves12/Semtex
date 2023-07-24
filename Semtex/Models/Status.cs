@@ -13,5 +13,5 @@ public enum Status
     ProjectDidNotRestore = 8,
     OnlyRename = 9,
     SafeFile = 10,
-    SomeMethodsEquivalent = 11,
+    SubsetOfDiffEquivalent = 11,
 }

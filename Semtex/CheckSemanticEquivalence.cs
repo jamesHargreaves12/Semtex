@@ -402,33 +402,32 @@ public class CheckSemanticEquivalence
             (stopwatch ??= new Stopwatch()).Restart();
             var semanticallyUnequal =
                 await SemanticEqualBreakdown.GetSemanticallyUnequal(sourceDocs.Single(), targetDocs.Single()).ConfigureAwait(false);
-            Logger.LogInformation(SemtexLog.GetPerformanceStr(nameof(SemanticsAwareEquality.SemanticallyEqual), stopwatch.ElapsedMilliseconds));
+            Logger.LogInformation(SemtexLog.GetPerformanceStr(nameof(SemanticEqualBreakdown.GetSemanticallyUnequal), stopwatch.ElapsedMilliseconds));
 
             var result = semanticallyUnequal.Match(
                 functions =>
                 {
                     if (!functions.FunctionNames.Any())
                         return new FileModel(relativePath, Status.SemanticallyEquivalent);
-
-                    if (!sourceChangedMethods.ContainsKey(sourceFilepath)) // Indicates that couldn't filter down diff to small set of changes
-                        return new FileModel(relativePath, Status.ContainsSemanticChanges);
                     
-                    if (!targetChangedMethods.ContainsKey(sourceFilepath)) // Indicates that couldn't filter down diff to small set of changes
+                    if (!sourceChangedMethods.ContainsKey(sourceFilepath) || 
+                        functions.FunctionNames.ToHashSet().IsProperSubsetOf(sourceChangedMethods[sourceFilepath]))
+                    {
+                        // We have limited the set of semantic changes to a smaller subset than the diff.
+                        return new FileModel(relativePath, Status.SubsetOfDiffEquivalent, functions.FunctionNames.ToHashSet());
+                    }
+                    
+                    if(!sourceChangedMethods.ContainsKey(sourceFilepath))
                         return new FileModel(relativePath, Status.ContainsSemanticChanges);
 
-                    // If functionNames is a proper subset then some of the methods that were changed then this indicates that the methods are a subset.
-                    if (functions.FunctionNames.ToHashSet().IsProperSubsetOf(sourceChangedMethods[sourceFilepath])
-                        && functions.FunctionNames.ToHashSet().IsProperSubsetOf(targetChangedMethods[targetFilepath]))
+                    var newDiffs = functions.FunctionNames.Where(x => !sourceChangedMethods[sourceFilepath].Contains(x));
+                    // ReSharper disable once PossibleMultipleEnumeration
+                    if (newDiffs.Count() != 0)
                     {
-                        return new FileModel(relativePath, Status.SomeMethodsEquivalent, functions.FunctionNames.ToHashSet());
+                        // ReSharper disable once PossibleMultipleEnumeration
+                        Logger.LogWarning("Functions is not a subset of the input methods for file {Filepath}: {NewDiffs}", sourceFilepath, string.Join(",",newDiffs));
                     }
-
-                    if (functions.FunctionNames.Count != sourceChangedMethods[sourceFilepath].Count ||
-                        functions.FunctionNames.Any(x => !sourceChangedMethods[sourceFilepath].Contains(x)))
-                    {
-                        Logger.LogInformation("Functions is not a subset of the input methods for file {Filepath}", sourceFilepath);
-                    }
-
+                    
                     return new FileModel(relativePath, Status.ContainsSemanticChanges);
                 },
                 _ => new FileModel(relativePath, Status.ContainsSemanticChanges));

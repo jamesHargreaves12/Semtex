@@ -7,19 +7,20 @@ using Semtex.Logging;
 
 namespace Semtex.Semantics;
 
-public struct WholeFile
+public struct CouldntLimitToFunctions
 {
 }
 
-public struct UnequalFunctions
+public struct DifferencesLimitedToFunctions
 {
+    //EmptyList => no differences.
     public List<string> FunctionNames { get; }
 
-    public UnequalFunctions(List<string> functionNames)
+    public DifferencesLimitedToFunctions(List<string> functionNames)
     {
         FunctionNames = functionNames;
     }
-    public UnequalFunctions()
+    public DifferencesLimitedToFunctions()
     {
         FunctionNames = new List<string>();
     }
@@ -30,7 +31,7 @@ public class SemanticEqualBreakdown
     private static readonly ILogger<SemanticEqualBreakdown> Logger = SemtexLog.LoggerFactory.CreateLogger<SemanticEqualBreakdown>();
 
 
-    internal static async Task<OneOf<UnequalFunctions, WholeFile>> GetSemanticallyUnequal(Document left, Document right)
+    internal static async Task<OneOf<DifferencesLimitedToFunctions, CouldntLimitToFunctions>> GetSemanticallyUnequal(Document left, Document right)
     {
         Logger.LogInformation("Checking Semantic Equality for {LeftFilePath}", left.FilePath);
         var leftTree = await left.GetSyntaxTreeAsync().ConfigureAwait(false);
@@ -47,11 +48,27 @@ public class SemanticEqualBreakdown
         var rightSemanticModel = rightCompilation!.GetSemanticModel(rightTree!);
         Logger.LogInformation("Evaluating Equality");
         
-        return await GetSemanticallyUnequal(leftRoot, rightRoot, leftSemanticModel, rightSemanticModel, left, right).ConfigureAwait(false); // We can just push down the semantic model getting now that we are passing down the document.
+        // if (true)
+        // {
+        //     File.WriteAllText(
+        //         $"/Users/james_hargreaves/dev/Semtex/Semtex/Out/tmp/left/{leftTree.FilePath.Split("/").Last()}",
+        //         leftTree.ToString());
+        //     File.WriteAllText(
+        //         $"/Users/james_hargreaves/dev/Semtex/Semtex/Out/tmp/right/{leftTree.FilePath.Split("/").Last()}",
+        //         rightTree.ToString());
+        // }
+
+        var res = await GetSemanticallyUnequal(leftRoot, rightRoot, leftSemanticModel, rightSemanticModel, left, right).ConfigureAwait(false); // We can just push down the semantic model getting now that we are passing down the document.
+        if (res.IsT0 && res.AsT0.FunctionNames.Any())
+        {
+            Logger.LogInformation("Resulting diffs = " + string.Join(",", res.AsT0.FunctionNames));
+        }
+        
+        return res;
     }
 
     // The idea here is that we can apply semantic equality bit by bit always falling back to a string comparison.
-    private static async Task<OneOf<UnequalFunctions, WholeFile>> GetSemanticallyUnequal(SyntaxNode left, SyntaxNode right, SemanticModel leftSemanticModel, SemanticModel rightSemanticModel, Document leftDocument, Document rightDocument)
+    private static async Task<OneOf<DifferencesLimitedToFunctions, CouldntLimitToFunctions>> GetSemanticallyUnequal(SyntaxNode left, SyntaxNode right, SemanticModel leftSemanticModel, SemanticModel rightSemanticModel, Document leftDocument, Document rightDocument)
     {
         return (left, right) switch
         {
@@ -59,7 +76,9 @@ public class SemanticEqualBreakdown
             (BaseNamespaceDeclarationSyntax l, BaseNamespaceDeclarationSyntax r) => await GetSemanticallyUnequalNamespace(l, r, leftSemanticModel, rightSemanticModel, leftDocument, rightDocument).ConfigureAwait(false),
             (ClassDeclarationSyntax l, ClassDeclarationSyntax r) => await GetSemanticallyUnequalClassDeclaration(l, r, leftSemanticModel, rightSemanticModel, leftDocument, rightDocument).ConfigureAwait(false),
             (MethodDeclarationSyntax l, MethodDeclarationSyntax r) => await GetSemanticallyUnequalMethodDeclaration(l, r, leftSemanticModel, rightSemanticModel, leftDocument, rightDocument).ConfigureAwait(false),
-            _ => StringEqual(left, right) ? OneOf<UnequalFunctions, WholeFile>.FromT0(new UnequalFunctions()) : OneOf<UnequalFunctions, WholeFile>.FromT1(new WholeFile())
+            _ => StringEqual(left, right) 
+                ? OneOf<DifferencesLimitedToFunctions, CouldntLimitToFunctions>.FromT0(new DifferencesLimitedToFunctions())
+                : OneOf<DifferencesLimitedToFunctions, CouldntLimitToFunctions>.FromT1(new CouldntLimitToFunctions())
         };
     }
     
@@ -104,17 +123,17 @@ public class SemanticEqualBreakdown
         return left.NormalizeWhitespace().ToString() == right.NormalizeWhitespace().ToString();
     }
 
-    private static async Task<OneOf<UnequalFunctions, WholeFile>> GetSemanticallyUnequalCompilationUnit(CompilationUnitSyntax left, CompilationUnitSyntax right, SemanticModel leftSemanticModel, SemanticModel rightSemanticModel, Document leftDocument, Document rightDocument)
+    private static async Task<OneOf<DifferencesLimitedToFunctions, CouldntLimitToFunctions>> GetSemanticallyUnequalCompilationUnit(CompilationUnitSyntax left, CompilationUnitSyntax right, SemanticModel leftSemanticModel, SemanticModel rightSemanticModel, Document leftDocument, Document rightDocument)
     {
         if(SemanticallyEqualUsings(left.Usings, right.Usings) &&
                SemanticallyEqualSyntaxList(left.Externs, right.Externs) &&
                SemanticallyEqualSyntaxList(left.AttributeLists, right.AttributeLists))
             return await SemanticallyEqualMembers(left.Members, right.Members, leftSemanticModel, rightSemanticModel, leftDocument, rightDocument).ConfigureAwait(false);
 
-        return OneOf<UnequalFunctions, WholeFile>.FromT1(new WholeFile());
+        return OneOf<DifferencesLimitedToFunctions, CouldntLimitToFunctions>.FromT1(new CouldntLimitToFunctions());
     }
 
-    private static async Task<OneOf<UnequalFunctions, WholeFile>> GetSemanticallyUnequalNamespace(BaseNamespaceDeclarationSyntax left, BaseNamespaceDeclarationSyntax right, SemanticModel leftSemanticModel, SemanticModel rightSemanticModel, Document leftDocument, Document rightDocument)
+    private static async Task<OneOf<DifferencesLimitedToFunctions, CouldntLimitToFunctions>> GetSemanticallyUnequalNamespace(BaseNamespaceDeclarationSyntax left, BaseNamespaceDeclarationSyntax right, SemanticModel leftSemanticModel, SemanticModel rightSemanticModel, Document leftDocument, Document rightDocument)
     {
         if (SemanticallyEqualSyntaxList(left.Externs, right.Externs) &&
             SemanticallyEqualUsings(left.Usings, right.Usings) &&
@@ -123,10 +142,10 @@ public class SemanticEqualBreakdown
             left.Name.ToString() == right.Name.ToString())
             return await SemanticallyEqualMembers(left.Members, right.Members, leftSemanticModel, rightSemanticModel, leftDocument, rightDocument).ConfigureAwait(false);
 
-        return OneOf<UnequalFunctions, WholeFile>.FromT1(new WholeFile());
+        return OneOf<DifferencesLimitedToFunctions, CouldntLimitToFunctions>.FromT1(new CouldntLimitToFunctions());
     }
     
-    private static async Task<OneOf<UnequalFunctions, WholeFile>> GetSemanticallyUnequalClassDeclaration(ClassDeclarationSyntax left, ClassDeclarationSyntax right, SemanticModel leftSemanticModel, SemanticModel rightSemanticModel, Document leftDocument, Document rightDocument)
+    private static async Task<OneOf<DifferencesLimitedToFunctions, CouldntLimitToFunctions>> GetSemanticallyUnequalClassDeclaration(ClassDeclarationSyntax left, ClassDeclarationSyntax right, SemanticModel leftSemanticModel, SemanticModel rightSemanticModel, Document leftDocument, Document rightDocument)
     {
         if (SemanticallyEqualSyntaxList(left.AttributeLists, right.AttributeLists) &&
             SemanticallyEqualBaseList(left.BaseList, right.BaseList) &&
@@ -136,11 +155,17 @@ public class SemanticEqualBreakdown
             SemanticallyEqualSyntaxTokenList(left.Modifiers, right.Modifiers))
             return await SemanticallyEqualMembers(left.Members, right.Members, leftSemanticModel, rightSemanticModel, leftDocument, rightDocument).ConfigureAwait(false);
 
-        return OneOf<UnequalFunctions, WholeFile>.FromT1(new WholeFile());
+        return OneOf<DifferencesLimitedToFunctions, CouldntLimitToFunctions>.FromT1(new CouldntLimitToFunctions());
     }
 
-    private static async Task<OneOf<UnequalFunctions, WholeFile>> GetSemanticallyUnequalMethodDeclaration(MethodDeclarationSyntax left, MethodDeclarationSyntax right, SemanticModel leftSemanticModel, SemanticModel rightSemanticModel,Document leftDocument, Document rightDocument)
+    private static async Task<OneOf<DifferencesLimitedToFunctions, CouldntLimitToFunctions>> GetSemanticallyUnequalMethodDeclaration(MethodDeclarationSyntax left, MethodDeclarationSyntax right, SemanticModel leftSemanticModel, SemanticModel rightSemanticModel,Document leftDocument, Document rightDocument)
     {
+        var leftId = SemanticSimplifier.GetMethodIdentifier(left);
+        var rightId = SemanticSimplifier.GetMethodIdentifier(right);
+
+        if (leftId != rightId)
+            return new CouldntLimitToFunctions(); // If function identifier has changed then I think the best we can do is opt out. TODO is there something better?
+
         if (!SemanticallyEqualSyntaxList(left.AttributeLists, right.AttributeLists) ||
             !SemanticallyEqualSyntaxList(left.ConstraintClauses, right.ConstraintClauses) ||
             !NullableStringEqual(left.ExplicitInterfaceSpecifier, right.ExplicitInterfaceSpecifier) ||
@@ -151,29 +176,29 @@ public class SemanticEqualBreakdown
             !StringEqual(left.ReturnType, right.ReturnType) ||
             !NullableStringEqual(left.TypeParameterList, right.TypeParameterList) // Not checkint arity as it is covered by TypeParameterList
            )
-            return new UnequalFunctions(new List<string> {SemanticSimplifier.GetMethodIdentifier(left)});
+            return new DifferencesLimitedToFunctions(new List<string> {SemanticSimplifier.GetMethodIdentifier(left)});
 
         if (left.Body == null && right.Body == null)
         {
-            return new UnequalFunctions();
+            return new DifferencesLimitedToFunctions();
         }
         
         // Check the body for equality
         if (left.Body == null && right.Body != null)
         {
-            return new UnequalFunctions(new List<string> {SemanticSimplifier.GetMethodIdentifier(left)});
+            return new DifferencesLimitedToFunctions(new List<string> {SemanticSimplifier.GetMethodIdentifier(left)});
         }
 
         if (left.Body != null && right.Body == null)
         {
-            return new UnequalFunctions(new List<string> {SemanticSimplifier.GetMethodIdentifier(left)});
+            return new DifferencesLimitedToFunctions(new List<string> {SemanticSimplifier.GetMethodIdentifier(left)});
         }
         
         // Calculating Renames is more expensive so lets only do it for methods that are not equal before renaming:
         if (LocalStatementsEquality.SemanticallyEqualLocalStatements(left.Body.Statements, right.Body.Statements,
                 leftSemanticModel, rightSemanticModel, new List<(string left, string right)>()))
         {
-            return new UnequalFunctions();
+            return new DifferencesLimitedToFunctions();
         }
 
         var sw = Stopwatch.StartNew();
@@ -181,16 +206,12 @@ public class SemanticEqualBreakdown
             leftDocument, rightDocument).ConfigureAwait(false);
         Logger.LogInformation(SemtexLog.GetPerformanceStr(nameof(LocalVariableRenamer.GetProposedLocalVariableRenames), sw.ElapsedMilliseconds));
 
-        if(LocalStatementsEquality.SemanticallyEqualLocalStatements(left.Body.Statements, right.Body.Statements, leftSemanticModel, rightSemanticModel, proposedRenames))
-            return new UnequalFunctions();
+        if (LocalStatementsEquality.SemanticallyEqualLocalStatements(left.Body.Statements, right.Body.Statements, leftSemanticModel, rightSemanticModel, proposedRenames))
+        {
+            return new DifferencesLimitedToFunctions();
+        }
 
-        var leftId = SemanticSimplifier.GetMethodIdentifier(left);
-        var rightId = SemanticSimplifier.GetMethodIdentifier(right);
-        // TODO is this logic correct? should it be just the name or do we care about the params etc. Also need to apply it above.
-        if (leftId == rightId)
-            return new UnequalFunctions(new List<string> { SemanticSimplifier.GetMethodIdentifier(left) });
-        
-        return new WholeFile();
+        return new DifferencesLimitedToFunctions(new List<string> {SemanticSimplifier.GetMethodIdentifier(left)});
     }
     
     private static bool SemanticallyEqualUsings(SyntaxList<UsingDirectiveSyntax> left, SyntaxList<UsingDirectiveSyntax> right)
@@ -199,11 +220,11 @@ public class SemanticEqualBreakdown
         var leftUsings = left.Select(u => u.NormalizeWhitespace().ToString()).ToHashSet();
         return leftUsings.SetEquals(right.Select(u => u.NormalizeWhitespace().ToString()));
     }
-    private static async Task<OneOf<UnequalFunctions, WholeFile>> SemanticallyEqualMembers(SyntaxList<MemberDeclarationSyntax> left, SyntaxList<MemberDeclarationSyntax> right, SemanticModel leftSemanticModel, SemanticModel rightSemanticModel, Document leftDocument, Document rightDocument)
+    private static async Task<OneOf<DifferencesLimitedToFunctions, CouldntLimitToFunctions>> SemanticallyEqualMembers(SyntaxList<MemberDeclarationSyntax> left, SyntaxList<MemberDeclarationSyntax> right, SemanticModel leftSemanticModel, SemanticModel rightSemanticModel, Document leftDocument, Document rightDocument)
     {
         // probably worth just making this into its own method - pairwise equality;
         if (left.Count != right.Count)
-            return OneOf<UnequalFunctions, WholeFile>.FromT1(new WholeFile());
+            return OneOf<DifferencesLimitedToFunctions, CouldntLimitToFunctions>.FromT1(new CouldntLimitToFunctions());
 
         var accumulator = new List<string>();
         foreach (var (lMem,rMem) in left.Zip(right))
@@ -216,7 +237,7 @@ public class SemanticEqualBreakdown
             accumulator.AddRange(memberResult.AsT0.FunctionNames);
         }
 
-        return OneOf<UnequalFunctions, WholeFile>.FromT0(new UnequalFunctions(accumulator));
+        return OneOf<DifferencesLimitedToFunctions, CouldntLimitToFunctions>.FromT0(new DifferencesLimitedToFunctions(accumulator));
     }
 
     private static bool StringEqual(SyntaxNode left, SyntaxNode right)

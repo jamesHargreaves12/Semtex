@@ -84,7 +84,7 @@ public sealed class Commands
         var results = new List<CommitModel>();
         foreach (var (c,i) in commits.Select((x,i)=> (x,i)))
         {
-            Logger.LogInformation("Progress = {Pct}, Now checking {C} ", i*100/commits.Count , c);
+            Logger.LogInformation("Progress = {Pct}%, Now checking {C} ", i*100/commits.Count , c);
             var result = await CheckSemanticEquivalence.CheckSemanticallyEquivalent(gitRepo, c, analyzerConfigPath, projFilter, projectMappingFilepath)
                 .ConfigureAwait(false);
             var prettySummary = await DisplayResults.GetPrettySummaryOfResultsAsync(result, gitRepo).ConfigureAwait(false);
@@ -207,7 +207,7 @@ public sealed class Commands
             {
                 unsemanticChangesBuilder.Append(fullDiff);
             }
-            else if (file.Status == Status.SomeMethodsEquivalent)
+            else if (file.Status == Status.SubsetOfDiffEquivalent)
             {
                 var srcFilepath = gitRepo.RootFolder.Join(file.Filepath);
                 var targetFilepath = result.DiffConfig.GetTargetFilepath(srcFilepath);

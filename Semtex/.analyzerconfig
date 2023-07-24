@@ -5,6 +5,7 @@ roslynator_object_creation_parentheses_style = include
 roslynator_empty_string_style = literal
 roslynator_enum_has_flag_style = operator
 roslynator_object_creation_type_style = explicit
+roslynator_use_var_instead_of_implicit_object_creation = true
 roslynator_infinite_loop_style = while
 roslynator_enum_flag_value_style = decimal_number
 generated_code = false # The fix all provider will not fix all on code which has generated code commnet. We will only call fix all if the file is checked into git and so we want to ignore this check.
