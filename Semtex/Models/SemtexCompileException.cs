@@ -1,6 +1,4 @@
-using Semtex.Models;
-
-namespace Semtex.Semantics;
+namespace Semtex.Models;
 
 public class SemtexCompileException : Exception
 {

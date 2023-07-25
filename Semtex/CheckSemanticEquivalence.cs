@@ -172,57 +172,6 @@ public class CheckSemanticEquivalence
         return new ExplicitFileMapToProj(explicitFilePath, rootFolder);
     }
     
-    private static readonly string[] FrameworkPreferenceOrder = new[] {
-        "net11",
-        "net20",
-        "net35",
-        "net40",
-        "net403",
-        "net45",
-        "net451",
-        "net452",
-        "net46",
-        "net461",
-        "net462",
-        "net47",
-        "net471",
-        "net472",
-        "net48",
-        "netcoreapp1.0",
-        "netcoreapp1.1",
-        "netcoreapp2.0",
-        "netcoreapp2.1",
-        "netcoreapp2.2",
-        "netcoreapp3.0",
-        "netcoreapp3.1",
-        "netstandard1.0",
-        "netstandard1.1",
-        "netstandard1.2",
-        "netstandard1.3",
-        "netstandard1.4",
-        "netstandard1.5",
-        "netstandard1.6",
-        "netstandard2.0",
-        "netstandard2.1",
-        "net5.0",
-        "net6.0",
-        "net7.0",
-    };
-
-
-    private static Project GetHighestTargetVersion(IReadOnlyCollection<Project> projects)
-    {
-        if (projects.Count == 1)
-            return projects.Single();
-
-        var monikerPairs = projects.Select(proj => (ProjectNameParser.GetMoniker(proj.Name), proj));
-        var result = monikerPairs.MaxBy(pair =>
-            (Array.IndexOf(FrameworkPreferenceOrder, pair.Item1.Split("-")[0]), // index in the framework list above ignoring environment specific modifiers
-                pair.Item1.Contains("-") ? 0 : 1) // non environment specific should be higher.
-        ).proj; 
-        Logger.LogInformation("Multiple versions of project, chose {Name}", result.Name);
-        return result;
-    }
 
     private static async Task<(Solution simplifiedSln, UnsimplifiedFilesSummary unsimplifiedFilesSummary, List<Project> simplifiedProjects)> GetSimplifiedSolution(
             AbsolutePath? analyzerConfigPath, 
@@ -239,21 +188,21 @@ public class CheckSemanticEquivalence
 
         var (slnStart, failedToRestore, failedToCompile) =
             await SolutionUtils.LoadSolution(projectToFilesMap.Keys.ToList()).ConfigureAwait(false);
+        var projPathsToSimplify =
+            projectToFilesMap.Keys.Where(p => projectToFilesMap[p].Count > 0 && !failedToRestore.Contains(p) && !failedToCompile.Contains(p)).ToHashSet();
+        // TODO pushing this down into SolutionUtils.LoadSolution would avoid wasted work.
+        slnStart = SolutionUtils.FilterSolutionToHighestTargetVersionOfProjects(slnStart, projPathsToSimplify);
         var filepathsInFailedToRestore = failedToRestore.SelectMany(f => projectToFilesMap[f]).ToHashSet();
         var filepathsInFailedToCompile = failedToCompile.SelectMany(f => projectToFilesMap[f]).ToHashSet();
 
         // Because a single project can appear multiple times in a solution if it has multiple target frameworks then we should only pick one.
+        // Even though we do a best effort attempt at removing multiple target versions above this can still occur due to the need to check dependencies.
         var projectsToSimplify = slnStart.Projects
-            .Where(p => p.FilePath != null)
-            .Select(proj => (proj, Path: new AbsolutePath(proj.FilePath!)))
-            .Where(p => projectToFilesMap.ContainsKey(p.Path)
-                        && projectToFilesMap[p.Path].Count > 0
-                        && !failedToRestore.Contains(p.Path)
-                        && !failedToCompile.Contains(p.Path))
-            .GroupBy(p => p.Path)
-            .Select(g => GetHighestTargetVersion(g.Select(pair => pair.proj).ToList()))
+            .Where(p => p.FilePath != null && projPathsToSimplify.Contains(new AbsolutePath(p.FilePath!)))
+            .GroupBy(p => p.FilePath)
+            .Select(g => SolutionUtils.GetHighestTargetVersion(g.ToList()))
             .ToList();
-
+        
         var simplifiedSln = await SemanticSimplifier
             .GetSolutionWithFilesSimplified(slnStart, projectsToSimplify.Select(s=>s.Id).ToList(), projectToFilesMap, analyzerConfigPath,
                 changedMethodsMap)

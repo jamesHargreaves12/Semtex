@@ -405,3 +405,5 @@ FodyWeavers.xsd
 /Semtex/Snapshots/*
 
 CommandLineCache.txt
+
+*.ipynb_checkpoints

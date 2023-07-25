@@ -1,5 +1,6 @@
 using System.Collections.Immutable;
 using System.Diagnostics;
+using System.Text;
 using System.Text.RegularExpressions;
 using CliWrap;
 using CliWrap.Buffered;
@@ -39,14 +40,14 @@ internal sealed class SolutionUtils
     internal static async Task<(Solution sln, List<AbsolutePath> failedToRestore, HashSet<AbsolutePath> failedToCompile)> LoadSolution(List<AbsolutePath> projectPaths)
     {
         var stopwatch = Stopwatch.StartNew();
-        var (sln, failedToRestore) = await LoadSolutionImpl(projectPaths);
+        var (sln, failedToRestore) = await LoadSolutionImpl(projectPaths).ConfigureAwait(false);
         Logger.LogInformation(SemtexLog.GetPerformanceStr(nameof(LoadSolutionImpl), stopwatch.ElapsedMilliseconds));
 
         stopwatch.Restart();
         HashSet<AbsolutePath> failedToCompile;
         try
         {
-            failedToCompile = await CheckProjectsCompile(sln, projectPaths);
+            failedToCompile = await CheckProjectsCompile(sln, projectPaths).ConfigureAwait(false);
         }
         catch (Exception e)
         {
@@ -285,5 +286,104 @@ internal sealed class SolutionUtils
         }
 
         return filePaths;
+    }
+
+    
+    public static Solution FilterSolutionToHighestTargetVersionOfProjects(Solution slnStart, HashSet<AbsolutePath> projectPathsToSimplify)
+    {
+        // Take the highest version of every project that is supported.
+        // Workout the transitive closure of all projects it relies on.
+        // Remove the rest.
+
+        var projectsToKeep = slnStart.Projects
+            .Where(p => p.FilePath != null)
+            .Select(proj => (proj, Path: new AbsolutePath(proj.FilePath!)))
+            .Where(p => projectPathsToSimplify.Contains(p.Path))
+            .GroupBy(p => p.Path)
+            .Select(g => GetHighestTargetVersion(g.Select(pair => pair.proj).ToList())).Select(p=>p.Id).ToHashSet();
+
+        
+        var stack = new Stack<ProjectId>();
+        foreach (var pId in projectsToKeep)
+        {
+            stack.Push(pId);
+        }
+
+        while (stack.Count > 0)
+        {
+            var projId = stack.Pop();
+            foreach (var projRef in slnStart.GetProject(projId)!.ProjectReferences)
+            {
+                if (projectsToKeep.Contains(projRef.ProjectId))continue;
+                projectsToKeep.Add(projRef.ProjectId);
+                stack.Push(projRef.ProjectId);
+            }
+        }
+
+        var sln = slnStart;
+        var sb = new StringBuilder();
+        foreach (var p in slnStart.Projects)
+        {
+            if(projectsToKeep.Contains(p.Id))continue;
+            sln = sln.RemoveProject(p.Id);
+            sb.Append(p.Name + ",");
+        }
+
+        if(sb.Length > 0)
+            Logger.LogInformation("Removed unneeded projects from the sln: {Projs}",sb.ToString());
+        // Removing 
+        return sln;
+    }
+    
+    private static readonly string[] FrameworkPreferenceOrder = new[] {
+        "net11",
+        "net20",
+        "net35",
+        "net40",
+        "net403",
+        "net45",
+        "net451",
+        "net452",
+        "net46",
+        "net461",
+        "net462",
+        "net47",
+        "net471",
+        "net472",
+        "net48",
+        "netcoreapp1.0",
+        "netcoreapp1.1",
+        "netcoreapp2.0",
+        "netcoreapp2.1",
+        "netcoreapp2.2",
+        "netcoreapp3.0",
+        "netcoreapp3.1",
+        "netstandard1.0",
+        "netstandard1.1",
+        "netstandard1.2",
+        "netstandard1.3",
+        "netstandard1.4",
+        "netstandard1.5",
+        "netstandard1.6",
+        "netstandard2.0",
+        "netstandard2.1",
+        "net5.0",
+        "net6.0",
+        "net7.0",
+    };
+
+
+    internal static Project GetHighestTargetVersion(IReadOnlyCollection<Project> projects)
+    {
+        if (projects.Count == 1)
+            return projects.Single();
+
+        var monikerPairs = projects.Select(proj => (ProjectNameParser.GetMoniker(proj.Name), proj));
+        var result = monikerPairs.MaxBy(pair =>
+                (Array.IndexOf(FrameworkPreferenceOrder, pair.Item1.Split("-")[0]), // index in the framework list above ignoring environment specific modifiers
+                    pair.Item1.Contains("-") ? 0 : 1) // non environment specific should be higher.
+        ).proj; 
+        Logger.LogInformation("Multiple versions of project, chose {Name}", result.Name);
+        return result;
     }
 }
