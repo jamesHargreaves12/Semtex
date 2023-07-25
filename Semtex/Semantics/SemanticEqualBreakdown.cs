@@ -47,23 +47,14 @@ public class SemanticEqualBreakdown
         var rightCompilation = await right.Project.GetCompilationAsync().ConfigureAwait(false);
         var rightSemanticModel = rightCompilation!.GetSemanticModel(rightTree!);
         Logger.LogInformation("Evaluating Equality");
-        
-        // if (true)
-        // {
-        //     File.WriteAllText(
-        //         $"/Users/james_hargreaves/dev/Semtex/Semtex/Out/tmp/left/{leftTree.FilePath.Split("/").Last()}",
-        //         leftTree.ToString());
-        //     File.WriteAllText(
-        //         $"/Users/james_hargreaves/dev/Semtex/Semtex/Out/tmp/right/{leftTree.FilePath.Split("/").Last()}",
-        //         rightTree.ToString());
-        // }
+
 
         var res = await GetSemanticallyUnequal(leftRoot, rightRoot, leftSemanticModel, rightSemanticModel, left, right).ConfigureAwait(false); // We can just push down the semantic model getting now that we are passing down the document.
         if (res.IsT0 && res.AsT0.FunctionNames.Any())
         {
             Logger.LogInformation("Resulting diffs = " + string.Join(",", res.AsT0.FunctionNames));
         }
-        
+
         return res;
     }
 
@@ -259,4 +250,8 @@ public class SemanticEqualBreakdown
 
         return left.NormalizeWhitespace().ToString() == right.NormalizeWhitespace().ToString();
     }
+}
+
+internal class B
+{
 }

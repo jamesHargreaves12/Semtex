@@ -11,6 +11,12 @@ public sealed class ClosestAncestorProjHeuristic : IProjFinder
 
     public (Dictionary<AbsolutePath, HashSet<AbsolutePath>>, HashSet<AbsolutePath> unableToFindProj) GetProjectToFileMapping(HashSet<AbsolutePath> filepaths, AbsolutePath? projFilter)
     {
+
+        if(projFilter is not null)
+        {
+            Logger.LogInformation("Project filter limiting project to only {FilePath}", projFilter.Path);
+        }
+
         var fileToProj = new List<(AbsolutePath Path, AbsolutePath projPath)>();
         var unableToFindProj = new HashSet<AbsolutePath>();
         foreach (var filepath in filepaths)
