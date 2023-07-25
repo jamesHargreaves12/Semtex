@@ -31,7 +31,7 @@ public sealed class ClosestAncestorProjHeuristic : IProjFinder
                 }
                 else
                 {
-                    Logger.LogWarning("Skipping {Filepath} due to the project filter", filepath.Path);
+                    Logger.LogWarning("Skipping due to the project filter");
                     unableToFindProj.Add(filepath);
                 }
             }
@@ -67,7 +67,7 @@ public sealed class ClosestAncestorProjHeuristic : IProjFinder
                     continue;
                 case 1:
                     var projFile = csProjFilesInDir.Single();
-                    Logger.LogInformation("Project {ProjFile} is closest ancestor of {Filepath}", projFile, filepath.Path);
+                    Logger.LogInformation("Project {ProjFile} is closest ancestor", projFile);
                     return new AbsolutePath(projFile);
                 default:
                     throw new UnableToFindProjectException(
