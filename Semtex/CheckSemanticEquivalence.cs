@@ -3,6 +3,7 @@ using Microsoft.CodeAnalysis;
 using Semtex.ProjectFinder;
 using Semtex.Semantics;
 using Microsoft.Extensions.Logging;
+using OneOf;
 using Semtex.Logging;
 using Semtex.Models;
 
@@ -26,7 +27,7 @@ public class CheckSemanticEquivalence
             // Todo improve this early exit
             var fileModels = await GetFileModels(gitRepo, diffConfig, UnsimplifiedFilesSummary.Empty(),
                     UnsimplifiedFilesSummary.Empty(), new List<Project>(), new List<Project>(),
-                    new Dictionary<AbsolutePath, HashSet<string>>(), new Dictionary<AbsolutePath, HashSet<string>>())
+                    new Dictionary<AbsolutePath, HashSet<string>>())
                 .ConfigureAwait(false);
 
             return new CommitModel(target, fileModels, stopWatch.ElapsedMilliseconds, diffConfig)
@@ -83,7 +84,7 @@ public class CheckSemanticEquivalence
             var (sourceSln, sourceUnsimplifiedFiles, srcSimplifiedProjects) =
                 await GetSimplifiedSolution(analyzerConfigPath, sourceFilesToSimplify, projFilter, projectMappingFilepath, gitRepo.RootFolder, targetChangedMethodsMap).ConfigureAwait(false);
 
-            var result = await GetFileModels(gitRepo, diffConfig, targetUnsimplifiedFiles, sourceUnsimplifiedFiles, srcSimplifiedProjects, targetSimplifiedProjects, sourceChangedMethods, targetChangedMethods).ConfigureAwait(false);
+            var result = await GetFileModels(gitRepo, diffConfig, targetUnsimplifiedFiles, sourceUnsimplifiedFiles, srcSimplifiedProjects, targetSimplifiedProjects, sourceChangedMethods).ConfigureAwait(false);
             // I am not sure why the GC is not smart enough to do this itself. But these lines prevent a linear increase in memory usage that just kills the process after a while.
             // Could it be the caching within Roslyn is holding references to some nodes which are then causing the reference to the wholue workspace to be held.  
             sourceSln.Workspace.Dispose();
@@ -96,11 +97,19 @@ public class CheckSemanticEquivalence
         }
         catch (SemtexCompileException e)
         {
-            var commandline = $"check {gitRepo.RemoteUrl} {target} --source {source} --project-filter \"{gitRepo.GetRelativePath(e.ProjectPath)}\"";
+            var commandline = GetReproCommandline(gitRepo, target, source, e.ProjectPath);
             Logger.LogInformation("To reproduce the error use the following commandline args: \n {Commandline}", commandline);
             throw;
         }
         
+    }
+
+    private static string GetReproCommandline(GitRepo gitRepo, string target, string source, AbsolutePath? projectPath)
+    {
+        var projectFilter = projectPath is null ? "" : $"--project-filter \"{gitRepo.GetRelativePath(projectPath)}";
+        var commandline =
+            $"check {gitRepo.RemoteUrl} {target} --source {source} {projectFilter}\"";
+        return commandline;
     }
 
     private static async Task<DiffConfig> GetDiffConfig(GitRepo gitRepo, string target, string source)
@@ -122,7 +131,7 @@ public class CheckSemanticEquivalence
 
         return new DiffConfig(
             addedFilepaths, removedFilepaths, renamedFilepaths, allSourceFilePaths, sourceCsFilepaths,
-            targetCsFilepaths);
+            targetCsFilepaths, target, source);
     }
 
 
@@ -313,8 +322,7 @@ public class CheckSemanticEquivalence
     private static async Task<List<FileModel>> GetFileModels(GitRepo gitRepo, DiffConfig diffConfig,
         UnsimplifiedFilesSummary targetUnsimplified, UnsimplifiedFilesSummary sourceUnsimplified,
         List<Project> simplifiedSrcProjects, List<Project> simplifiedTargetProjects,
-        Dictionary<AbsolutePath, HashSet<string>> sourceChangedMethods
-        ,Dictionary<AbsolutePath, HashSet<string>> targetChangedMethods )
+        Dictionary<AbsolutePath, HashSet<string>> sourceChangedMethods)
     {
         Stopwatch? stopwatch = null;
         var fileResults = diffConfig.AddedFilepaths.Select(addedFp => 
@@ -397,11 +405,27 @@ public class CheckSemanticEquivalence
                 fileResults.Add(new FileModel(relativePath, Status.UnableToFindProj));
                 continue;
             }
-
-            
+        
             (stopwatch ??= new Stopwatch()).Restart();
-            var semanticallyUnequal =
-                await SemanticEqualBreakdown.GetSemanticallyUnequal(sourceDocs.Single(), targetDocs.Single()).ConfigureAwait(false);
+
+            OneOf<DifferencesLimitedToFunctions, CouldntLimitToFunctions> semanticallyUnequal;
+
+            try
+            {
+                semanticallyUnequal =
+                    await SemanticEqualBreakdown.GetSemanticallyUnequal(sourceDocs.Single(), targetDocs.Single())
+                        .ConfigureAwait(false);
+            }
+            catch (Exception)
+            {
+                var projectPathRaw = sourceDocs.Single().Project.FilePath;
+                var projectPath = projectPathRaw is null ? null : new AbsolutePath(projectPathRaw);
+                var commandline = GetReproCommandline(gitRepo, diffConfig.TargetSha, diffConfig.SourceSha, projectPath);
+                Logger.LogInformation("To reproduce the error use the following commandline args: \n {Commandline}", commandline);
+                throw;
+            }
+
+
             Logger.LogInformation(SemtexLog.GetPerformanceStr(nameof(SemanticEqualBreakdown.GetSemanticallyUnequal), stopwatch.ElapsedMilliseconds));
 
             var result = semanticallyUnequal.Match(
