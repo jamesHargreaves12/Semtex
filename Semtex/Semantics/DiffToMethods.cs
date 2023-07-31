@@ -11,6 +11,7 @@ namespace Semtex.Semantics;
 
 public class DiffToMethods
 {
+    public const string TOP_LEVEL_USING_IDENTIFIER = "<top_level_using>";
     private static readonly ILogger<DiffToMethods> Logger = SemtexLog.LoggerFactory.CreateLogger<DiffToMethods>();
     /// <summary>
     /// If all the changes in a function are within functions then we will only apply the analyzers that are located within those functions.
@@ -75,7 +76,7 @@ public class DiffToMethods
                     methodIdentifier = SemanticSimplifier.GetMethodIdentifier(methodDeclarationSyntax);
                     return true;
                 case UsingDirectiveSyntax { Parent: CompilationUnitSyntax }:
-                    methodIdentifier = "<top_level_using>"; // Special casing top level using as they will often change, methodIdentifier should be a union.
+                    methodIdentifier = TOP_LEVEL_USING_IDENTIFIER; // Special casing top level using as they will often change, methodIdentifier should be a union.
                     return true;
                 case ClassDeclarationSyntax or CompilationUnitSyntax or NamespaceDeclarationSyntax:
                     methodIdentifier = null;

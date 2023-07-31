@@ -116,12 +116,17 @@ public class SemanticEqualBreakdown
 
     private static async Task<OneOf<DifferencesLimitedToFunctions, CouldntLimitToFunctions>> GetSemanticallyUnequalCompilationUnit(CompilationUnitSyntax left, CompilationUnitSyntax right, SemanticModel leftSemanticModel, SemanticModel rightSemanticModel, Document leftDocument, Document rightDocument)
     {
-        if(SemanticallyEqualUsings(left.Usings, right.Usings) &&
-               SemanticallyEqualSyntaxList(left.Externs, right.Externs) &&
-               SemanticallyEqualSyntaxList(left.AttributeLists, right.AttributeLists))
-            return await SemanticallyEqualMembers(left.Members, right.Members, leftSemanticModel, rightSemanticModel, leftDocument, rightDocument).ConfigureAwait(false);
+        if(!SemanticallyEqualSyntaxList(left.Externs, right.Externs)
+           || !SemanticallyEqualSyntaxList(left.AttributeLists, right.AttributeLists))
+            return new CouldntLimitToFunctions();
+        
+        var memberResult = await SemanticallyEqualMembers(left.Members, right.Members, leftSemanticModel, rightSemanticModel, leftDocument, rightDocument).ConfigureAwait(false);
+        if (memberResult.IsT1 || SemanticallyEqualUsings(left.Usings, right.Usings))
+            return memberResult;
 
-        return OneOf<DifferencesLimitedToFunctions, CouldntLimitToFunctions>.FromT1(new CouldntLimitToFunctions());
+        return new DifferencesLimitedToFunctions(memberResult.AsT0.FunctionNames
+            .Append(DiffToMethods.TOP_LEVEL_USING_IDENTIFIER).ToList());
+
     }
 
     private static async Task<OneOf<DifferencesLimitedToFunctions, CouldntLimitToFunctions>> GetSemanticallyUnequalNamespace(BaseNamespaceDeclarationSyntax left, BaseNamespaceDeclarationSyntax right, SemanticModel leftSemanticModel, SemanticModel rightSemanticModel, Document leftDocument, Document rightDocument)

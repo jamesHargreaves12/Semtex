@@ -6,7 +6,7 @@ from utils import read_summaries
 import argparse
 
 
-def write_snapshot_files(left_path: Path, right_path: Path):
+def calc_perf(left_path: Path, right_path: Path):
     left_commits = read_summaries(left_path)
     right_commits = read_summaries(right_path)
     left_lookup = {x['CommitHash']:x for x in left_commits}
@@ -14,6 +14,11 @@ def write_snapshot_files(left_path: Path, right_path: Path):
 
     common = set(left_lookup.keys()).intersection(right_lookup.keys())
     print(f"Left has {len(left_commits)} commits and {len(common)} of these are common with right")
+
+    if not common:
+        print(f"⚠️ No commits in common so not doing perf")
+        return
+
 
     left_elapsed = [left_lookup[sha]["ElapsedMilliseconds"] / 1000 for sha in common]
     right_elapsed = [right_lookup[sha]["ElapsedMilliseconds"] / 1000 for sha in common]
@@ -43,4 +48,4 @@ if __name__ == "__main__":
     parser.add_argument('left')
     parser.add_argument('right')
     args = parser.parse_args()
-    write_snapshot_files(Path(os.path.join(os.getcwd(), args.left)), Path(os.path.join(os.getcwd(), args.right)))
+    calc_perf(Path(os.path.join(os.getcwd(), args.left)), Path(os.path.join(os.getcwd(), args.right)))

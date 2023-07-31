@@ -1,7 +1,6 @@
 using CliWrap;
 using CliWrap.Buffered;
 using CliWrap.Exceptions;
-using Microsoft.CodeAnalysis.FlowAnalysis.DataFlow.ValueContentAnalysis;
 using Microsoft.Extensions.Logging;
 using Semtex.Logging;
 using Semtex.Models;
