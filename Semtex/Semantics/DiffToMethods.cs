@@ -3,12 +3,15 @@ using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
 using Microsoft.CodeAnalysis.Text;
+using Microsoft.Extensions.Logging;
+using Semtex.Logging;
 using Semtex.Models;
 
 namespace Semtex.Semantics;
 
 public class DiffToMethods
 {
+    private static readonly ILogger<DiffToMethods> Logger = SemtexLog.LoggerFactory.CreateLogger<DiffToMethods>();
     /// <summary>
     /// If all the changes in a function are within functions then we will only apply the analyzers that are located within those functions.
     /// </summary>
@@ -65,42 +68,83 @@ public class DiffToMethods
         var node = root!.FindNode(span);
         while (true)
         {
-            if (node is MethodDeclarationSyntax methodDeclarationSyntax) // need other cases here e.g. getters
+            switch (node)
             {
-                methodIdentifier = SemanticSimplifier.GetMethodIdentifier(methodDeclarationSyntax);
-                return true;
-            }
-
-            if (node is ClassDeclarationSyntax or CompilationUnitSyntax or NamespaceDeclarationSyntax)
-            {
-                methodIdentifier = null;
-                return false;
+                // need other cases here e.g. getters
+                case MethodDeclarationSyntax methodDeclarationSyntax:
+                    methodIdentifier = SemanticSimplifier.GetMethodIdentifier(methodDeclarationSyntax);
+                    return true;
+                case UsingDirectiveSyntax { Parent: CompilationUnitSyntax }:
+                    methodIdentifier = "<top_level_using>"; // Special casing top level using as they will often change, methodIdentifier should be a union.
+                    return true;
+                case ClassDeclarationSyntax or CompilationUnitSyntax or NamespaceDeclarationSyntax:
+                    methodIdentifier = null;
+                    return false;
             }
 
             node = node.Parent;
         }
     }
 
-    internal static (string semanticDiff,string unsemanticDiff) SplitDiffByChanged(string sourceText, string targetText,
-        HashSet<string> changedMethodIdentifiers, List<(LineDiff,LineDiff,string)> diffs)
+    internal static (string semanticDiff, string unsemanticDiff) SplitDiffByChanged(string sourceText,
+        string targetText,
+        HashSet<string> changedMethodIdentifiers, List<(LineDiff, LineDiff)> diffs,
+        List<(LineDiff left, LineDiff right, string text)> diffWithContext)
     {
         var srcFileLines = SourceText.From(sourceText).Lines;
         var srcRoot = CSharpSyntaxTree.ParseText(sourceText).GetRoot();
         var targetFileLines = SourceText.From(targetText).Lines;
         var targetRoot = CSharpSyntaxTree.ParseText(targetText).GetRoot();
-        var semanticDiff = new StringBuilder();
-        var unsemanticDiff = new StringBuilder();
-        foreach (var (srcDiff, targetDiff, text) in diffs)
+
+        var semanticIndecies = new HashSet<int>();
+        foreach (var (srcDiff, targetDiff) in diffs)
         {
+            var lineChangesWithContext = diffWithContext
+                .Select((val,i)=>(val, i))
+                .Where(item => item.val.left.Contains(srcDiff))
+                .ToList();
+            
+            if (lineChangesWithContext.Count == 0)
+            {
+                Logger.LogWarning("--unified=0 diff {Src} not contained in normal diff hunk", srcDiff);
+                return (string.Join("\n", diffWithContext.Select(x => x.text)), "");
+            }
+            if (lineChangesWithContext.Count > 1)
+            {
+                Logger.LogWarning("--unified=0 diff {Src} contained in {Count} normal diff hunks", srcDiff, lineChangesWithContext.Count);
+                return (string.Join("\n", diffWithContext.Select(x => x.text)), "");
+            }
+
+            var (withContext, i) = lineChangesWithContext.Single();
+            
+            if(!withContext.right.Contains(targetDiff))
+            {
+                Logger.LogWarning(
+                    "targetDiff not contained in same hunk as srcDiff: \n{SrcDiff} in {Left}\n{TargetDiff} not in {Right}",
+                    srcDiff, withContext.left, targetDiff, withContext.right);
+                return (string.Join("\n", diffWithContext.Select(x => x.text)), "");
+            }
+
+
             if (!TryGetMethodIdentifier(srcDiff, srcFileLines, srcRoot, out var srcMethodIdentifier)
                 || !TryGetMethodIdentifier(targetDiff, targetFileLines, targetRoot, out var targetMethodIdentifier)
                 || srcMethodIdentifier != targetMethodIdentifier // TODO think about this line some more
                )
             {
-                return (string.Join("\n", diffs.Select(x => x.Item3)), "");
+                return (string.Join("\n", diffWithContext.Select(x => x.text)), "");
             }
 
             if (changedMethodIdentifiers.Contains(srcMethodIdentifier!))
+            {
+                semanticIndecies.Add(i);
+            }
+        }
+
+        var semanticDiff = new StringBuilder();
+        var unsemanticDiff = new StringBuilder();
+        foreach (var ((src, trg, text), i) in diffWithContext.Select((val, i) => (val, i)))
+        {
+            if (semanticIndecies.Contains(i))
             {
                 semanticDiff.AppendLine(text);
             }

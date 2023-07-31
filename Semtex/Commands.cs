@@ -180,12 +180,12 @@ public sealed class Commands
 
         await gitRepo.Checkout(baseCommit);
 
-        await gitRepo.ApplyPatch(new AbsolutePath(patchFilepath));
+        await gitRepo.ApplyPatch(new AbsolutePath(patchFilepath)).ConfigureAwait(false);
         await gitRepo.AddAllAndCommit().ConfigureAwait(false);
 
-        var commitWithPatch = await gitRepo.GetCurrentCommitSha();
+        var commitWithPatch = await gitRepo.GetCurrentCommitSha().ConfigureAwait(false);
 
-        await FindSplit(gitRepo, commitWithPatch, projectMapPath);
+        await FindSplit(gitRepo, commitWithPatch, projectMapPath).ConfigureAwait(false);
     }
 
     private static async Task FindSplit(GitRepo gitRepo, string commit, AbsolutePath? projectMapPath)
@@ -201,7 +201,7 @@ public sealed class Commands
         foreach (var file in result.FileModels)
         {
             var srcSha = $"{commit}~1";
-            var fullDiff = await gitRepo.GetFileDiff(srcSha, commit, file.Filepath);
+            var fullDiff = await gitRepo.GetFileDiff(srcSha, commit, file.Filepath).ConfigureAwait(false);
             // Probably just make this a switch statemenmt
             if(semanticallyEquivalentStatuses.Contains(file.Status))
             {
@@ -212,9 +212,10 @@ public sealed class Commands
                 var srcFilepath = gitRepo.RootFolder.Join(file.Filepath);
                 var targetFilepath = result.DiffConfig.GetTargetFilepath(srcFilepath);
                 var lineChanges = await gitRepo.GetLineChanges(srcSha, commit, srcFilepath).ConfigureAwait(false);
-                var sourceText = await gitRepo.GetFileTextAtCommit(srcSha, srcFilepath);
-                var targetText = await gitRepo.GetFileTextAtCommit(commit, targetFilepath);
-                var (semanticDiff,unsemanticDiff) = DiffToMethods.SplitDiffByChanged(sourceText, targetText, file.SubsetOfMethodsThatAreNotEquivalent!, lineChanges);
+                var lineChangesWithContex = await gitRepo.GetLineChangesWithContex(srcSha, commit, srcFilepath).ConfigureAwait(false);
+                var sourceText = await gitRepo.GetFileTextAtCommit(srcSha, srcFilepath).ConfigureAwait(false);
+                var targetText = await gitRepo.GetFileTextAtCommit(commit, targetFilepath).ConfigureAwait(false);
+                var (semanticDiff,unsemanticDiff) = DiffToMethods.SplitDiffByChanged(sourceText, targetText, file.SubsetOfMethodsThatAreNotEquivalent!, lineChanges, lineChangesWithContex);
                 var header = string.Join("\n", fullDiff.Split("\n").Take(4));
                 
                 if (semanticDiff.Any())
@@ -235,7 +236,7 @@ public sealed class Commands
             }
         }
         
-        var resultStr = await DisplayResults.GetPrettySummaryOfResultsAsync(result, gitRepo, "changes");
+        var resultStr = await DisplayResults.GetPrettySummaryOfResultsAsync(result, gitRepo, "changes").ConfigureAwait(false);
         Logger.LogInformation(resultStr);
 
         var semanticFilepath = Path.Join(ScratchSpacePath, "change_behaviour.patch");

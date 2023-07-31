@@ -1,13 +1,22 @@
 using CliWrap;
 using CliWrap.Buffered;
 using CliWrap.Exceptions;
+using Microsoft.CodeAnalysis.FlowAnalysis.DataFlow.ValueContentAnalysis;
 using Microsoft.Extensions.Logging;
 using Semtex.Logging;
 using Semtex.Models;
 
 namespace Semtex;
 
-public record LineDiff(int Start, int Count){}
+public record LineDiff(int Start, int Count)
+{
+    private int End => Start + Count;
+
+    public bool Contains(LineDiff other)
+    {
+        return Start <= other.Start && End >= other.End;
+    }
+}
 
 internal class GitRepo
 {
@@ -431,7 +440,45 @@ internal class GitRepo
         Logger.LogInformation("Finished diff");
     }
     
-    public async Task<List<(LineDiff, LineDiff, string)>> GetLineChanges(string sourceSha, string targetSha, AbsolutePath sourceFileName)
+    public async Task<List<(LineDiff, LineDiff)>> GetLineChanges(string sourceSha, string targetSha, AbsolutePath sourceFileName)
+    {
+        var gitDiffCmd = Cli.Wrap("git")
+            .WithArguments(new[]
+            {
+                "diff",
+                $"{sourceSha}..{targetSha}",
+                "--unified=0",
+                "--", sourceFileName.Path
+            })
+            .WithWorkingDirectory(RootFolder.Path)
+            .WithStandardOutputPipe(PipeTarget.ToDelegate(s=>
+            {
+                if (s.StartsWith("@@")) Logger.LogInformation(FormatOutputString(s)); // Only show the @@ lines as its to noisey otherwise
+            }))
+            .WithStandardErrorPipe(StdErrPipe);
+        Logger.LogInformation("Executing {GitDiffCmd}",gitDiffCmd);
+        var cmdResult = await gitDiffCmd.ExecuteBufferedAsync();
+        Logger.LogInformation("Finished");
+        var lines = cmdResult.StandardOutput
+            .Split("\n");
+        var result = new List<(LineDiff,LineDiff)>();
+        var diffLines = lines
+            .Select((line, i) => (line, i))
+            .Where(pair => pair.line.StartsWith("@@"))
+            .Select(pair => pair.i).ToList(); 
+
+        foreach (var (start,end) in diffLines.Zip(diffLines.Skip(1).Concat(new[] {lines.Length})))
+        {
+            var parts = lines[start].Split(" ");
+            var leftParts = parts[1];
+            var rightPart = parts[2];
+            result.Add((GetLineDiff(leftParts), GetLineDiff(rightPart)));
+        }
+
+        return result;
+    }
+
+    public async Task<List<(LineDiff, LineDiff, string)>> GetLineChangesWithContex(string sourceSha, string targetSha, AbsolutePath sourceFileName)
     {
         var gitDiffCmd = Cli.Wrap("git")
             .WithArguments(new[]
