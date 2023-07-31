@@ -25,7 +25,11 @@ public sealed class AnalyzerConfigOverwrite
     {
         var project = sln.GetProject(projId)!;
         // Strip out all existing config docs. TODO perhaps it would be better to try do some kinda merge here? But this is better then letting it be overriden by actual editor config files.
-        var configDocuments = project.AnalyzerConfigDocuments.ToList();
+        var whitelistConfigDocumentName = $"{project.Name}.GeneratedMSBuildEditorConfig.editorconfig";
+        var configDocuments = project.AnalyzerConfigDocuments
+            .Where(x=>x.Name != whitelistConfigDocumentName)
+            .ToList();
+        
         Logger.LogWarning(
             $"Stripping out Existing config documents {string.Join(",", configDocuments.Select(c => c.FilePath))}");
         var newSln = sln.RemoveAnalyzerConfigDocuments(configDocuments.Select(d => d.Id).ToImmutableArray());
