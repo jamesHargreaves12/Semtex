@@ -20,7 +20,10 @@ internal static class SemtexLog
                 .AddFilter("Microsoft", LogLevel.Warning)
                 .AddFilter("System", LogLevel.Warning)
                 .AddFilter("LoggingConsoleApp.Program", LogLevel.Debug)
-                .AddConsole(options => options.FormatterName = nameof(SemtexConsoleFormatter))
+                .AddConsole(options =>
+                {
+                    options.FormatterName = nameof(SemtexConsoleFormatter);
+                })
                 .AddConsoleFormatter<SemtexConsoleFormatter, ConsoleFormatterOptions>(options =>
                 {
                     options.TimestampFormat = timestampFormat;

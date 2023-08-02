@@ -453,12 +453,11 @@ internal class GitRepo
             .WithWorkingDirectory(RootFolder.Path)
             .WithStandardOutputPipe(PipeTarget.ToDelegate(s=>
             {
-                if (s.StartsWith("@@")) Logger.LogInformation(FormatOutputString(s)); // Only show the @@ lines as its to noisey otherwise
+                if (s.StartsWith("@@")) Logger.LogDebug(FormatOutputString(s)); // Only show the @@ lines as its to noisey otherwise
             }))
             .WithStandardErrorPipe(StdErrPipe);
         Logger.LogInformation("Executing {GitDiffCmd}",gitDiffCmd);
         var cmdResult = await gitDiffCmd.ExecuteBufferedAsync();
-        Logger.LogInformation("Finished");
         var lines = cmdResult.StandardOutput
             .Split("\n");
         var result = new List<(LineDiff,LineDiff)>();
@@ -490,12 +489,11 @@ internal class GitRepo
             .WithWorkingDirectory(RootFolder.Path)
             .WithStandardOutputPipe(PipeTarget.ToDelegate(s=>
             {
-                if (s.StartsWith("@@")) Logger.LogInformation(FormatOutputString(s)); // Only show the @@ lines as its to noisey otherwise
+                if (s.StartsWith("@@")) Logger.LogDebug(FormatOutputString(s)); // Only show the @@ lines as its to noisey otherwise
             }))
             .WithStandardErrorPipe(StdErrPipe);
         Logger.LogInformation("Executing {GitDiffCmd}",gitDiffCmd);
         var cmdResult = await gitDiffCmd.ExecuteBufferedAsync();
-        Logger.LogInformation("Finished");
         var lines = cmdResult.StandardOutput
             .Split("\n");
         var result = new List<(LineDiff,LineDiff,string)>();

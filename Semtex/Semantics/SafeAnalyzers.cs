@@ -195,7 +195,8 @@ public sealed class SafeAnalyzers
             {
                 break;
             }
-            
+
+            var sw = Stopwatch.StartNew();
             // Apply one diagnostic for each file that we care about. This makes the assumption that changes to one file wont invalidate the diagnostic in another.
             foreach (var documentFilepath in documentFilepaths)
             {
@@ -233,7 +234,6 @@ public sealed class SafeAnalyzers
                     diagnosticsToApply.First().Location.GetLineSpan());
 
                 var fixProvider = CodeFixProviders[descriptorId];
-                
                 var nextSolution = await MakeCodeFixForAllDiagnostic(
                     document,
                     descriptorId,
@@ -248,7 +248,8 @@ public sealed class SafeAnalyzers
                     diagnosticsThatDidntMakeFix.Add((documentFilepath.Path, descriptorId));
                 }
             }
-            // Surely there is an easy way to filter these by file and then we can compile each time rather than this horrible method.
+
+            Logger.LogInformation(SemtexLog.GetPerformanceStr(nameof(MakeCodeFixForAllDiagnostic), sw.ElapsedMilliseconds));
         }
 
         return currentSolution;
@@ -399,6 +400,7 @@ public sealed class SafeAnalyzers
             return await MakeCodeFixForDiagnostic(document, nonOverlappingDiagnostic.First(d => d.Descriptor.Id == diagnosticDescriptorId), fixProvider).ConfigureAwait(false);
         
         // Compute the equivalence key of the first diagnostic
+        var sw = Stopwatch.StartNew();
         var codeActions = new List<CodeAction>();
         var context = new CodeFixContext(
             document,
@@ -407,6 +409,8 @@ public sealed class SafeAnalyzers
             default
         );
         await fixProvider.RegisterCodeFixesAsync(context).ConfigureAwait(false);
+        if (sw.ElapsedMilliseconds > 500)
+            Logger.LogInformation(SemtexLog.GetPerformanceStr(nameof(fixProvider.RegisterCodeFixesAsync), sw.ElapsedMilliseconds));
 
         if (!codeActions.Any())
         {
@@ -419,7 +423,6 @@ public sealed class SafeAnalyzers
 
         // Apply the all diagnostic with the same the equivalence key
         // This causes issues. https://github.com/dotnet/roslyn/issues/59130 need to have a think about what the best solution is here. Step 1 should be learning more about this DocumentBasedCodeFixProvider.
-        var sw = Stopwatch.StartNew();
         var fixAllProvider = fixProvider.GetFixAllProvider() ?? WellKnownFixAllProviders.BatchFixer;
         var fixAllContext = new FixAllContext(
             document,
@@ -433,6 +436,7 @@ public sealed class SafeAnalyzers
 
         try
         {
+            sw.Restart();
             var fixAll = await fixAllProvider.GetFixAsync(fixAllContext).ConfigureAwait(false);
             
             if (sw.ElapsedMilliseconds > 500)
