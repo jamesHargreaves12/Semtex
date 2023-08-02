@@ -25,7 +25,8 @@ internal class GitRepo
 
     public string RemoteUrl { get; }
     private static Func<string,string> FormatOutputString = s => $"[git] {s}";
-    private static readonly PipeTarget StdOutPipe = PipeTarget.ToDelegate(s => Logger.LogInformation(FormatOutputString(s)));
+    // This is noisy for little gain. May regret this but right now its a pain.
+    private static readonly PipeTarget StdOutPipe = PipeTarget.ToDelegate(s => Logger.LogDebug(FormatOutputString(s)));
     private static readonly PipeTarget StdErrPipe = PipeTarget.ToDelegate(s => Logger.LogError(FormatOutputString(s)));
 
     private GitRepo(AbsolutePath rootFolder, string remoteUrl)
