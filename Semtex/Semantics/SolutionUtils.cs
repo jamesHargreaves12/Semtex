@@ -210,6 +210,13 @@ internal sealed class SolutionUtils
         var sw = Stopwatch.StartNew();
         foreach (var path in projectPaths)
         {
+            var projectAssetsPath = Path.Join(Directory.GetParent(path.Path)!.FullName, "obj/project.assets.json");
+            if (Path.Exists(projectAssetsPath))
+            {
+                Logger.LogDebug("Project Assets File already exists so skipping restore on {Path}", path);
+                continue;
+            }
+
             // just avoiding wasting time as we could do this every commit otherwise.
             // Sometimes we will need to rerun it. Not sure when this is - Could we diff the proj file to find out - doesn't help with dependent projs.?
             if (AlreadyRunDotNetRestoreOnProj.Contains(path))

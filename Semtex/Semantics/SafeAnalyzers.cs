@@ -230,7 +230,7 @@ public sealed class SafeAnalyzers
                 var diagnosticsToApply = groupedDiagnostics.First();
                 var descriptorId = diagnosticsToApply.Key;
 
-                Logger.LogInformation("Fixing {DescriptorId} on {LineSpan}", descriptorId,
+                Logger.LogInformation("Fixing {DescriptorId} x {N} on {LineSpan}", descriptorId, diagnosticsToApply.Count(),
                     diagnosticsToApply.First().Location.GetLineSpan());
 
                 var fixProvider = CodeFixProviders[descriptorId];
