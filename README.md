@@ -41,3 +41,4 @@ dotnet tool install semtex --global
 ```
 
 Happy coding! Let Semtex remove the Git friction so you can focus on improving your codebase.
+
