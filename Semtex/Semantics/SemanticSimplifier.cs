@@ -1,6 +1,9 @@
+using System.Diagnostics;
 using Semtex.Rewriters;
 using Microsoft.CodeAnalysis;
+using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
+using Microsoft.CodeAnalysis.Simplification;
 using Microsoft.Extensions.Logging;
 using Semtex.Logging;
 using Semtex.Models;
@@ -30,25 +33,38 @@ internal class SemanticSimplifier
 
         return sln;
     }
-    
 
+
+    private static List<CSharpSyntaxRewriter> _rewriters = new()
+    {
+        new RemoveTriviaRewriter(),
+        new ConsistentOrderRewriter(),
+        new RemoveSuppressNullableWarningRewriter(),
+        new ApplySimplificationServiceRewriter(),
+    };
     private static async Task<Solution> ApplyRewriters(Solution sln, ProjectId projectId,
         HashSet<AbsolutePath> docsToSimplify)
     {
-        var stingDocsToSimplify = docsToSimplify.Select(d => d.Path).ToHashSet(); 
+        var sw = Stopwatch.StartNew();
+        var docsToSimplifyString = docsToSimplify.Select(d => d.Path).ToHashSet(); 
         var simplifiedDocs = sln.GetProject(projectId)!.Documents
-            .Where(d => stingDocsToSimplify.Contains(d.FilePath!));
+            .Where(d => docsToSimplifyString.Contains(d.FilePath!));
 
         foreach (var doc in simplifiedDocs)
         {
             var rootNode = (await doc.GetSyntaxRootAsync().ConfigureAwait(false))!;
-            var noTrivia = new RemoveTriviaRewriter().Visit(rootNode);
-            var consistentOrder = new ConsistentOrderRewriter().Visit(noTrivia);
-            var withoutNullableSupression = new RemoveSuppressNullableWarningRewriter().Visit(consistentOrder);
-            var normalizedWhiteSpace = withoutNullableSupression!.NormalizeWhitespace();
+            foreach (var rewriter in _rewriters)
+            {
+                rootNode = rewriter.Visit(rootNode);
+            }
+            var normalizedWhiteSpace = rootNode.NormalizeWhitespace();
             sln = sln.WithDocumentSyntaxRoot(doc.Id, normalizedWhiteSpace);
+            
+            var simplifiedDoc = await Simplifier.ReduceAsync(sln.GetDocument(doc.Id)!,Simplifier.Annotation).ConfigureAwait(false);
+            sln = sln.WithDocumentSyntaxRoot(doc.Id, (await simplifiedDoc.GetSyntaxRootAsync().ConfigureAwait(false))!);
         }
-
+        
+        Logger.LogInformation(SemtexLog.GetPerformanceStr(nameof(ApplyRewriters), sw.ElapsedMilliseconds));
         return sln;
     }
 

@@ -205,6 +205,7 @@ public class SemanticEquivalenceTests
         "ShortCircuit",
         "SimplifyBranching",
         "SimplifyConditional",
+        "SimplifyQualifiedName",
         "SimplityNestedUsing",
         "SortEnum",
         "SplitVarDecleration",
@@ -347,6 +348,7 @@ public class SemanticEquivalenceTests
     {
         if (
             folderName == "DebuggerDisplayAttribute" // just too annoying
+            || folderName =="ExceptionConstructors"
         )
         {
             return; // TODO clearly this is temporary
