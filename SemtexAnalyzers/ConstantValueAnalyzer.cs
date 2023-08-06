@@ -6,6 +6,7 @@ using Microsoft.CodeAnalysis.Diagnostics;
 
 namespace SemtexAnalyzers;
 
+[DiagnosticAnalyzer(LanguageNames.CSharp)]
 public class ConstantValueAnalyzer: DiagnosticAnalyzer
 {
 
@@ -68,7 +69,7 @@ public class ConstantValueAnalyzer: DiagnosticAnalyzer
     }
 
 
-    public override ImmutableArray<Microsoft.CodeAnalysis.DiagnosticDescriptor> SupportedDiagnostics {
+    public override ImmutableArray<DiagnosticDescriptor> SupportedDiagnostics {
         get
         {
             return ImmutableArray.Create(new[]

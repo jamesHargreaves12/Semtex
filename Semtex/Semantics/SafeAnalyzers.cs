@@ -143,7 +143,8 @@ public sealed class SafeAnalyzers
         new RemoveUnnecessaryBracesAnalyzer(),
         new NormalizeUsageOfInfiniteLoopAnalyzer(),
         new NormalizeFormatOfEnumFlagValueAnalyzer(),
-        new ConstantValueAnalyzer()
+        new ConstantValueAnalyzer(),
+        new LogTemplateParamsAnalyzer()
     }.ToImmutableArray();
 
     private static int GetPriority(string descriptorId)

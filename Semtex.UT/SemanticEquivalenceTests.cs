@@ -160,6 +160,7 @@ public class SemanticEquivalenceTests
         "LocalAsConst",
         "LocalVariableOrder",
         "LocalVariableRename",
+        "LogParams",
         "Maths",
         "MemberHidesInheritedMember",
         "MergePreprocessor",
@@ -302,10 +303,12 @@ public class SemanticEquivalenceTests
 
         var dotnetLibs = Directory.GetFiles(dotnetAssembliesLocation)
             .Where(f => f.EndsWith(".dll")).OrderBy(x => x).ToList();
-        var currentAssemblyLocation = Directory.GetParent(typeof(SemanticEquivalenceTests).Assembly.Location)!.FullName; 
-        
+        var currentAssemblyLocation = Directory.GetParent(typeof(SemanticEquivalenceTests).Assembly.Location)!.FullName;
+
         var otherLibs = Directory.GetFiles(currentAssemblyLocation)
-            .Where(f => f.EndsWith(".dll") && f.Contains("xunit")).OrderBy(x => x).ToList();
+            .Where(f => f.EndsWith(".dll") && (f.Contains("xunit") || f.Contains("Microsoft")))
+            .OrderBy(x => x)
+            .ToList();
         
         var metadataRefs =  dotnetLibs.Concat(otherLibs).Select(f => MetadataReference.CreateFromFile(f));
         var projId = ProjectId.CreateNewId();
