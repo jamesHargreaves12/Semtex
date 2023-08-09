@@ -230,7 +230,7 @@ public class CheckSemanticEquivalence
     }
     
 
-    private static readonly HashSet<string> CommonSafeFilenames = new HashSet<string>()
+    private static readonly HashSet<string> CommonSafeFilenames = new()
     {
         "README.md",
         "CONTRIBUTING.md",
@@ -267,6 +267,21 @@ public class CheckSemanticEquivalence
         ".editorconfig",
         ".gitignore"
     };
+
+    private static readonly HashSet<string> CommonSafeFolders = new()
+    {
+        ".github/workflows"
+    };
+
+    private static bool IsKnownSafe(AbsolutePath path, GitRepo repo)
+    {
+        if (CommonSafeFilenames.Contains(Path.GetFileName(path.Path)))
+            return true;
+
+        var relativePath = repo.GetRelativePath(path);
+        return CommonSafeFolders.Any(x => relativePath.StartsWith(x));
+    }
+
     // This needs a better name
     private static async Task<List<FileModel>> GetFileModels(GitRepo gitRepo, DiffConfig diffConfig,
         UnsimplifiedFilesSummary targetUnsimplified, UnsimplifiedFilesSummary sourceUnsimplified,
@@ -275,10 +290,10 @@ public class CheckSemanticEquivalence
     {
         Stopwatch? stopwatch = null;
         var fileResults = diffConfig.AddedFilepaths.Select(addedFp => 
-                new FileModel(gitRepo.GetRelativePath(addedFp), CommonSafeFilenames.Contains(Path.GetFileName(addedFp.Path)) ? Status.SafeFile : Status.Added)
+                new FileModel(gitRepo.GetRelativePath(addedFp), IsKnownSafe(addedFp, gitRepo) ? Status.SafeFile : Status.Added)
             )
             .Concat(diffConfig.RemovedFilepaths.Select(removedFp => 
-                new FileModel(gitRepo.GetRelativePath(removedFp), CommonSafeFilenames.Contains(Path.GetFileName(removedFp.Path)) ? Status.SafeFile : Status.Removed)))
+                new FileModel(gitRepo.GetRelativePath(removedFp), IsKnownSafe(removedFp, gitRepo) ? Status.SafeFile : Status.Removed)))
             .ToList();
         foreach (var sourceFilepath in diffConfig.AllSourceFilePaths)
         {
@@ -286,7 +301,7 @@ public class CheckSemanticEquivalence
 
             var targetFilepath = diffConfig.GetTargetFilepath(sourceFilepath);
 
-            if (CommonSafeFilenames.Contains(Path.GetFileName(sourceFilepath.Path)) && CommonSafeFilenames.Contains(Path.GetFileName(targetFilepath.Path)))
+            if (IsKnownSafe(sourceFilepath, gitRepo) && IsKnownSafe(targetFilepath, gitRepo))
             {
                 fileResults.Add(new FileModel(relativePath, Status.SafeFile));
                 continue;
