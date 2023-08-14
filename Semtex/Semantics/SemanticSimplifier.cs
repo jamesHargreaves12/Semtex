@@ -41,6 +41,7 @@ internal class SemanticSimplifier
         new ConsistentOrderRewriter(),
         new RemoveSuppressNullableWarningRewriter(),
         new ApplySimplificationServiceRewriter(),
+        new TrailingCommaRewriter()
     };
     private static async Task<Solution> ApplyRewriters(Solution sln, ProjectId projectId,
         HashSet<AbsolutePath> docsToSimplify)
