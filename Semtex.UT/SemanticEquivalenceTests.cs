@@ -218,6 +218,7 @@ public class SemanticEquivalenceTests
         "SwitchBraces",
         "SwitchSameContex",
         "ToStringUnneeded",
+        "TrailingComma",
         "TupleInForeach",
         "TypeParameterConstraintOrder",
         "UnnecesaryInterpolation",
