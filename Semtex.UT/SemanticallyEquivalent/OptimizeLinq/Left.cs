@@ -15,4 +15,19 @@ public class Left
         return items.Where(x => x % 2 == 0).Where(x => x % 3 == 0);
     }
 
+    public int MinMod7(List<int> items)
+    {
+        return items.OrderBy(x => x % 7).Min();
+    }
+
+    public int AnyOdd(List<int> items)
+    {
+        if (!items.All(x => x % 2 == 0))
+        {
+            return 1;
+        }
+
+        return 7;
+    }
+
 }
