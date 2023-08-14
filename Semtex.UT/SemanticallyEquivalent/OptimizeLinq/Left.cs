@@ -17,7 +17,7 @@ public class Left
 
     public int MinMod7(List<int> items)
     {
-        return items.OrderBy(x => x % 7).Min();
+        return items.OrderBy(x => x % 7).FirstOrDefault();
     }
 
     public int AnyOdd(List<int> items)
