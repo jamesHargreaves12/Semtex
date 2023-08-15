@@ -337,8 +337,11 @@ public class SemanticEquivalenceTests
     
     private static DocumentInfo GetMainMethod(string folder, ProjectId projectId)
     {
-        // Needed to avoid CS5001
-        var text = "public static class NoOpProgram{public static void Main(){}}";
+        var text = @"
+[assembly: global::System.Runtime.Versioning.TargetFrameworkAttribute("".NETCoreApp,Version=v7.0"", FrameworkDisplayName = "".NET 7.0"")]
+public static class NoOpProgram{public static void Main(){}}// Needed to avoid CS5001
+
+";
         var source = SourceText.From(text);
         var id = DocumentId.CreateNewId(projectId);
         var loader = TextLoader.From(TextAndVersion.Create(source, VersionStamp.Create()));
