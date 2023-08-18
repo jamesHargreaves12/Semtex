@@ -8,7 +8,8 @@ public class SemtexCodeFixProviders
         new Dictionary<string, CodeFixProvider>()
         {
             [DiagnosticDescriptors.ConstantValueId] = new ConstantValueCodeFixProvider(),
-            [DiagnosticDescriptors.LogTemplateParamsId] = new LogTemplateParamsCodeFixProvider()
+            [DiagnosticDescriptors.LogTemplateParamsId] = new LogTemplateParamsCodeFixProvider(),
+            [DiagnosticDescriptors.CanBeMadeStaticId] = new CanBeMadeStaticCodeFixProvider()
         };
 
 }

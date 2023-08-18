@@ -211,6 +211,7 @@ public class SemanticEquivalenceTests
         "SimplityNestedUsing",
         "SortEnum",
         "SplitVarDecleration",
+        "StaticMakesNoDifference",
         "StringBuilder",
         "StringBuilderPlusFormatting",
         "StringComparison",
