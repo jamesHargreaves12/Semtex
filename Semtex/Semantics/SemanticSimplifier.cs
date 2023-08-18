@@ -105,8 +105,14 @@ internal class SemanticSimplifier
 
         public override void VisitClassDeclaration(ClassDeclarationSyntax node)
         {
-            if (node.Modifiers.Any(m => m.IsKind(SyntaxKind.PrivateKeyword)) 
-                && node.FirstAncestor(SyntaxKind.ClassDeclaration) is ClassDeclarationSyntax cds && cds.Modifiers.All(m=>!m.IsKind(SyntaxKind.PartialKeyword)))
+            if (node.Modifiers.All(m =>
+                    !m.IsKind(SyntaxKind.PublicKeyword)
+                    && !m.IsKind(SyntaxKind.ProtectedKeyword) 
+                    && !m.IsKind(SyntaxKind.InternalKeyword))
+                && (node.Parent is ClassDeclarationSyntax cds && cds.Modifiers.All(m => !m.IsKind(SyntaxKind.PartialKeyword))
+                    || node.Parent is StructDeclarationSyntax sds && sds.Modifiers.All(m => !m.IsKind(SyntaxKind.PartialKeyword))
+                    || node.Parent is RecordDeclarationSyntax rds && rds.Modifiers.All(m => !m.IsKind(SyntaxKind.PartialKeyword))
+                ))
             {
                 var symbol = _semanticModel.GetDeclaredSymbol(node);
                 if(symbol is not null)
@@ -118,9 +124,13 @@ internal class SemanticSimplifier
 
         public override void VisitFieldDeclaration(FieldDeclarationSyntax node)
         {
-            if (node.Modifiers.Any(m => m.IsKind(SyntaxKind.PrivateKeyword)) 
-                && node.FirstAncestor(SyntaxKind.ClassDeclaration) is ClassDeclarationSyntax cds 
-                && cds.Modifiers.All(m=>!m.IsKind(SyntaxKind.PartialKeyword))
+            if (node.Modifiers.All(m =>
+                    !m.IsKind(SyntaxKind.PublicKeyword)
+                    && !m.IsKind(SyntaxKind.ProtectedKeyword) 
+                    && !m.IsKind(SyntaxKind.InternalKeyword))
+                && (node.Parent is ClassDeclarationSyntax cds && cds.Modifiers.All(m => !m.IsKind(SyntaxKind.PartialKeyword))
+                    || node.Parent is StructDeclarationSyntax sds && sds.Modifiers.All(m => !m.IsKind(SyntaxKind.PartialKeyword))
+                    || node.Parent is RecordDeclarationSyntax rds && rds.Modifiers.All(m => !m.IsKind(SyntaxKind.PartialKeyword))) 
                 && node.Declaration.Variables is [var declaration])
             {
                 
@@ -147,8 +157,14 @@ internal class SemanticSimplifier
 
         public override void VisitRecordDeclaration(RecordDeclarationSyntax node)
         {
-            if (node.Modifiers.Any(m => m.IsKind(SyntaxKind.PrivateKeyword)) 
-                && node.FirstAncestor(SyntaxKind.ClassDeclaration) is ClassDeclarationSyntax cds && cds.Modifiers.All(m=>!m.IsKind(SyntaxKind.PartialKeyword)))
+            if (node.Modifiers.All(m =>
+                    !m.IsKind(SyntaxKind.PublicKeyword)
+                    && !m.IsKind(SyntaxKind.ProtectedKeyword) 
+                    && !m.IsKind(SyntaxKind.InternalKeyword))
+                && (node.Parent is ClassDeclarationSyntax cds && cds.Modifiers.All(m => !m.IsKind(SyntaxKind.PartialKeyword))
+                    || node.Parent is StructDeclarationSyntax sds && sds.Modifiers.All(m => !m.IsKind(SyntaxKind.PartialKeyword))
+                    || node.Parent is RecordDeclarationSyntax rds && rds.Modifiers.All(m => !m.IsKind(SyntaxKind.PartialKeyword))
+                ))
             {
                 PrivateSymbols.Add(_semanticModel.GetDeclaredSymbol(node)!);
             }
@@ -158,11 +174,17 @@ internal class SemanticSimplifier
 
         public override void VisitPropertyDeclaration(PropertyDeclarationSyntax node)
         {
-            if (node.Modifiers.Any(m => m.IsKind(SyntaxKind.PrivateKeyword)) 
-                && node.FirstAncestor(SyntaxKind.ClassDeclaration) is ClassDeclarationSyntax cds && cds.Modifiers.All(m=>!m.IsKind(SyntaxKind.PartialKeyword)))
+            if (node.Modifiers.All(m =>
+                    !m.IsKind(SyntaxKind.PublicKeyword)
+                    && !m.IsKind(SyntaxKind.ProtectedKeyword) 
+                    && !m.IsKind(SyntaxKind.InternalKeyword))
+                && (node.Parent is ClassDeclarationSyntax cds && cds.Modifiers.All(m => !m.IsKind(SyntaxKind.PartialKeyword))
+                    || node.Parent is StructDeclarationSyntax sds && sds.Modifiers.All(m => !m.IsKind(SyntaxKind.PartialKeyword))
+                    || node.Parent is RecordDeclarationSyntax rds && rds.Modifiers.All(m => !m.IsKind(SyntaxKind.PartialKeyword))
+                ))
             {
                 var symbol = _semanticModel.GetDeclaredSymbol(node);
-                if(symbol is not null)
+                if (symbol is not null)
                     PrivateSymbols.Add(symbol);
             }
 
