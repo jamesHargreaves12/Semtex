@@ -307,7 +307,6 @@ public sealed class SafeAnalyzers
         Logger.LogInformation(SemtexLog.GetPerformanceStr("CompilationAndDiagnostics", stopwatch.ElapsedMilliseconds));
         Logger.LogInformation("{Percent}% from custom analyzers)", (int)(stopwatch2.ElapsedMilliseconds/(float)stopwatch.ElapsedMilliseconds*100));
         
-        // TODO test this
         var analyzerErrors = diagnostics
             .Where(d => d.Descriptor.Id == "AD0001")
             .Select(d => d.GetMessage())

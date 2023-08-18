@@ -5,6 +5,7 @@ using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
 using Microsoft.CodeAnalysis.Simplification;
 using Microsoft.Extensions.Logging;
+using Roslynator.CSharp;
 using Semtex.Logging;
 using Semtex.Models;
 
@@ -14,7 +15,6 @@ internal class SemanticSimplifier
 {
     private static readonly ILogger<SemanticSimplifier> Logger =
         SemtexLog.LoggerFactory.CreateLogger<SemanticSimplifier>();
-
 
     internal static async Task<Solution> GetSolutionWithFilesSimplified(
         Solution sln, List<ProjectId> projectIds, Dictionary<AbsolutePath, HashSet<AbsolutePath>> projectToFilesMap, AbsolutePath? analyzerConfigPath,
@@ -54,6 +54,16 @@ internal class SemanticSimplifier
         foreach (var doc in simplifiedDocs)
         {
             var rootNode = (await doc.GetSyntaxRootAsync().ConfigureAwait(false))!;
+            var compilation = await doc.Project.GetCompilationAsync().ConfigureAwait(false); // Should we just reuse this on subsequent loops?
+            var semanticModel = compilation!.GetSemanticModel(rootNode.SyntaxTree);
+
+            var renamablePrivateSymbolsWalker = new AllRenameablePrivateSymbols(semanticModel);
+            renamablePrivateSymbolsWalker.Visit(rootNode);
+            // TODO there is no need to keep this as any resembelance to what was there before. We should probably just make it semtex_{i} or something
+            var renameConfig = renamablePrivateSymbolsWalker.PrivateSymbols
+                .ToDictionary(s => s.Name, s => (s, $"p_{s.Name.ToLower().Trim('_')}")); 
+
+            rootNode = new RenameSymbolRewriter(semanticModel, renameConfig).Visit(rootNode);
             foreach (var rewriter in _rewriters)
             {
                 rootNode = rewriter.Visit(rootNode);
@@ -81,4 +91,84 @@ internal class SemanticSimplifier
         return $"{method.Identifier}_{overloadIdentifier}";
     }
 
+    // TODO add an all symbols and only apply the renaming if they wont conflict.
+    public class AllRenameablePrivateSymbols : CSharpSyntaxWalker
+    {
+        private readonly SemanticModel _semanticModel;
+
+        public AllRenameablePrivateSymbols(SemanticModel semanticModel)
+        {
+            _semanticModel = semanticModel;
+        }
+
+        public readonly List<ISymbol> PrivateSymbols = new List<ISymbol>();
+
+        public override void VisitClassDeclaration(ClassDeclarationSyntax node)
+        {
+            if (node.Modifiers.Any(m => m.IsKind(SyntaxKind.PrivateKeyword)) 
+                && node.FirstAncestor(SyntaxKind.ClassDeclaration) is ClassDeclarationSyntax cds && cds.Modifiers.All(m=>!m.IsKind(SyntaxKind.PartialKeyword)))
+            {
+                var symbol = _semanticModel.GetDeclaredSymbol(node);
+                if(symbol is not null)
+                    PrivateSymbols.Add(symbol);
+            }
+
+            base.VisitClassDeclaration(node);
+        }
+
+        public override void VisitFieldDeclaration(FieldDeclarationSyntax node)
+        {
+            if (node.Modifiers.Any(m => m.IsKind(SyntaxKind.PrivateKeyword)) 
+                && node.FirstAncestor(SyntaxKind.ClassDeclaration) is ClassDeclarationSyntax cds 
+                && cds.Modifiers.All(m=>!m.IsKind(SyntaxKind.PartialKeyword))
+                && node.Declaration.Variables is [var declaration])
+            {
+                
+                var symbol = _semanticModel.GetDeclaredSymbol(declaration);
+                if(symbol is not null)
+                    PrivateSymbols.Add(symbol);
+            }
+
+            base.VisitFieldDeclaration(node);
+        }
+
+        public override void VisitStructDeclaration(StructDeclarationSyntax node)
+        {
+            if (node.Modifiers.Any(m => m.IsKind(SyntaxKind.PrivateKeyword)) 
+                && node.FirstAncestor(SyntaxKind.ClassDeclaration) is ClassDeclarationSyntax cds && cds.Modifiers.All(m=>!m.IsKind(SyntaxKind.PartialKeyword)))
+            {
+                var symbol = _semanticModel.GetDeclaredSymbol(node);
+                if(symbol is not null)
+                    PrivateSymbols.Add(symbol);
+            }
+
+            base.VisitStructDeclaration(node);
+        }
+
+        public override void VisitRecordDeclaration(RecordDeclarationSyntax node)
+        {
+            if (node.Modifiers.Any(m => m.IsKind(SyntaxKind.PrivateKeyword)) 
+                && node.FirstAncestor(SyntaxKind.ClassDeclaration) is ClassDeclarationSyntax cds && cds.Modifiers.All(m=>!m.IsKind(SyntaxKind.PartialKeyword)))
+            {
+                PrivateSymbols.Add(_semanticModel.GetDeclaredSymbol(node)!);
+            }
+
+            base.VisitRecordDeclaration(node);
+        }
+
+        public override void VisitPropertyDeclaration(PropertyDeclarationSyntax node)
+        {
+            if (node.Modifiers.Any(m => m.IsKind(SyntaxKind.PrivateKeyword)) 
+                && node.FirstAncestor(SyntaxKind.ClassDeclaration) is ClassDeclarationSyntax cds && cds.Modifiers.All(m=>!m.IsKind(SyntaxKind.PartialKeyword)))
+            {
+                var symbol = _semanticModel.GetDeclaredSymbol(node);
+                if(symbol is not null)
+                    PrivateSymbols.Add(symbol);
+            }
+
+            base.VisitPropertyDeclaration(node);
+        }
+
+        // Not doing method as we don't want to change the identifier
+    }
 }

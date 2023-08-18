@@ -117,6 +117,7 @@ public class SemanticEquivalenceTests
         "DefaultParam",
         "DoubleUsing",
         "DuplicateEnumVal",
+        "EasyPrivateVariableRename",
         "ElementAccess",
         "EmptyDestructor",
         "EmptyElse",
