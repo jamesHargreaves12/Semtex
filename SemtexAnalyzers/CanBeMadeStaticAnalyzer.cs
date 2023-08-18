@@ -39,8 +39,10 @@ public class CanBeMadeStaticAnalyzer: DiagnosticAnalyzer
 
         if (instanceMemberAccesses.Any()) return;
         
-        if (IsAccessedWithThisQualifier(methodDeclaration, semanticModel))return;
-            var diagnostic = Diagnostic.Create(DiagnosticDescriptors.CanBeMadeStatic, methodDeclaration.Identifier.GetLocation(), methodDeclaration.Identifier.Text);
+        var symbol = semanticModel.GetDeclaredSymbol(methodDeclaration);
+        if (symbol is null || IsAccessedWithThisQualifier(symbol, semanticModel)) return;
+        
+        var diagnostic = Diagnostic.Create(DiagnosticDescriptors.CanBeMadeStatic, methodDeclaration.Identifier.GetLocation(), methodDeclaration.Identifier.Text);
         context.ReportDiagnostic(diagnostic);
     }
 
@@ -63,12 +65,8 @@ public class CanBeMadeStaticAnalyzer: DiagnosticAnalyzer
         };
     }
 
-    private static bool IsAccessedWithThisQualifier(MethodDeclarationSyntax methodDeclaration, SemanticModel semanticModel)
+    private static bool IsAccessedWithThisQualifier(ISymbol symbol, SemanticModel semanticModel)
     {
-        var symbol = semanticModel.GetDeclaredSymbol(methodDeclaration);
-        
-        if (symbol is null) return true;
-        
         var root = semanticModel.SyntaxTree.GetRoot();
         return root.DescendantNodes()
             .OfType<IdentifierNameSyntax>()
