@@ -42,7 +42,7 @@ public class CanBeMadeStaticAnalyzer: DiagnosticAnalyzer
         var symbol = semanticModel.GetDeclaredSymbol(methodDeclaration);
         if (symbol is null || IsAccessedWithThisQualifier(symbol, semanticModel)) return;
         
-        var diagnostic = Diagnostic.Create(DiagnosticDescriptors.CanBeMadeStatic, methodDeclaration.Identifier.GetLocation(), methodDeclaration.Identifier.Text);
+        var diagnostic = Diagnostic.Create(DiagnosticDescriptors.CanBeMadeStaticDescriptor, methodDeclaration.Identifier.GetLocation(), methodDeclaration.Identifier.Text);
         context.ReportDiagnostic(diagnostic);
     }
 
@@ -88,7 +88,7 @@ public class CanBeMadeStaticAnalyzer: DiagnosticAnalyzer
         {
             return ImmutableArray.Create(new[]
                 {
-                    DiagnosticDescriptors.CanBeMadeStatic
+                    DiagnosticDescriptors.CanBeMadeStaticDescriptor
                 }
             );
         }

@@ -145,7 +145,8 @@ public sealed class SafeAnalyzers
         new NormalizeFormatOfEnumFlagValueAnalyzer(),
         new ConstantValueAnalyzer(),
         new LogTemplateParamsAnalyzer(),
-        new CanBeMadeStaticAnalyzer()
+        new CanBeMadeStaticAnalyzer(),
+        new UsingStatementAnalyzer()
     }.ToImmutableArray();
 
     private static int GetPriority(string descriptorId)

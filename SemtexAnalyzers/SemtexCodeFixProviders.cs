@@ -9,7 +9,8 @@ public class SemtexCodeFixProviders
         {
             [DiagnosticDescriptors.ConstantValueId] = new ConstantValueCodeFixProvider(),
             [DiagnosticDescriptors.LogTemplateParamsId] = new LogTemplateParamsCodeFixProvider(),
-            [DiagnosticDescriptors.CanBeMadeStaticId] = new CanBeMadeStaticCodeFixProvider()
+            [DiagnosticDescriptors.CanBeMadeStaticId] = new CanBeMadeStaticCodeFixProvider(),
+            [DiagnosticDescriptors.UsingStatementId] = new UsingStatementCodeFixProvider()
         };
 
 }

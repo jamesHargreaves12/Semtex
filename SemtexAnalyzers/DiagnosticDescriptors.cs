@@ -8,7 +8,8 @@ public static class DiagnosticDescriptors
 
     public static readonly string ConstantValueId = $"{Prefix}_{nameof(ConstantValueDiagnosticDescriptors)}";
     public static readonly string LogTemplateParamsId = $"{Prefix}_{nameof(LogTemplateParamsDiagnosticDescriptors)}";
-    public static readonly string CanBeMadeStaticId = $"{Prefix}_{nameof(CanBeMadeStatic)}";
+    public static readonly string CanBeMadeStaticId = $"{Prefix}_{nameof(CanBeMadeStaticDescriptor)}";
+    public static readonly string UsingStatementId = $"{Prefix}_{nameof(UsingStatementDescriptor)}";
     public static DiagnosticDescriptor ConstantValueDiagnosticDescriptors = new(
         ConstantValueId,
         nameof(ConstantValueDiagnosticDescriptors),
@@ -25,9 +26,16 @@ public static class DiagnosticDescriptors
         DiagnosticSeverity.Warning,
         isEnabledByDefault: true);
 
-    public static DiagnosticDescriptor CanBeMadeStatic = new(
+    public static DiagnosticDescriptor CanBeMadeStaticDescriptor = new(
         CanBeMadeStaticId,
-        nameof(CanBeMadeStatic),
+        nameof(CanBeMadeStaticDescriptor),
+        "messageFormat",
+        "category",
+        DiagnosticSeverity.Warning,
+        isEnabledByDefault: true);
+    public static DiagnosticDescriptor UsingStatementDescriptor = new(
+        UsingStatementId,
+        nameof(CanBeMadeStaticDescriptor),
         "messageFormat",
         "category",
         DiagnosticSeverity.Warning,
