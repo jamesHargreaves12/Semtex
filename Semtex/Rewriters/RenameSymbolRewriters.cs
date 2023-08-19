@@ -49,7 +49,7 @@ public class RenameSymbolRewriter: CSharpSyntaxRewriter
         if (!_oldSymbolNames.Contains(node.Identifier.Text))
             return base.VisitPropertyDeclaration(node);
 
-        var currentSymbol = _semanticModel.GetSymbolInfo(node).Symbol;
+        var currentSymbol = _semanticModel.GetDeclaredSymbol(node);
         if (currentSymbol == null)
             return base.VisitPropertyDeclaration(node);
 
@@ -65,7 +65,7 @@ public class RenameSymbolRewriter: CSharpSyntaxRewriter
         if (!_oldSymbolNames.Contains(node.Identifier.Text))
             return base.VisitStructDeclaration(node);
 
-        var currentSymbol = _semanticModel.GetSymbolInfo(node).Symbol;
+        var currentSymbol = _semanticModel.GetDeclaredSymbol(node);
         if (currentSymbol == null)
             return base.VisitStructDeclaration(node);
 
@@ -81,7 +81,7 @@ public class RenameSymbolRewriter: CSharpSyntaxRewriter
         if (!_oldSymbolNames.Contains(node.Identifier.Text))
             return base.VisitRecordDeclaration(node);
 
-        var currentSymbol = _semanticModel.GetSymbolInfo(node).Symbol;
+        var currentSymbol = _semanticModel.GetDeclaredSymbol(node);
         if (currentSymbol == null)
             return base.VisitRecordDeclaration(node);
 
@@ -98,7 +98,7 @@ public class RenameSymbolRewriter: CSharpSyntaxRewriter
         if (!_oldSymbolNames.Contains(node.Identifier.Text))
             return base.VisitVariableDeclarator(node);
 
-        var currentSymbol = _semanticModel.GetSymbolInfo(node).Symbol;
+        var currentSymbol = _semanticModel.GetDeclaredSymbol(node);
         if (currentSymbol == null)
             return base.VisitVariableDeclarator(node);
 
