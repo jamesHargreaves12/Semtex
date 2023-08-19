@@ -59,11 +59,8 @@ internal class SemanticSimplifier
 
             var renamablePrivateSymbolsWalker = new AllRenameablePrivateSymbols(semanticModel);
             renamablePrivateSymbolsWalker.Visit(rootNode);
-            // TODO there is no need to keep this as any resembelance to what was there before. We should probably just make it semtex_{i} or something
-            var renameConfig = renamablePrivateSymbolsWalker.PrivateSymbols
-                .ToDictionary(s => s.Name, s => (s, $"p_{s.Name.ToLower().Trim('_')}")); 
 
-            rootNode = new RenameSymbolRewriter(semanticModel, renameConfig).Visit(rootNode);
+            rootNode = new RenameSymbolRewriter(semanticModel, renamablePrivateSymbolsWalker.PrivateSymbols).Visit(rootNode);
             foreach (var rewriter in _rewriters)
             {
                 rootNode = rewriter.Visit(rootNode);
@@ -101,7 +98,7 @@ internal class SemanticSimplifier
             _semanticModel = semanticModel;
         }
 
-        public readonly List<ISymbol> PrivateSymbols = new List<ISymbol>();
+        public readonly HashSet<ISymbol> PrivateSymbols = new();
 
         public override void VisitClassDeclaration(ClassDeclarationSyntax node)
         {
