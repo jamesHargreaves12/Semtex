@@ -16,6 +16,9 @@ public class UsingStatementAnalyzer: DiagnosticAnalyzer
 
     private void AnalyzeNode(SyntaxNodeAnalysisContext context)
     {
+        if(context.Compilation is not CSharpCompilation { LanguageVersion: >= LanguageVersion.CSharp8 })
+            return;
+        
         var usingStatement = (UsingStatementSyntax)context.Node;
 
         var parentBlock = usingStatement.Parent as BlockSyntax;
