@@ -21,4 +21,9 @@ public class ApplySimplificationServiceRewriter : CSharpSyntaxRewriter
         
         return node.WithSimplifierAnnotation();
     }
+
+    public override SyntaxNode? VisitCastExpression(CastExpressionSyntax node)
+    {
+        return node.WithSimplifierAnnotation();
+    }
 }
