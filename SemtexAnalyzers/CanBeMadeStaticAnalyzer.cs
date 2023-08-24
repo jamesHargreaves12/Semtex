@@ -17,6 +17,9 @@ public class CanBeMadeStaticAnalyzer: DiagnosticAnalyzer
     private void AnalyzeMethod(SyntaxNodeAnalysisContext context)
     {
         var methodDeclaration = (MethodDeclarationSyntax)context.Node;
+     
+        if(methodDeclaration.ExplicitInterfaceSpecifier is not null)
+            return;
         
         if(methodDeclaration.Parent is InterfaceDeclarationSyntax)
             return;
