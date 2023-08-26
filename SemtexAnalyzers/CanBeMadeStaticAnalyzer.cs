@@ -31,6 +31,9 @@ public class CanBeMadeStaticAnalyzer: DiagnosticAnalyzer
                 || m.IsKind(SyntaxKind.InternalKeyword) 
                 || m.IsKind(SyntaxKind.ProtectedKeyword)
                 || m.IsKind(SyntaxKind.PartialKeyword)
+                || m.IsKind(SyntaxKind.VirtualKeyword)
+                || m.IsKind(SyntaxKind.SealedKeyword)
+                || m.IsKind(SyntaxKind.OverrideKeyword)
                 ))
         {
             return;
