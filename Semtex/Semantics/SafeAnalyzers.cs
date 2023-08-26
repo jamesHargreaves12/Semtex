@@ -138,7 +138,7 @@ public sealed class SafeAnalyzers
         new UseForStatementInsteadOfWhileStatementAnalyzer(),
         new RefReadOnlyParameterAnalyzer(),
         new DefaultExpressionAnalyzer(),
-        new UnncessaryNullForgivingOperatorAnalyzer(),
+        new UnnecessaryNullForgivingOperatorAnalyzer(),
         new UseImplicitOrExplicitObjectCreationAnalyzer(),
         new RemoveUnnecessaryBracesAnalyzer(),
         new NormalizeUsageOfInfiniteLoopAnalyzer(),

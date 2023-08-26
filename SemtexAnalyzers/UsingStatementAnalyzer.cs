@@ -33,10 +33,48 @@ public class UsingStatementAnalyzer: DiagnosticAnalyzer
         {
             return;
         }
+        
+        if(DoDeclaredVariablesOverlapWithOuterScope(usingStatement, context.SemanticModel))
+            return;
 
         var diagnostic = Diagnostic.Create(DiagnosticDescriptors.UsingStatementDescriptor, usingStatement.GetLocation());
         context.ReportDiagnostic(diagnostic);
     }
+    
+    // https://github.com/JosefPihrt/Roslynator/blob/914b232d7a7916ae8bd36f1bd472f5e708c7fc33/src/Common/CSharp/Analysis/ReduceIfNesting/IfLocalVariableAnalysis.cs#L12
+    private static bool DoDeclaredVariablesOverlapWithOuterScope(
+        StatementSyntax usingStatement,
+        SemanticModel semanticModel
+    )
+    {
+        ImmutableArray<ISymbol> variablesDeclared = semanticModel.AnalyzeDataFlow(usingStatement)!
+            .VariablesDeclared;
+    
+        if (variablesDeclared.IsEmpty)
+            return false;
+        var parentStatements = usingStatement.Parent switch
+        {
+            BlockSyntax b => b.Statements,
+            SwitchSectionSyntax s => s.Statements
+        };
+        foreach (StatementSyntax statement in parentStatements)
+        {
+            if (statement == usingStatement)
+                continue;
+    
+            foreach (ISymbol parentVariable in semanticModel.AnalyzeDataFlow(statement)!.VariablesDeclared)
+            {
+                foreach (ISymbol variable in variablesDeclared)
+                {
+                    if (variable.Name == parentVariable.Name)
+                        return true;
+                }
+            }
+        }
+    
+        return false;
+    }
+
 
     public override ImmutableArray<DiagnosticDescriptor> SupportedDiagnostics {
         get

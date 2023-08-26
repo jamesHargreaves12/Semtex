@@ -154,8 +154,9 @@ internal sealed class SolutionUtils
             if (workspace.CurrentSolution.Projects.Any(p => p.FilePath == projPath.Path))
             {
                 continue;
-            }
-
+            }          
+            Logger.LogInformation("Loading {projectPath}", projPath.Path);
+            
             await workspace.OpenProjectAsync(projPath.Path).ConfigureAwait(false);
         }
 
