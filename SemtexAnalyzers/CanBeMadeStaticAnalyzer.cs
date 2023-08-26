@@ -53,7 +53,7 @@ public class CanBeMadeStaticAnalyzer: DiagnosticAnalyzer
             .Any(m => IsInstanceMemberAccess(m, semanticModel))) 
             return;
 
-        if (methodDeclaration.DescendantNodes().OfType<BaseExpressionSyntax>().Any())
+        if (methodDeclaration.DescendantNodes().OfType<BaseExpressionSyntax>().Any() || methodDeclaration.DescendantNodes().OfType<ThisExpressionSyntax>().Any())
             return;
         
         var symbol = semanticModel.GetDeclaredSymbol(methodDeclaration);
