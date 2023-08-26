@@ -42,11 +42,16 @@ public class CanBeMadeStaticAnalyzer: DiagnosticAnalyzer
         var semanticModel = context.SemanticModel;
 
         // Check if method accesses any instance members
-        var instanceMemberAccesses = methodDeclaration.DescendantNodes()
-            .OfType<IdentifierNameSyntax>()
-            .Where(m => IsInstanceMemberAccess(m, semanticModel));
 
-        if (instanceMemberAccesses.Any()) return;
+        if (methodDeclaration.DescendantNodes()
+            .OfType<IdentifierNameSyntax>()
+            .Any(m => IsInstanceMemberAccess(m, semanticModel))) 
+            return;
+
+        if (methodDeclaration.DescendantNodes()
+            .OfType<GenericNameSyntax>()
+            .Any(m => IsInstanceMemberAccess(m, semanticModel))) 
+            return;
 
         if (methodDeclaration.DescendantNodes().OfType<BaseExpressionSyntax>().Any())
             return;
@@ -58,7 +63,7 @@ public class CanBeMadeStaticAnalyzer: DiagnosticAnalyzer
         context.ReportDiagnostic(diagnostic);
     }
 
-    private static bool IsInstanceMemberAccess(IdentifierNameSyntax memberAccess, SemanticModel semanticModel)
+    private static bool IsInstanceMemberAccess(ExpressionSyntax memberAccess, SemanticModel semanticModel)
     {
         // if accessing x.Y where x is not this then you are still fine to be static
         if (memberAccess.Parent is MemberAccessExpressionSyntax memberAccessExpression
