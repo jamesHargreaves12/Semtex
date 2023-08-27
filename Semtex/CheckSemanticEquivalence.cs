@@ -85,6 +85,7 @@ public sealed class CheckSemanticEquivalence
             var (srcSolution, srcUnsimplified, sourceProjectIds) = await GetSolution(sourceFilesToSimplify, projFilter, sourceProjFinder).ConfigureAwait(false);
 
             sourceFilesToSimplify = sourceFilesToSimplify.Where(fp => !srcUnsimplified.IsUnsimplified(fp)).ToHashSet();
+            targetFilesToSimplify = targetFilesToSimplify.Where(fp => !targetUnsimplified.IsUnsimplified(fp)).ToHashSet();
             
             // Simplify the solutions by apply rewriters and Analyzers/Code Fixes
             var simplifiedSrcSln = await SemanticSimplifier
@@ -144,8 +145,13 @@ public sealed class CheckSemanticEquivalence
                 var sourceRenamablePrivateSymbolsWalker = new SemanticSimplifier.AllRenameablePrivateSymbols(srcSemanticModel);
                 sourceRenamablePrivateSymbolsWalker.Visit(sourceRootNode);
                 var srcRenamableSymbols = sourceRenamablePrivateSymbolsWalker.PrivateSymbols;
+                // TODO there is no need to keep this as any resembelance to what was there before. We should probably just make it semtex_{i} or something
+                // TODO make this a mapping based on what the targetRenameMapping returns
+                // I think a good method is to remove all those that match and then come up some heuristic for matching and then use that. If you can rename a private variable and make two things equal then they are equal.
+                // Does the same hold true when you are doing partial renames? It feels like it would have to be fail facetious for this not to be true?
+                var srcRenameMapping = srcRenamableSymbols.ToDictionary(s => s, s => $"p_{s.Name.ToLower().Trim('_')}");
                 
-                sourceRootNode = new RenameSymbolRewriter(srcSemanticModel, srcRenamableSymbols).Visit(sourceRootNode);
+                sourceRootNode = new RenameSymbolRewriter(srcSemanticModel, srcRenameMapping).Visit(sourceRootNode);
                 sourceRootNode = new ConsistentOrderRewriter().Visit(sourceRootNode);
                 srcSln = srcSln.WithDocumentSyntaxRoot(sourceDoc.Id, sourceRootNode);
 
@@ -156,7 +162,8 @@ public sealed class CheckSemanticEquivalence
                 var targetRenamablePrivateSymbolsWalker = new SemanticSimplifier.AllRenameablePrivateSymbols(targetSemanticModel);
                 targetRenamablePrivateSymbolsWalker.Visit(targetRootNode);
                 var targetRenamableSymbols = targetRenamablePrivateSymbolsWalker.PrivateSymbols;
-                targetRootNode = new RenameSymbolRewriter(targetSemanticModel, targetRenamableSymbols).Visit(targetRootNode);
+                var targetRenameMapping = targetRenamableSymbols.ToDictionary(s => s, s => $"p_{s.Name.ToLower().Trim('_')}");
+                targetRootNode = new RenameSymbolRewriter(targetSemanticModel, targetRenameMapping).Visit(targetRootNode);
                 targetRootNode = new ConsistentOrderRewriter().Visit(targetRootNode);
                 targetSln = targetSln.WithDocumentSyntaxRoot(targetDoc.Id, targetRootNode);
             }

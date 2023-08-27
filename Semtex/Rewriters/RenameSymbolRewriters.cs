@@ -7,27 +7,24 @@ namespace Semtex.Rewriters;
 internal class RenameSymbolRewriter: CSharpSyntaxRewriter
 {
     private readonly SemanticModel _semanticModel;
+    private readonly Dictionary<ISymbol, string> _renameMapping;
     private readonly HashSet<ISymbol> _oldSymbols;
     private readonly HashSet<string> _oldSymbolNames;
 
-    public RenameSymbolRewriter(SemanticModel semanticModel, HashSet<ISymbol> symbols)
+    public RenameSymbolRewriter(SemanticModel semanticModel, Dictionary<ISymbol, string> renameMapping)
     {
         _semanticModel = semanticModel;
+        _renameMapping = renameMapping;
         _oldSymbolNames = new HashSet<string>();
-        foreach (var s in symbols)
+        foreach (var s in renameMapping)
         {
-            _oldSymbolNames.Add(s.Name);
+            _oldSymbolNames.Add(s.Key.Name);
         }
 
-        _oldSymbols = symbols;
+        _oldSymbols = renameMapping.Keys.ToHashSet();
+        
     }
-
-    private static string GetNewName(ISymbol s)
-    {
-        // TODO there is no need to keep this as any resembelance to what was there before. We should probably just make it semtex_{i} or something
-        return $"p_{s.Name.ToLower().Trim('_')}";
-    }
-
+    
     public override SyntaxNode? VisitIdentifierName(IdentifierNameSyntax node)
     {
         if (!_oldSymbolNames.Contains(node.Identifier.Text))
@@ -41,7 +38,7 @@ internal class RenameSymbolRewriter: CSharpSyntaxRewriter
         if (symbol is null)
             return base.VisitIdentifierName(node);
         
-        return node.WithIdentifier(SyntaxFactory.Identifier(GetNewName(symbol)));
+        return node.WithIdentifier(SyntaxFactory.Identifier(_renameMapping[symbol]));
     }
 
     public override SyntaxNode? VisitPropertyDeclaration(PropertyDeclarationSyntax node)
@@ -57,7 +54,7 @@ internal class RenameSymbolRewriter: CSharpSyntaxRewriter
         if (symbol is null)
             return base.VisitPropertyDeclaration(node);
         
-        return node.WithIdentifier(SyntaxFactory.Identifier(GetNewName(symbol)));
+        return node.WithIdentifier(SyntaxFactory.Identifier(_renameMapping[symbol]));
     }
 
     public override SyntaxNode? VisitStructDeclaration(StructDeclarationSyntax node)
@@ -73,7 +70,7 @@ internal class RenameSymbolRewriter: CSharpSyntaxRewriter
         if (symbol is null)
             return base.VisitStructDeclaration(node);
         
-        return node.WithIdentifier(SyntaxFactory.Identifier(GetNewName(symbol)));
+        return node.WithIdentifier(SyntaxFactory.Identifier(_renameMapping[symbol]));
     }
     
     public override SyntaxNode? VisitRecordDeclaration(RecordDeclarationSyntax node)
@@ -89,7 +86,7 @@ internal class RenameSymbolRewriter: CSharpSyntaxRewriter
         if (symbol is null)
             return base.VisitRecordDeclaration(node);
         
-        return node.WithIdentifier(SyntaxFactory.Identifier(GetNewName(symbol)));
+        return node.WithIdentifier(SyntaxFactory.Identifier(_renameMapping[symbol]));
     }
 
 
@@ -106,7 +103,7 @@ internal class RenameSymbolRewriter: CSharpSyntaxRewriter
         if (symbol is null)
             return base.VisitVariableDeclarator(node);
         
-        return node.WithIdentifier(SyntaxFactory.Identifier(GetNewName(symbol)));
+        return node.WithIdentifier(SyntaxFactory.Identifier(_renameMapping[symbol]));
     }
 
 }
