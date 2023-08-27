@@ -166,12 +166,12 @@ public sealed class SafeAnalyzers
     {
         "RCS1213", // Unused Member
     };
-    internal static async Task<Solution> Apply(Solution sln, ProjectId projId, HashSet<AbsolutePath> documentFilepaths,
+    internal static async Task<Solution> Apply(Solution sln, ProjectId projId, IEnumerable<AbsolutePath> documentFilepaths,
         AbsolutePath? analyzerConfigPath, Dictionary<AbsolutePath, HashSet<string>> changedMethodsMap)
     {
         // Clone the set so that any edits don't effect caller.
-        documentFilepaths = new HashSet<AbsolutePath>(documentFilepaths, documentFilepaths.Comparer);
-        var currentSolution = await AnalyzerConfigOverwrite.ReplaceAnyAnalyzerConfigDocuments(sln, projId, documentFilepaths, analyzerConfigPath).ConfigureAwait(false);
+        var documentFilepathsSet = new HashSet<AbsolutePath>(documentFilepaths);
+        var currentSolution = await AnalyzerConfigOverwrite.ReplaceAnyAnalyzerConfigDocuments(sln, projId, documentFilepathsSet, analyzerConfigPath).ConfigureAwait(false);
         
         Logger.LogInformation("Starting Applying Diagnostic Fixes");
         
@@ -187,7 +187,7 @@ public sealed class SafeAnalyzers
             var project = currentSolution.GetProject(projId)!;
 
             var relevantDiagnostics =
-                await CompileAndGetRelevantDiagnostics(project, documentFilepaths, analyzerOptions).ConfigureAwait(false);
+                await CompileAndGetRelevantDiagnostics(project, documentFilepathsSet, analyzerOptions).ConfigureAwait(false);
 
             relevantDiagnostics = relevantDiagnostics
                 .Where(d => CodeFixProviders.ContainsKey(d.Descriptor.Id))
@@ -201,7 +201,7 @@ public sealed class SafeAnalyzers
 
             var sw = Stopwatch.StartNew();
             // Apply one diagnostic for each file that we care about. This makes the assumption that changes to one file wont invalidate the diagnostic in another.
-            foreach (var documentFilepath in documentFilepaths)
+            foreach (var documentFilepath in documentFilepathsSet)
             {
                 var document = currentSolution
                     .GetProject(projId)!
@@ -227,7 +227,7 @@ public sealed class SafeAnalyzers
                 if (!groupedDiagnostics.Any())
                 {
                     // (Optimization) Remove it from the set of filepaths that we are looking from analyzers in
-                    documentFilepaths.Remove(documentFilepath);
+                    documentFilepathsSet.Remove(documentFilepath);
                     continue;
                 }
                 var diagnosticsToApply = groupedDiagnostics.First();

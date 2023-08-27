@@ -75,22 +75,46 @@ public sealed class CheckSemanticEquivalence
             }
 
             Logger.LogInformation("We have a method filter for {Percentage}% of methods ({ChangedCount} files)",(int)(sourceChangedMethodsMap.Count/(float)sourceFilesToSimplify.Count), sourceChangedMethodsMap.Count);
+            // Setup the solutions
             await gitRepo.Checkout(target).ConfigureAwait(false);
-            var simplifiedTargetSolutionSummary = 
-                await GetSimplifiedSolution(analyzerConfigPath, targetFilesToSimplify, projFilter, projectMappingFilepath, gitRepo.RootFolder, sourceChangedMethodsMap).ConfigureAwait(false);
-            await gitRepo.Checkout(source).ConfigureAwait(false);
-            var simplifiedSrcSolutionSummary =
-                await GetSimplifiedSolution(analyzerConfigPath, sourceFilesToSimplify, projFilter, projectMappingFilepath, gitRepo.RootFolder, targetChangedMethodsMap).ConfigureAwait(false);
+            var targetProjFinder = GetProjFinder(gitRepo.RootFolder, projectMappingFilepath);
+            var (targetSolution, targetUnsimplified, targetProjectIds) = await GetSolution(targetFilesToSimplify, projFilter, targetProjFinder).ConfigureAwait(false);
             
-            // Co simplify here - some changes like renmaing make much more sense to do once we have both left and right. Aim is to keep this set of operation small though.
-            var filePathsToSimplify = diffConfig.SourceCsFilepaths.Select(p => (p, diffConfig.GetTargetFilepath(p)));
-            (simplifiedSrcSolutionSummary, simplifiedTargetSolutionSummary) = await CoSimplifySolutions(simplifiedSrcSolutionSummary, simplifiedTargetSolutionSummary, filePathsToSimplify).ConfigureAwait(false);
+            await gitRepo.Checkout(source).ConfigureAwait(false);
+            var sourceProjFinder = GetProjFinder(gitRepo.RootFolder, projectMappingFilepath);
+            var (srcSolution, srcUnsimplified, sourceProjectIds) = await GetSolution(sourceFilesToSimplify, projFilter, sourceProjFinder).ConfigureAwait(false);
+
+            sourceFilesToSimplify = sourceFilesToSimplify.Where(fp => !srcUnsimplified.IsUnsimplified(fp)).ToHashSet();
+            
+            // Simplify the solutions by apply rewriters and Analyzers/Code Fixes
+            var simplifiedSrcSln = await SemanticSimplifier
+                .GetSolutionWithFilesSimplified(srcSolution, sourceProjectIds, sourceFilesToSimplify, analyzerConfigPath, sourceChangedMethodsMap)
+                .ConfigureAwait(false);
+            
+            var simplifiedTargetSln = await SemanticSimplifier
+                .GetSolutionWithFilesSimplified(targetSolution, targetProjectIds, targetFilesToSimplify, analyzerConfigPath, targetChangedMethodsMap)
+                .ConfigureAwait(false);
+
+            
+            // Co simplify here - some changes like renaming make much more sense to do once we have both left and right. Aim is to keep this set of operation small though.
+            var filePathsToSimplify = diffConfig.SourceCsFilepaths
+                .Select(p => (p, diffConfig.GetTargetFilepath(p)))
+                .Where(pair=> 
+                    !srcUnsimplified.IsUnsimplified(pair.Item1)
+                    && !targetUnsimplified.IsUnsimplified(pair.Item2)
+                );
+            
+            (simplifiedSrcSln, simplifiedTargetSln) = await CoSimplifySolutions(simplifiedSrcSln, simplifiedTargetSln, sourceProjectIds, targetProjectIds, filePathsToSimplify).ConfigureAwait(false);
+
+            var simplifiedSrcSolutionSummary = new SimplifiedSolutionSummary(simplifiedSrcSln, sourceProjectIds, srcUnsimplified);
+            var simplifiedTargetSolutionSummary = new SimplifiedSolutionSummary(simplifiedTargetSln, targetProjectIds, targetUnsimplified);
+            
             
             var result = await GetFileModels(gitRepo, diffConfig, simplifiedSrcSolutionSummary, simplifiedTargetSolutionSummary, sourceChangedMethods).ConfigureAwait(false);
             // I am not sure why the GC is not smart enough to do this itself. But these lines prevent a linear increase in memory usage that just kills the process after a while.
             // Could it be the caching within Roslyn is holding references to some nodes which are then causing the reference to the wholue workspace to be held.  
-            simplifiedTargetSolutionSummary.Sln?.Workspace.Dispose();
-            simplifiedTargetSolutionSummary.Sln?.Workspace.Dispose();
+            simplifiedSrcSln.Workspace.Dispose();
+            simplifiedTargetSln.Workspace.Dispose();
             
             return new CommitModel(target, result, stopWatch.ElapsedMilliseconds, diffConfig)
             {
@@ -106,22 +130,14 @@ public sealed class CheckSemanticEquivalence
         
     }
 
-    internal static async Task<(SimplifiedSolutionSummary simplifiedSrcSolutionSummary, SimplifiedSolutionSummary simplifiedTargetSolutionSummary)> CoSimplifySolutions(SimplifiedSolutionSummary srcSolutionSummary, SimplifiedSolutionSummary targetSolutionSummary, IEnumerable<(AbsolutePath, AbsolutePath)> filepaths)
+    internal static async Task<(Solution srcSln, Solution targetSln)> CoSimplifySolutions(Solution srcSln, Solution targetSln, HashSet<ProjectId> sourceProjectIds, HashSet<ProjectId> targetProjectIds, IEnumerable<(AbsolutePath, AbsolutePath)> filepaths)
     {
-        var sourceProjectIds = srcSolutionSummary.SimplifiedProjectIds;
-        var targetProjectIds = targetSolutionSummary.SimplifiedProjectIds;
-
-        var sourceSln = srcSolutionSummary.Sln!;
-        var targetSln = targetSolutionSummary.Sln!;
         foreach (var (sourceFilepath,targetFilepath) in filepaths)
         {
-            if(srcSolutionSummary.UnsimplifiedFilesSummary.IsUnsimplified(sourceFilepath) || targetSolutionSummary.UnsimplifiedFilesSummary.IsUnsimplified(targetFilepath))
-                continue;
-            
             try
             {
                 // Right now we get now advantage by doing this once we have both solutions in context TODO change this
-                var sourceDoc = GetDocumentFromProjects(sourceSln.Projects.Where(p=>sourceProjectIds.Contains(p.Id)), sourceFilepath);
+                var sourceDoc = GetDocumentFromProjects(srcSln.Projects.Where(p=>sourceProjectIds.Contains(p.Id)), sourceFilepath);
                 var sourceRootNode = (await sourceDoc.GetSyntaxRootAsync().ConfigureAwait(false))!;
                 var srcCompilation = await sourceDoc.Project.GetCompilationAsync().ConfigureAwait(false);
                 var srcSemanticModel = srcCompilation!.GetSemanticModel(sourceRootNode.SyntaxTree);
@@ -131,7 +147,7 @@ public sealed class CheckSemanticEquivalence
                 
                 sourceRootNode = new RenameSymbolRewriter(srcSemanticModel, srcRenamableSymbols).Visit(sourceRootNode);
                 sourceRootNode = new ConsistentOrderRewriter().Visit(sourceRootNode);
-                sourceSln = srcSolutionSummary.Sln!.WithDocumentSyntaxRoot(sourceDoc.Id, sourceRootNode);
+                srcSln = srcSln.WithDocumentSyntaxRoot(sourceDoc.Id, sourceRootNode);
 
                 var targetDoc = GetDocumentFromProjects(targetSln.Projects.Where(p=>targetProjectIds.Contains(p.Id)), targetFilepath);
                 var targetRootNode = (await targetDoc.GetSyntaxRootAsync().ConfigureAwait(false))!;
@@ -142,9 +158,7 @@ public sealed class CheckSemanticEquivalence
                 var targetRenamableSymbols = targetRenamablePrivateSymbolsWalker.PrivateSymbols;
                 targetRootNode = new RenameSymbolRewriter(targetSemanticModel, targetRenamableSymbols).Visit(targetRootNode);
                 targetRootNode = new ConsistentOrderRewriter().Visit(targetRootNode);
-                targetSln = targetSolutionSummary.Sln!.WithDocumentSyntaxRoot(targetDoc.Id, targetRootNode);
-
-
+                targetSln = targetSln.WithDocumentSyntaxRoot(targetDoc.Id, targetRootNode);
             }
             catch (CantFindDocumentException)
             {
@@ -153,8 +167,7 @@ public sealed class CheckSemanticEquivalence
             }
         }
 
-        return (new SimplifiedSolutionSummary(sourceSln,sourceProjectIds, srcSolutionSummary.UnsimplifiedFilesSummary),
-            new SimplifiedSolutionSummary(targetSln,targetProjectIds, targetSolutionSummary.UnsimplifiedFilesSummary));
+        return (srcSln,targetSln);
     }
 
     private static string GetReproCommandline(GitRepo gitRepo, string target, string source, AbsolutePath? projectPath)
@@ -196,42 +209,35 @@ public sealed class CheckSemanticEquivalence
     }
     
 
-    private static async Task<SimplifiedSolutionSummary> GetSimplifiedSolution(
-            AbsolutePath? analyzerConfigPath, 
+    private static async Task<(Solution slnStart, UnsimplifiedFilesSummary, HashSet<ProjectId>)> GetSolution(
             HashSet<AbsolutePath> csFilepaths, 
             AbsolutePath? projFilter,
-            AbsolutePath? projectMappingFilepath, 
-            AbsolutePath rootFolder,
-            Dictionary<AbsolutePath, HashSet<string>> changedMethodsMap )
+            IProjFinder projFinder )
     {
         var filepathsWithIfPreprocessor = csFilepaths.Where(HasIfPreprocessor).ToHashSet();
         var filepathsToSimplify = csFilepaths.Except(filepathsWithIfPreprocessor).ToHashSet();
-        var (projectToFilesMap, unableToFindProj) = GetProjFinder(rootFolder, projectMappingFilepath)
-            .GetProjectToFileMapping(filepathsToSimplify, projFilter);
+        var (projectToFilesMap, unableToFindProj) = projFinder.GetProjectToFileMapping(filepathsToSimplify, projFilter);
 
         var (slnStart, failedToRestore, failedToCompile) =
             await SolutionUtils.LoadSolution(projectToFilesMap.Keys.ToList()).ConfigureAwait(false);
-        var projPathsToSimplify =
-            projectToFilesMap.Keys.Where(p => projectToFilesMap[p].Count > 0 && !failedToRestore.Contains(p) && !failedToCompile.Contains(p)).ToHashSet();
         
         var filepathsInFailedToRestore = failedToRestore.SelectMany(f => projectToFilesMap[f]).ToHashSet();
         var filepathsInFailedToCompile = failedToCompile.SelectMany(f => projectToFilesMap[f]).ToHashSet();
+        
+        var projPathsToSimplify =
+            projectToFilesMap.Keys.Where(p => projectToFilesMap[p].Count > 0 && !failedToRestore.Contains(p) && !failedToCompile.Contains(p)).ToHashSet();
 
-        // Because a single project can appear multiple times in a solution if it has multiple target frameworks then we should only pick one.
-        // Even though we do a best effort attempt at removing multiple target versions above this can still occur due to the need to check dependencies.
         var projectsToSimplify = slnStart.Projects
             .Where(p => p.FilePath != null && projPathsToSimplify.Contains(new AbsolutePath(p.FilePath!)))
             .GroupBy(p => p.FilePath)
             .Select(g => SolutionUtils.GetHighestTargetVersion(g.ToList()))
             .ToList();
-        var simplifiedProjectIds = projectsToSimplify.Select(p => p.Id).ToHashSet();
+        var projectIdsToSimplify = projectsToSimplify.Select(p => p.Id).ToHashSet();
 
-        var simplifiedSln = await SemanticSimplifier
-            .GetSolutionWithFilesSimplified(slnStart, simplifiedProjectIds, projectToFilesMap, analyzerConfigPath,
-                changedMethodsMap)
-            .ConfigureAwait(false);
-        return new SimplifiedSolutionSummary(simplifiedSln, simplifiedProjectIds, new UnsimplifiedFilesSummary(filepathsWithIfPreprocessor, filepathsInFailedToCompile, unableToFindProj,
-            filepathsInFailedToRestore));
+        // Because a single project can appear multiple times in a solution if it has multiple target frameworks then we should only pick one.
+        // Even though we do a best effort attempt at removing multiple target versions above this can still occur due to the need to check dependencies.
+        return (slnStart,new UnsimplifiedFilesSummary(filepathsWithIfPreprocessor, filepathsInFailedToCompile, unableToFindProj,
+            filepathsInFailedToRestore),projectIdsToSimplify);
     }
 
 

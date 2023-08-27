@@ -392,19 +392,29 @@ public static class NoOpProgram{public static void Main(){}}// Needed to avoid C
 
     public static async Task<(Document, Document)> GetSimplifiedDocs(string folderPath)
     {
-        var leftSln = await GetSimplifiedSln(folderPath, "Left.cs").ConfigureAwait(false);
-        var rightSln = await GetSimplifiedSln(folderPath, "Right.cs").ConfigureAwait(false);
-        var leftDoc = leftSln.Projects.SelectMany(p => p.Documents).First(d => d.FilePath!.EndsWith("Left.cs"));
-        var rightDoc = rightSln.Projects.SelectMany(p => p.Documents).First(d => d.FilePath!.EndsWith("Right.cs"));
+        var leftDocInfo = GetDocumentInfo(folderPath, "Left.cs", BaseProjectId);
+        var leftSln = BaseSolution.AddDocument(leftDocInfo);
+        var leftFp = new AbsolutePath(leftDocInfo.FilePath!);
         
-        var leftSs = new SimplifiedSolutionSummary(leftSln, new HashSet<ProjectId>() { leftDoc.Project.Id }, UnsimplifiedFilesSummary.Empty());
-        var rightSs  = new SimplifiedSolutionSummary(rightSln, new HashSet<ProjectId>() { rightDoc.Project.Id }, UnsimplifiedFilesSummary.Empty());
-        
-        var (simplifiedSrcSolutionSummary, simplifiedTargetSolutionSummary) = await CheckSemanticEquivalence.CoSimplifySolutions(leftSs, rightSs, new []{(new AbsolutePath(leftDoc.FilePath!),new AbsolutePath(rightDoc.FilePath!))});
+        var rightDocInfo = GetDocumentInfo(folderPath, "Right.cs", BaseProjectId);
+        var rightSln = BaseSolution.AddDocument(rightDocInfo);
+        var rightFp = new AbsolutePath(rightDocInfo.FilePath!);
 
-        var leftSimplified = simplifiedSrcSolutionSummary.SimplifiedProjects!.SelectMany(p => p.Documents).First(d => d.FilePath!.EndsWith("Left.cs"));
-        var rightSimplified = simplifiedTargetSolutionSummary.SimplifiedProjects!.SelectMany(p => p.Documents).First(d => d.FilePath!.EndsWith("Right.cs"));
-        return (leftSimplified, rightSimplified);
+        leftSln =  await SimplifySolution(leftSln, leftFp).ConfigureAwait(false);
+        rightSln =  await SimplifySolution(rightSln, rightFp).ConfigureAwait(false);
+        
+        var leftDoc = leftSln.Projects.SelectMany(p => p.Documents).First(d => d.FilePath == leftFp.Path);
+        var rightDoc = rightSln.Projects.SelectMany(p => p.Documents).First(d => d.FilePath == rightFp.Path);
+        
+        (leftSln, rightSln) = await CheckSemanticEquivalence.CoSimplifySolutions(
+            leftSln, 
+            rightSln, 
+            new HashSet<ProjectId>() { leftDoc.Project.Id }, 
+            new HashSet<ProjectId>() { rightDoc.Project.Id }, 
+            new []{(new AbsolutePath(leftDoc.FilePath!),new AbsolutePath(rightDoc.FilePath!))}
+        );
+
+        return (leftSln.GetDocument(leftDoc.Id)!, rightSln.GetDocument(rightDoc.Id)!);
     }
 
     [Test, TestCaseSource(nameof(NonSemanticallyEquivalentDirectories))]
@@ -436,14 +446,8 @@ public static class NoOpProgram{public static void Main(){}}// Needed to avoid C
 
     }
 
-
-    private static async Task<Solution> GetSimplifiedSln(string folderPath, string filename)
+    private static async Task<Solution> SimplifySolution(Solution sln, AbsolutePath fpToSimplify)
     {
-        var docInfo = GetDocumentInfo(folderPath, filename, BaseProjectId);
-        var sln = BaseSolution
-            .AddDocument(docInfo);
-        var projToFiles = new Dictionary<AbsolutePath, HashSet<AbsolutePath>>()
-            { [new AbsolutePath(ProjectFilepath)] = new() { new AbsolutePath(docInfo.FilePath!) } };
         // Empty indicates just apply it to the whole solution
         var changeMethodsMap = new Dictionary<AbsolutePath, HashSet<string>>();
         
@@ -452,10 +456,9 @@ public static class NoOpProgram{public static void Main(){}}// Needed to avoid C
             .Select(p => p.Id)
             .ToHashSet();
 
-        var newSln = await SemanticSimplifier
-            .GetSolutionWithFilesSimplified(sln, projectIds, projToFiles, null, changeMethodsMap)
+        return await SemanticSimplifier
+            .GetSolutionWithFilesSimplified(sln, projectIds, new HashSet<AbsolutePath>(){fpToSimplify}, null, changeMethodsMap)
             .ConfigureAwait(false);
-        return newSln;
     }
 
 

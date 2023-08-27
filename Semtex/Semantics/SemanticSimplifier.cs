@@ -17,14 +17,15 @@ internal class SemanticSimplifier
         SemtexLog.LoggerFactory.CreateLogger<SemanticSimplifier>();
 
     internal static async Task<Solution> GetSolutionWithFilesSimplified(
-        Solution sln, HashSet<ProjectId> projectIds, Dictionary<AbsolutePath, HashSet<AbsolutePath>> projectToFilesMap, AbsolutePath? analyzerConfigPath,
+        Solution sln, HashSet<ProjectId> projectIds, HashSet<AbsolutePath> documentsToSimplify, AbsolutePath? analyzerConfigPath,
         Dictionary<AbsolutePath, HashSet<string>> changedMethodsMap)
     {
         foreach (var projId in projectIds) // This could 100% be parallelized for speed - for now won't do this as the logging becomes more difficult.
         {
             var proj = sln.GetProject(projId)!;
             Logger.LogInformation("Processing {ProjName}", proj.Name);
-            var docsToSimplify = projectToFilesMap[new AbsolutePath(proj.FilePath!)];
+            // TODO why don't we calculate the DocumentId?
+            var docsToSimplify = proj.Documents.Select(d=>new AbsolutePath(d.FilePath!)).Where(documentsToSimplify.Contains).ToList();
 
             // Simplify docs
             sln = await SafeAnalyzers.Apply(sln, projId, docsToSimplify, analyzerConfigPath, changedMethodsMap).ConfigureAwait(false);
@@ -44,7 +45,7 @@ internal class SemanticSimplifier
         new TrailingCommaRewriter()
     };
     private static async Task<Solution> ApplyRewriters(Solution sln, ProjectId projectId,
-        HashSet<AbsolutePath> docsToSimplify)
+        IEnumerable<AbsolutePath> docsToSimplify)
     {
         var sw = Stopwatch.StartNew();
         var docsToSimplifyString = docsToSimplify.Select(d => d.Path).ToHashSet(); 
