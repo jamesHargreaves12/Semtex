@@ -24,7 +24,6 @@ public class CheckSemanticEquivalence
         if (diffConfig.SourceCsFilepaths.Count == 0)
         {
             Logger.LogInformation("Skipping commit {Target} as it has no c# diffs",target);
-            // Todo improve this early exit
             var fileModels = await GetFileModels(gitRepo, diffConfig, UnsimplifiedFilesSummary.Empty(),
                     UnsimplifiedFilesSummary.Empty(), new List<Project>(), new List<Project>(),
                     new Dictionary<AbsolutePath, HashSet<string>>())

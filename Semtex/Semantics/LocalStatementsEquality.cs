@@ -20,7 +20,6 @@ namespace Semtex.Semantics;
 /// 5.   - Find the minimum number of pairwise swaps needed to reorder it the two statements so that they are in the same place.
 /// 6.   - Confirm that Obsv1 holds for all these swaps.
 
-// TODO error messages
 public static class LocalStatementsEquality
 {
     public static bool SemanticallyEqualLocalStatements(SyntaxList<StatementSyntax> left,
@@ -87,9 +86,8 @@ public static class LocalStatementsEquality
         if (leftTexts.Any(s => !rightTexts.Contains(s)) || leftTexts.Count != rightTexts.Count)
             return false;
         
-        // TODO think about repeated texts.
         if (leftTexts.Distinct().Count() < leftTexts.Count)
-            return false;
+            return false; // This wouldn't be difficult to support but right now I don't think its worth it.
         
         // 4. From description
         foreach (var (leftText, leftIndex) in leftTexts.Select((t,i)=>(t,i)))
@@ -204,7 +202,7 @@ public static class LocalStatementsEquality
             case ExpressionStatementSyntax expressionStatementSyntax:
                 return GetReadsAndWrites(expressionStatementSyntax.Expression);
             default:
-                throw new InvalidOperationException("Didn't expect this");
+                throw new InvalidOperationException($"Unexpected Statement with kind {statementSyntax.Kind()}");
         }
     }
     private static (IEnumerable<string> reads,IEnumerable<string>writes) GetReadsAndWrites(ExpressionSyntax statementSyntax)
@@ -213,7 +211,8 @@ public static class LocalStatementsEquality
         {
             case AssignmentExpressionSyntax expressionStatementSyntax:
                 if (expressionStatementSyntax.Left is not IdentifierNameSyntax leftIdentifierNameSyntax)
-                    throw new InvalidOperationException("Didn't expect this");
+                    throw new InvalidOperationException("Only support for assignment to IdentifierNames.");
+                
                 var rhs = GetReadsAndWrites(expressionStatementSyntax.Right);
                 return (rhs.reads, rhs.writes.Append( leftIdentifierNameSyntax.Identifier.Text));
             case BinaryExpressionSyntax binaryExpression:
@@ -225,7 +224,7 @@ public static class LocalStatementsEquality
             case LiteralExpressionSyntax:
                 return (new List<string>(), new List<string>());
             default:
-                throw new InvalidOperationException("Didn't expect this");
+                throw new InvalidOperationException($"Unexpected Statement with kind {statementSyntax.Kind()}");
         }
     }
 

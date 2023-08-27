@@ -11,6 +11,8 @@ namespace Semtex.Semantics;
 public class LocalVariableRenamer
 {
     private static readonly ILogger<LocalVariableRenamer> Logger = SemtexLog.LoggerFactory.CreateLogger<LocalVariableRenamer>();
+    
+    // TODO this should be returning a mapping from ISymbol.
     internal static async Task<List<(string left, string right)>> GetProposedLocalVariableRenames(MethodDeclarationSyntax left, MethodDeclarationSyntax right,
         SemanticModel leftSemanticModel, SemanticModel rightSemanticModel, Document leftDocument, Document rightDocument)
     {

@@ -9,7 +9,7 @@ using Semtex.Models;
 
 namespace Semtex.Semantics;
 
-public class DiffToMethods
+public sealed class DiffToMethods
 {
     public const string TOP_LEVEL_USING_IDENTIFIER = "<top_level_using>";
     private static readonly ILogger<DiffToMethods> Logger = SemtexLog.LoggerFactory.CreateLogger<DiffToMethods>();
@@ -19,7 +19,7 @@ public class DiffToMethods
     /// <param name="filepaths"></param>
     /// <param name="lineChangeMapping"></param>
     /// <returns></returns>
-    public static async Task<Dictionary<AbsolutePath, HashSet<string>>> GetChangesFilter(
+    internal static async Task<Dictionary<AbsolutePath, HashSet<string>>> GetChangesFilter(
         HashSet<AbsolutePath> filepaths, Dictionary<AbsolutePath, List<LineDiff>> lineChangeMapping)
     {
         var result = new Dictionary<AbsolutePath, HashSet<string>>();
@@ -33,7 +33,7 @@ public class DiffToMethods
 
             var fileLines = SourceText.From(fileText).Lines;
 
-            var root = await CSharpSyntaxTree.ParseText(fileText).GetRootAsync();
+            var root = await CSharpSyntaxTree.ParseText(fileText).GetRootAsync().ConfigureAwait(false);
             var changeOutsideMethod = false;
             foreach (var lineDiff in lineDiffs)
             {
