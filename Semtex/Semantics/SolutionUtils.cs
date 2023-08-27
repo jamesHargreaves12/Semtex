@@ -70,7 +70,7 @@ internal sealed class SolutionUtils
             (sln, var failedToRestore2) = await LoadSolutionImpl(projectPaths).ConfigureAwait(false);
             
             failedToRestore.AddRange(failedToRestore2);
-            failedToCompile = await CheckProjectsCompile(sln, projectPaths);
+            failedToCompile = await CheckProjectsCompile(sln, projectPaths).ConfigureAwait(false);
             if (failedToCompile.Any())
             {
                 Logger.LogWarning(
@@ -83,6 +83,10 @@ internal sealed class SolutionUtils
             }
             Logger.LogInformation(SemtexLog.GetPerformanceStr(nameof(LoadSolution)+"-Reload", stopwatch.ElapsedMilliseconds));
         }
+
+        var toSimplify = projectPaths.Where(p => !failedToRestore.Contains(p) && !failedToRestore.Contains(p)).ToHashSet();
+        // TODO can we pull this up so that we never load them. Would help with the long load times of big solutions.
+        sln = FilterSolutionToHighestTargetVersionOfProjects(sln, toSimplify);
 
         return (sln, failedToRestore, failedToCompile);
     }

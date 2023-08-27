@@ -24,7 +24,7 @@ internal class GitRepo
     private static readonly string ScratchSpacePath = Path.Join(Path.GetTempPath(), "Semtex");
 
     public string RemoteUrl { get; }
-    private static Func<string,string> FormatOutputString = s => $"[git] {s}";
+    private static readonly Func<string,string> FormatOutputString = s => $"[git] {s}";
     // This is noisy for little gain. May regret this but right now its a pain.
     private static readonly PipeTarget StdOutPipe = PipeTarget.ToDelegate(s => Logger.LogDebug(FormatOutputString(s)));
     private static readonly PipeTarget StdErrPipe = PipeTarget.ToDelegate(s => Logger.LogError(FormatOutputString(s)));
@@ -113,7 +113,7 @@ internal class GitRepo
                     return existingRepo;
                 }
             }
-            catch (CommandExecutionException e) // TODO exception type
+            catch (Exception e)
             {
                 Logger.LogWarning($"Failed to load repo from existing folder with message {e}");
                 // Will just continue and check it out from scratch.
@@ -128,9 +128,6 @@ internal class GitRepo
         return gitRepo;
     }
 
-
-
-    // TODO does this need to exist any more?
     internal string GetRelativePath(AbsolutePath fullPath)
     {
         return RootFolder.GetRelativePath(fullPath);
@@ -154,7 +151,6 @@ internal class GitRepo
         return new GitRepo(rootFolder, repo);
     }
 
-    // TODO check what other statuses there are
     internal async Task<(HashSet<AbsolutePath> modifiedFilepaths, HashSet<AbsolutePath> addedFilepaths, HashSet<AbsolutePath> removedFilepaths, HashSet<(AbsolutePath Source, AbsolutePath Target, int Similarity)> renamedFilepaths)> DiffFiles(string sourceSha, string targetSha)
     {
         var gitDiffCmd = Cli.Wrap("git")
@@ -173,10 +169,13 @@ internal class GitRepo
         var diffResults = cmdResult.StandardOutput
             .Split("\n")
             .Where(c => !string.IsNullOrEmpty(c))
-            .Select(c => c.Split("\t"));
+            .Select(c => c.Split("\t"))
+            .ToList();
        var diffResultsLookup = diffResults
             .ToLookup(c => c[0]); // Renamings have a similarity score as well.
 
+       
+       // Not supporting "C", "T", "U", "X"
         var modifiedFilepaths = diffResultsLookup["M"]
             .Select(c => c[1])
             .Select(f => RootFolder.Join(f))
@@ -191,7 +190,7 @@ internal class GitRepo
             .ToHashSet();
         var renamedFilepaths = diffResults
             .Where(c=>c[0].StartsWith("R"))
-            .Select(c => (RootFolder.Join(c[1]),  RootFolder.Join(c[2]), int.Parse(c[0].Substring(1))))
+            .Select(c => (RootFolder.Join(c[1]),  RootFolder.Join(c[2]), int.Parse(c[0][1..])))
             .ToHashSet();
         // We should report the similarity because if they are R100 then we should not bother doing processing them.
         // However keeping them in for development is probably good as it means that we can assert nothing funny is going on.
@@ -200,7 +199,7 @@ internal class GitRepo
             modifiedFilepaths.Count + addedFilepaths.Count + removedFilepaths.Count + renamedFilepaths.Count)
         {
             throw new Exception(
-                $"Unknown type of Diff - Types of diff: {string.Join(",", diffResultsLookup.Select(k => k.Key).ToList())}");
+                $"Unhandled type of Diff - Types of diff: {string.Join(",", diffResultsLookup.Select(k => k.Key).ToList())}");
         }
 
         return (modifiedFilepaths, addedFilepaths, removedFilepaths, renamedFilepaths);

@@ -17,7 +17,7 @@ internal class SemanticSimplifier
         SemtexLog.LoggerFactory.CreateLogger<SemanticSimplifier>();
 
     internal static async Task<Solution> GetSolutionWithFilesSimplified(
-        Solution sln, List<ProjectId> projectIds, Dictionary<AbsolutePath, HashSet<AbsolutePath>> projectToFilesMap, AbsolutePath? analyzerConfigPath,
+        Solution sln, HashSet<ProjectId> projectIds, Dictionary<AbsolutePath, HashSet<AbsolutePath>> projectToFilesMap, AbsolutePath? analyzerConfigPath,
         Dictionary<AbsolutePath, HashSet<string>> changedMethodsMap)
     {
         foreach (var projId in projectIds) // This could 100% be parallelized for speed - for now won't do this as the logging becomes more difficult.
@@ -38,7 +38,7 @@ internal class SemanticSimplifier
     private static List<CSharpSyntaxRewriter> _rewriters = new()
     {
         new RemoveTriviaRewriter(),
-        new ConsistentOrderRewriter(),
+        // new ConsistentOrderRewriter(), want to do this after renaming
         new RemoveSuppressNullableWarningRewriter(),
         new ApplySimplificationServiceRewriter(),
         new TrailingCommaRewriter()
@@ -54,13 +54,6 @@ internal class SemanticSimplifier
         foreach (var doc in simplifiedDocs)
         {
             var rootNode = (await doc.GetSyntaxRootAsync().ConfigureAwait(false))!;
-            var compilation = await doc.Project.GetCompilationAsync().ConfigureAwait(false); // Should we just reuse this on subsequent loops?
-            var semanticModel = compilation!.GetSemanticModel(rootNode.SyntaxTree);
-
-            var renamablePrivateSymbolsWalker = new AllRenameablePrivateSymbols(semanticModel);
-            renamablePrivateSymbolsWalker.Visit(rootNode);
-
-            rootNode = new RenameSymbolRewriter(semanticModel, renamablePrivateSymbolsWalker.PrivateSymbols).Visit(rootNode);
             foreach (var rewriter in _rewriters)
             {
                 rootNode = rewriter.Visit(rootNode);

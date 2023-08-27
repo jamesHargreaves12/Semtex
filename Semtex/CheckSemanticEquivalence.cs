@@ -6,10 +6,11 @@ using Microsoft.Extensions.Logging;
 using OneOf;
 using Semtex.Logging;
 using Semtex.Models;
+using Semtex.Rewriters;
 
 namespace Semtex;
 
-public class CheckSemanticEquivalence
+public sealed class CheckSemanticEquivalence
 {
     private static readonly ILogger<CheckSemanticEquivalence> Logger = SemtexLog.LoggerFactory.CreateLogger<CheckSemanticEquivalence>();
 
@@ -24,9 +25,7 @@ public class CheckSemanticEquivalence
         if (diffConfig.SourceCsFilepaths.Count == 0)
         {
             Logger.LogInformation("Skipping commit {Target} as it has no c# diffs",target);
-            var fileModels = await GetFileModels(gitRepo, diffConfig, UnsimplifiedFilesSummary.Empty(),
-                    UnsimplifiedFilesSummary.Empty(), new List<Project>(), new List<Project>(),
-                    new Dictionary<AbsolutePath, HashSet<string>>())
+            var fileModels = await GetFileModels(gitRepo, diffConfig, SimplifiedSolutionSummary.Empty(), SimplifiedSolutionSummary.Empty(), new Dictionary<AbsolutePath, HashSet<string>>())
                 .ConfigureAwait(false);
 
             return new CommitModel(target, fileModels, stopWatch.ElapsedMilliseconds, diffConfig)
@@ -55,7 +54,7 @@ public class CheckSemanticEquivalence
                 var targetFilepath = diffConfig.GetTargetFilepath(sourceFilepath);
                 targetLineChangeMapping[targetFilepath] = lineChanges.Select(l => l.Item2).ToList();
             }
-            // TODO can this be done without an additional sourceChangedCheck
+
             await gitRepo.Checkout(target).ConfigureAwait(false);
             var targetChangedMethods =
                     await DiffToMethods.GetChangesFilter(targetFilesToSimplify, targetLineChangeMapping).ConfigureAwait(false);
@@ -77,17 +76,21 @@ public class CheckSemanticEquivalence
 
             Logger.LogInformation("We have a method filter for {Percentage}% of methods ({ChangedCount} files)",(int)(sourceChangedMethodsMap.Count/(float)sourceFilesToSimplify.Count), sourceChangedMethodsMap.Count);
             await gitRepo.Checkout(target).ConfigureAwait(false);
-            var (targetSln, targetUnsimplifiedFiles, targetSimplifiedProjects) =
+            var simplifiedTargetSolutionSummary = 
                 await GetSimplifiedSolution(analyzerConfigPath, targetFilesToSimplify, projFilter, projectMappingFilepath, gitRepo.RootFolder, sourceChangedMethodsMap).ConfigureAwait(false);
             await gitRepo.Checkout(source).ConfigureAwait(false);
-            var (sourceSln, sourceUnsimplifiedFiles, srcSimplifiedProjects) =
+            var simplifiedSrcSolutionSummary =
                 await GetSimplifiedSolution(analyzerConfigPath, sourceFilesToSimplify, projFilter, projectMappingFilepath, gitRepo.RootFolder, targetChangedMethodsMap).ConfigureAwait(false);
-
-            var result = await GetFileModels(gitRepo, diffConfig, targetUnsimplifiedFiles, sourceUnsimplifiedFiles, srcSimplifiedProjects, targetSimplifiedProjects, sourceChangedMethods).ConfigureAwait(false);
+            
+            // Co simplify here - some changes like renmaing make much more sense to do once we have both left and right. Aim is to keep this set of operation small though.
+            var filePathsToSimplify = diffConfig.SourceCsFilepaths.Select(p => (p, diffConfig.GetTargetFilepath(p)));
+            (simplifiedSrcSolutionSummary, simplifiedTargetSolutionSummary) = await CoSimplifySolutions(simplifiedSrcSolutionSummary, simplifiedTargetSolutionSummary, filePathsToSimplify).ConfigureAwait(false);
+            
+            var result = await GetFileModels(gitRepo, diffConfig, simplifiedSrcSolutionSummary, simplifiedTargetSolutionSummary, sourceChangedMethods).ConfigureAwait(false);
             // I am not sure why the GC is not smart enough to do this itself. But these lines prevent a linear increase in memory usage that just kills the process after a while.
             // Could it be the caching within Roslyn is holding references to some nodes which are then causing the reference to the wholue workspace to be held.  
-            sourceSln.Workspace.Dispose();
-            targetSln.Workspace.Dispose();
+            simplifiedTargetSolutionSummary.Sln?.Workspace.Dispose();
+            simplifiedTargetSolutionSummary.Sln?.Workspace.Dispose();
             
             return new CommitModel(target, result, stopWatch.ElapsedMilliseconds, diffConfig)
             {
@@ -101,6 +104,57 @@ public class CheckSemanticEquivalence
             throw;
         }
         
+    }
+
+    internal static async Task<(SimplifiedSolutionSummary simplifiedSrcSolutionSummary, SimplifiedSolutionSummary simplifiedTargetSolutionSummary)> CoSimplifySolutions(SimplifiedSolutionSummary srcSolutionSummary, SimplifiedSolutionSummary targetSolutionSummary, IEnumerable<(AbsolutePath, AbsolutePath)> filepaths)
+    {
+        var sourceProjectIds = srcSolutionSummary.SimplifiedProjectIds;
+        var targetProjectIds = targetSolutionSummary.SimplifiedProjectIds;
+
+        var sourceSln = srcSolutionSummary.Sln!;
+        var targetSln = targetSolutionSummary.Sln!;
+        foreach (var (sourceFilepath,targetFilepath) in filepaths)
+        {
+            if(srcSolutionSummary.UnsimplifiedFilesSummary.IsUnsimplified(sourceFilepath) || targetSolutionSummary.UnsimplifiedFilesSummary.IsUnsimplified(targetFilepath))
+                continue;
+            
+            try
+            {
+                // Right now we get now advantage by doing this once we have both solutions in context TODO change this
+                var sourceDoc = GetDocumentFromProjects(sourceSln.Projects.Where(p=>sourceProjectIds.Contains(p.Id)), sourceFilepath);
+                var sourceRootNode = (await sourceDoc.GetSyntaxRootAsync().ConfigureAwait(false))!;
+                var srcCompilation = await sourceDoc.Project.GetCompilationAsync().ConfigureAwait(false);
+                var srcSemanticModel = srcCompilation!.GetSemanticModel(sourceRootNode.SyntaxTree);
+                var sourceRenamablePrivateSymbolsWalker = new SemanticSimplifier.AllRenameablePrivateSymbols(srcSemanticModel);
+                sourceRenamablePrivateSymbolsWalker.Visit(sourceRootNode);
+                var srcRenamableSymbols = sourceRenamablePrivateSymbolsWalker.PrivateSymbols;
+                
+                sourceRootNode = new RenameSymbolRewriter(srcSemanticModel, srcRenamableSymbols).Visit(sourceRootNode);
+                sourceRootNode = new ConsistentOrderRewriter().Visit(sourceRootNode);
+                sourceSln = srcSolutionSummary.Sln!.WithDocumentSyntaxRoot(sourceDoc.Id, sourceRootNode);
+
+                var targetDoc = GetDocumentFromProjects(targetSln.Projects.Where(p=>targetProjectIds.Contains(p.Id)), targetFilepath);
+                var targetRootNode = (await targetDoc.GetSyntaxRootAsync().ConfigureAwait(false))!;
+                var targetCompilation = await targetDoc.Project.GetCompilationAsync().ConfigureAwait(false);
+                var targetSemanticModel = targetCompilation!.GetSemanticModel(targetRootNode.SyntaxTree);
+                var targetRenamablePrivateSymbolsWalker = new SemanticSimplifier.AllRenameablePrivateSymbols(targetSemanticModel);
+                targetRenamablePrivateSymbolsWalker.Visit(targetRootNode);
+                var targetRenamableSymbols = targetRenamablePrivateSymbolsWalker.PrivateSymbols;
+                targetRootNode = new RenameSymbolRewriter(targetSemanticModel, targetRenamableSymbols).Visit(targetRootNode);
+                targetRootNode = new ConsistentOrderRewriter().Visit(targetRootNode);
+                targetSln = targetSolutionSummary.Sln!.WithDocumentSyntaxRoot(targetDoc.Id, targetRootNode);
+
+
+            }
+            catch (CantFindDocumentException)
+            {
+                // TODO
+                continue; 
+            }
+        }
+
+        return (new SimplifiedSolutionSummary(sourceSln,sourceProjectIds, srcSolutionSummary.UnsimplifiedFilesSummary),
+            new SimplifiedSolutionSummary(targetSln,targetProjectIds, targetSolutionSummary.UnsimplifiedFilesSummary));
     }
 
     private static string GetReproCommandline(GitRepo gitRepo, string target, string source, AbsolutePath? projectPath)
@@ -134,36 +188,6 @@ public class CheckSemanticEquivalence
     }
 
 
-    private record UnsimplifiedFilesSummary
-    {
-        public UnsimplifiedFilesSummary(HashSet<AbsolutePath> filepathsWithIfPreprocessor,
-            HashSet<AbsolutePath> filepathsInProjThatFailedToCompile,
-            HashSet<AbsolutePath> filepathsWhichUnableToFindProjFor,
-            HashSet<AbsolutePath> filepathsInProjThatFailedToRestore)
-        {
-            FilepathsWithIfPreprocessor = filepathsWithIfPreprocessor;
-            FilepathsInProjThatFailedToCompile = filepathsInProjThatFailedToCompile;
-            FilepathsWhichUnableToFindProjFor = filepathsWhichUnableToFindProjFor;
-            FilepathsInProjThatFailedToRestore = filepathsInProjThatFailedToRestore;
-        }
-
-        internal HashSet<AbsolutePath> FilepathsWithIfPreprocessor { get; }
-        internal HashSet<AbsolutePath> FilepathsInProjThatFailedToCompile { get; }
-        internal HashSet<AbsolutePath> FilepathsWhichUnableToFindProjFor { get; }
-        public HashSet<AbsolutePath> FilepathsInProjThatFailedToRestore { get; }
-
-        public static UnsimplifiedFilesSummary Empty()
-        {
-            return new UnsimplifiedFilesSummary(
-                new HashSet<AbsolutePath>(),
-                new HashSet<AbsolutePath>(),
-                new HashSet<AbsolutePath>(),
-                new HashSet<AbsolutePath>()
-            );
-        }
-    }
-
-    
     // I think this is better done through DI
     private static IProjFinder GetProjFinder(AbsolutePath rootFolder, AbsolutePath? explicitFilePath)
     {
@@ -172,7 +196,7 @@ public class CheckSemanticEquivalence
     }
     
 
-    private static async Task<(Solution simplifiedSln, UnsimplifiedFilesSummary unsimplifiedFilesSummary, List<Project> simplifiedProjects)> GetSimplifiedSolution(
+    private static async Task<SimplifiedSolutionSummary> GetSimplifiedSolution(
             AbsolutePath? analyzerConfigPath, 
             HashSet<AbsolutePath> csFilepaths, 
             AbsolutePath? projFilter,
@@ -189,8 +213,7 @@ public class CheckSemanticEquivalence
             await SolutionUtils.LoadSolution(projectToFilesMap.Keys.ToList()).ConfigureAwait(false);
         var projPathsToSimplify =
             projectToFilesMap.Keys.Where(p => projectToFilesMap[p].Count > 0 && !failedToRestore.Contains(p) && !failedToCompile.Contains(p)).ToHashSet();
-        // TODO pushing this down into SolutionUtils.LoadSolution would avoid wasted work.
-        slnStart = SolutionUtils.FilterSolutionToHighestTargetVersionOfProjects(slnStart, projPathsToSimplify);
+        
         var filepathsInFailedToRestore = failedToRestore.SelectMany(f => projectToFilesMap[f]).ToHashSet();
         var filepathsInFailedToCompile = failedToCompile.SelectMany(f => projectToFilesMap[f]).ToHashSet();
 
@@ -201,16 +224,14 @@ public class CheckSemanticEquivalence
             .GroupBy(p => p.FilePath)
             .Select(g => SolutionUtils.GetHighestTargetVersion(g.ToList()))
             .ToList();
-        
+        var simplifiedProjectIds = projectsToSimplify.Select(p => p.Id).ToHashSet();
+
         var simplifiedSln = await SemanticSimplifier
-            .GetSolutionWithFilesSimplified(slnStart, projectsToSimplify.Select(s=>s.Id).ToList(), projectToFilesMap, analyzerConfigPath,
+            .GetSolutionWithFilesSimplified(slnStart, simplifiedProjectIds, projectToFilesMap, analyzerConfigPath,
                 changedMethodsMap)
             .ConfigureAwait(false);
-        var simplifiedProjectIds = projectsToSimplify.Select(p => p.Id).ToHashSet();
-        var simplifiedProjects = simplifiedSln.Projects.Where(p => simplifiedProjectIds.Contains(p.Id)).ToList();
-        return (simplifiedSln,
-            new UnsimplifiedFilesSummary(filepathsWithIfPreprocessor, filepathsInFailedToCompile, unableToFindProj,
-                filepathsInFailedToRestore), simplifiedProjects);
+        return new SimplifiedSolutionSummary(simplifiedSln, simplifiedProjectIds, new UnsimplifiedFilesSummary(filepathsWithIfPreprocessor, filepathsInFailedToCompile, unableToFindProj,
+            filepathsInFailedToRestore));
     }
 
 
@@ -283,8 +304,7 @@ public class CheckSemanticEquivalence
 
     // This needs a better name
     private static async Task<List<FileModel>> GetFileModels(GitRepo gitRepo, DiffConfig diffConfig,
-        UnsimplifiedFilesSummary targetUnsimplified, UnsimplifiedFilesSummary sourceUnsimplified,
-        List<Project> simplifiedSrcProjects, List<Project> simplifiedTargetProjects,
+        SimplifiedSolutionSummary simplifiedSrcSolution, SimplifiedSolutionSummary simplifiedTargetSolution,
         Dictionary<AbsolutePath, HashSet<string>> sourceChangedMethods)
     {
         Stopwatch? stopwatch = null;
@@ -320,68 +340,58 @@ public class CheckSemanticEquivalence
                 continue;
             }
 
-            if (targetUnsimplified.FilepathsWhichUnableToFindProjFor.Contains(targetFilepath)
-                || sourceUnsimplified.FilepathsWhichUnableToFindProjFor.Contains(sourceFilepath))
+            if (simplifiedTargetSolution.UnsimplifiedFilesSummary.FilepathsWhichUnableToFindProjFor.Contains(targetFilepath)
+                || simplifiedSrcSolution.UnsimplifiedFilesSummary.FilepathsWhichUnableToFindProjFor.Contains(sourceFilepath))
             {
                 fileResults.Add(new FileModel(relativePath, Status.UnableToFindProj));
                 continue;
             }
 
-            if (targetUnsimplified.FilepathsInProjThatFailedToCompile.Contains(targetFilepath)
-                || sourceUnsimplified.FilepathsInProjThatFailedToCompile.Contains(sourceFilepath))
+            if (simplifiedTargetSolution.UnsimplifiedFilesSummary.FilepathsInProjThatFailedToCompile.Contains(targetFilepath)
+                || simplifiedSrcSolution.UnsimplifiedFilesSummary.FilepathsInProjThatFailedToCompile.Contains(sourceFilepath))
             {
                 fileResults.Add(new FileModel(relativePath, Status.ProjectDidNotCompile));
                 continue;
             }
 
-            if (targetUnsimplified.FilepathsWithIfPreprocessor.Contains(targetFilepath)
-                || sourceUnsimplified.FilepathsWithIfPreprocessor.Contains(sourceFilepath))
+            if (simplifiedTargetSolution.UnsimplifiedFilesSummary.FilepathsWithIfPreprocessor.Contains(targetFilepath)
+                || simplifiedSrcSolution.UnsimplifiedFilesSummary.FilepathsWithIfPreprocessor.Contains(sourceFilepath))
             {
                 fileResults.Add(new FileModel(relativePath, Status.HasConditionalPreprocessor));
                 continue;
             }
 
-            if (targetUnsimplified.FilepathsInProjThatFailedToRestore.Contains(targetFilepath)
-                || sourceUnsimplified.FilepathsInProjThatFailedToRestore.Contains(sourceFilepath))
+            if (simplifiedTargetSolution.UnsimplifiedFilesSummary.FilepathsInProjThatFailedToRestore.Contains(targetFilepath)
+                || simplifiedSrcSolution.UnsimplifiedFilesSummary.FilepathsInProjThatFailedToRestore.Contains(sourceFilepath))
             {
                 fileResults.Add(new FileModel(relativePath, Status.ProjectDidNotRestore));
                 continue;
             }
 
-            var sourceDocs = simplifiedSrcProjects.SelectMany(p => p.Documents)
-                .Where(d => d.FilePath == sourceFilepath.Path).ToList();
-            var targetDocs = simplifiedTargetProjects.SelectMany(p => p.Documents)
-                .Where(d => d.FilePath == targetFilepath.Path).ToList();
-
-            if (sourceDocs.Count == 0)
+            Document sourceDoc;
+            Document targetDoc;
+            try
             {
-                Logger.LogWarning("Document not found in source or target projects {Path}", sourceFilepath.Path);
-                fileResults.Add(new FileModel(relativePath, Status.UnableToFindProj));
-                continue;
+                sourceDoc = GetDocumentFromProjects(simplifiedSrcSolution.SimplifiedProjects, sourceFilepath);
+                targetDoc = GetDocumentFromProjects(simplifiedTargetSolution.SimplifiedProjects, targetFilepath);
             }
-
-            if (sourceDocs.Count > 1 || targetDocs.Count > 1)
+            catch (CantFindDocumentException)
             {
-                // This indicates that the same document is in multiple projects. Something that is not worth supporting.
-                Logger.LogWarning("Source document in multiple projects, reporting unable to find project {Path}",
-                    sourceFilepath.Path);
                 fileResults.Add(new FileModel(relativePath, Status.UnableToFindProj));
-                continue;
+                continue; 
             }
-        
+            
             (stopwatch ??= new Stopwatch()).Restart();
 
             OneOf<DifferencesLimitedToFunctions, CouldntLimitToFunctions> semanticallyUnequal;
 
             try
             {
-                semanticallyUnequal =
-                    await SemanticEqualBreakdown.GetSemanticallyUnequal(sourceDocs.Single(), targetDocs.Single())
-                        .ConfigureAwait(false);
+                semanticallyUnequal = await SemanticEqualBreakdown.GetSemanticallyUnequal(sourceDoc, targetDoc).ConfigureAwait(false);
             }
             catch (Exception)
             {
-                var projectPathRaw = sourceDocs.Single().Project.FilePath;
+                var projectPathRaw = sourceDoc.Project.FilePath;
                 var projectPath = projectPathRaw is null ? null : new AbsolutePath(projectPathRaw);
                 var commandline = GetReproCommandline(gitRepo, diffConfig.TargetSha, diffConfig.SourceSha, projectPath);
                 Logger.LogInformation("To reproduce the error use the following commandline args: \n {Commandline}", commandline);
@@ -423,4 +433,24 @@ public class CheckSemanticEquivalence
 
         return fileResults;
     }
+
+    private static Document GetDocumentFromProjects(IEnumerable<Project>? simplifiedProjects, AbsolutePath filepath)
+    {
+        if(simplifiedProjects is null)
+            throw new CantFindDocumentException();
+        
+        switch (simplifiedProjects.SelectMany(p => p.Documents).Where(d => d.FilePath == filepath.Path).ToList())
+        {
+            case [var x]:
+                return x;
+            case []:
+                Logger.LogWarning("Document not found in source projects {Path}", filepath.Path);
+                throw new CantFindDocumentException();
+            default:
+                // This indicates that the same document is in multiple projects. Something that is not worth supporting.
+                Logger.LogWarning("Document in multiple projects, reporting unable to find project {Path}",
+                    filepath.Path);
+                throw new CantFindDocumentException();
+        }
     }
+}

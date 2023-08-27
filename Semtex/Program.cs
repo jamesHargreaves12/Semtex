@@ -35,16 +35,16 @@ Command GetCheckCommand(){
         var explicitProjectMapTyped = explicitProjectMap == null ? null : new AbsolutePath(explicitProjectMap);
 
         bool passedCheck;
-        if (!allAncestors)
+        if (allAncestors)
         {
-            passedCheck = await Commands.Run(repo, target, source, analyzerConfigPathTyped, projFilter, explicitProjectMapTyped)
-                .ConfigureAwait(false);
+            if (source is not "origin/master")
+                throw new ArgumentException("You can set both --all-ancestors and --source");
+
+            passedCheck = await Commands.RunAllAncestors(repo, target, analyzerConfigPathTyped, projFilter, explicitProjectMapTyped, new AbsolutePath(outputPath)).ConfigureAwait(false);
         }
         else
         {
-            // TODO Check source hasn't been set by the user.
-            passedCheck = await Commands.RunAllAncestors(repo, target, analyzerConfigPathTyped, projFilter, explicitProjectMapTyped, new AbsolutePath(outputPath))
-                .ConfigureAwait(false);
+            passedCheck = await Commands.Run(repo, target, source, analyzerConfigPathTyped, projFilter, explicitProjectMapTyped).ConfigureAwait(false);
         }
 
         if (!passedCheck)

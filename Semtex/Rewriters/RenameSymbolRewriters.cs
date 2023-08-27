@@ -4,7 +4,7 @@ using Microsoft.CodeAnalysis.CSharp.Syntax;
 
 namespace Semtex.Rewriters;
 
-public class RenameSymbolRewriter: CSharpSyntaxRewriter
+internal class RenameSymbolRewriter: CSharpSyntaxRewriter
 {
     private readonly SemanticModel _semanticModel;
     private readonly HashSet<ISymbol> _oldSymbols;
@@ -28,7 +28,7 @@ public class RenameSymbolRewriter: CSharpSyntaxRewriter
         return $"p_{s.Name.ToLower().Trim('_')}";
     }
 
-    public override SyntaxNode VisitIdentifierName(IdentifierNameSyntax node)
+    public override SyntaxNode? VisitIdentifierName(IdentifierNameSyntax node)
     {
         if (!_oldSymbolNames.Contains(node.Identifier.Text))
             return base.VisitIdentifierName(node);
@@ -44,7 +44,7 @@ public class RenameSymbolRewriter: CSharpSyntaxRewriter
         return node.WithIdentifier(SyntaxFactory.Identifier(GetNewName(symbol)));
     }
 
-    public override SyntaxNode VisitPropertyDeclaration(PropertyDeclarationSyntax node)
+    public override SyntaxNode? VisitPropertyDeclaration(PropertyDeclarationSyntax node)
     {
         if (!_oldSymbolNames.Contains(node.Identifier.Text))
             return base.VisitPropertyDeclaration(node);
@@ -60,7 +60,7 @@ public class RenameSymbolRewriter: CSharpSyntaxRewriter
         return node.WithIdentifier(SyntaxFactory.Identifier(GetNewName(symbol)));
     }
 
-    public override SyntaxNode VisitStructDeclaration(StructDeclarationSyntax node)
+    public override SyntaxNode? VisitStructDeclaration(StructDeclarationSyntax node)
     {
         if (!_oldSymbolNames.Contains(node.Identifier.Text))
             return base.VisitStructDeclaration(node);
@@ -76,7 +76,7 @@ public class RenameSymbolRewriter: CSharpSyntaxRewriter
         return node.WithIdentifier(SyntaxFactory.Identifier(GetNewName(symbol)));
     }
     
-    public override SyntaxNode VisitRecordDeclaration(RecordDeclarationSyntax node)
+    public override SyntaxNode? VisitRecordDeclaration(RecordDeclarationSyntax node)
     {
         if (!_oldSymbolNames.Contains(node.Identifier.Text))
             return base.VisitRecordDeclaration(node);

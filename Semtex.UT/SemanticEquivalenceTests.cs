@@ -358,17 +358,16 @@ public static class NoOpProgram{public static void Main(){}}// Needed to avoid C
     {
         if (
             folderName == "DebuggerDisplayAttribute" // just too annoying
-            || folderName =="ExceptionConstructors"
+            || folderName == "ExceptionConstructors"
         )
         {
             return; // TODO clearly this is temporary
         }
+
         var folderPath = Path.Combine(SemanticEquivalentLocation, folderName);
 
-        var leftSimplified = await GetSimplifiedDocument(folderPath,"Left.cs").ConfigureAwait(false);
-        var rightSimplified = await GetSimplifiedDocument(folderPath, "Right.cs").ConfigureAwait(false);
-        var result = await SemanticEqualBreakdown.GetSemanticallyUnequal(leftSimplified, rightSimplified)
-            .ConfigureAwait(false);
+        var (leftSimplified,rightSimplified) = await GetSimplifiedDocs(folderPath).ConfigureAwait(false);
+        var result = await SemanticEqualBreakdown.GetSemanticallyUnequal(leftSimplified, rightSimplified).ConfigureAwait(false);
         
         
         var leftRaw = await leftSimplified.GetSyntaxRootAsync().ConfigureAwait(false);
@@ -389,14 +388,31 @@ public static class NoOpProgram{public static void Main(){}}// Needed to avoid C
         Console.WriteLine("**************************");
         Console.WriteLine(rightRaw!.ToFullString());
     }
-    
+
+
+    public static async Task<(Document, Document)> GetSimplifiedDocs(string folderPath)
+    {
+        var leftSln = await GetSimplifiedSln(folderPath, "Left.cs").ConfigureAwait(false);
+        var rightSln = await GetSimplifiedSln(folderPath, "Right.cs").ConfigureAwait(false);
+        var leftDoc = leftSln.Projects.SelectMany(p => p.Documents).First(d => d.FilePath!.EndsWith("Left.cs"));
+        var rightDoc = rightSln.Projects.SelectMany(p => p.Documents).First(d => d.FilePath!.EndsWith("Right.cs"));
+        
+        var leftSs = new SimplifiedSolutionSummary(leftSln, new HashSet<ProjectId>() { leftDoc.Project.Id }, UnsimplifiedFilesSummary.Empty());
+        var rightSs  = new SimplifiedSolutionSummary(rightSln, new HashSet<ProjectId>() { rightDoc.Project.Id }, UnsimplifiedFilesSummary.Empty());
+        
+        var (simplifiedSrcSolutionSummary, simplifiedTargetSolutionSummary) = await CheckSemanticEquivalence.CoSimplifySolutions(leftSs, rightSs, new []{(new AbsolutePath(leftDoc.FilePath!),new AbsolutePath(rightDoc.FilePath!))});
+
+        var leftSimplified = simplifiedSrcSolutionSummary.SimplifiedProjects!.SelectMany(p => p.Documents).First(d => d.FilePath!.EndsWith("Left.cs"));
+        var rightSimplified = simplifiedTargetSolutionSummary.SimplifiedProjects!.SelectMany(p => p.Documents).First(d => d.FilePath!.EndsWith("Right.cs"));
+        return (leftSimplified, rightSimplified);
+    }
+
     [Test, TestCaseSource(nameof(NonSemanticallyEquivalentDirectories))]
     public async Task NotSemanticallyEquivalent(string folderName)
     {
         var folderPath = Path.Combine(NotSemanticallyEquivalentDirectory, folderName);
 
-        var leftSimplified = await GetSimplifiedDocument(folderPath,"Left.cs").ConfigureAwait(false);
-        var rightSimplified = await GetSimplifiedDocument(folderPath, "Right.cs").ConfigureAwait(false);
+        var (leftSimplified,rightSimplified) = await GetSimplifiedDocs(folderPath).ConfigureAwait(false);
         var result = await SemanticEqualBreakdown.GetSemanticallyUnequal(leftSimplified, rightSimplified).ConfigureAwait(false);
         
         
@@ -421,9 +437,9 @@ public static class NoOpProgram{public static void Main(){}}// Needed to avoid C
     }
 
 
-    private static async Task<Document> GetSimplifiedDocument(string folderName, string filename)
+    private static async Task<Solution> GetSimplifiedSln(string folderPath, string filename)
     {
-        var docInfo = GetDocumentInfo(folderName, filename, BaseProjectId);
+        var docInfo = GetDocumentInfo(folderPath, filename, BaseProjectId);
         var sln = BaseSolution
             .AddDocument(docInfo);
         var projToFiles = new Dictionary<AbsolutePath, HashSet<AbsolutePath>>()
@@ -434,12 +450,12 @@ public static class NoOpProgram{public static void Main(){}}// Needed to avoid C
         var projectIds = sln.Projects
             .Where(p => p.FilePath == ProjectFilepath)
             .Select(p => p.Id)
-            .ToList();
+            .ToHashSet();
 
         var newSln = await SemanticSimplifier
             .GetSolutionWithFilesSimplified(sln, projectIds, projToFiles, null, changeMethodsMap)
             .ConfigureAwait(false);
-        return newSln.Projects.SelectMany(p => p.Documents).First(d => d.FilePath!.EndsWith(filename));
+        return newSln;
     }
 
 

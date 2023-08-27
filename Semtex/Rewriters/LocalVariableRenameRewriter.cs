@@ -5,7 +5,7 @@ using Microsoft.CodeAnalysis.CSharp.Syntax;
 namespace Semtex.Rewriters;
 
 // Note that there is an assumption here that this will only be called on a subset of the method for which the _mapping was setup.
-// This enables us do less checks but this constraint needs to be more clear TODO.
+// This enables us do less checks but this constraint needs to be more clear. Using ISymbol to access the dictionary would be better.
 public class LocalVariableRenameRewriter: CSharpSyntaxRewriter
 {
     private readonly SemanticModel _semanticModel;

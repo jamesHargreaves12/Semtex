@@ -12,6 +12,8 @@ public class ConstantValueAnalyzer: DiagnosticAnalyzer
 
     public override void Initialize(AnalysisContext context)
     {
+        context.EnableConcurrentExecution();
+        context.ConfigureGeneratedCodeAnalysis(GeneratedCodeAnalysisFlags.None);
         // Probably more places can use this but for now this is fine.
         context.RegisterSyntaxNodeAction(Analyze, SyntaxKind.InvocationExpression);
         context.RegisterSyntaxNodeAction(Analyze, SyntaxKind.AddExpression);

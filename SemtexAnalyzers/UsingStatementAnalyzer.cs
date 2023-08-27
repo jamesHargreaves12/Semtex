@@ -11,6 +11,9 @@ public class UsingStatementAnalyzer: DiagnosticAnalyzer
 {
     public override void Initialize(AnalysisContext context)
     {
+        context.EnableConcurrentExecution();
+        context.ConfigureGeneratedCodeAnalysis(GeneratedCodeAnalysisFlags.None);
+
         context.RegisterSyntaxNodeAction(AnalyzeNode, SyntaxKind.UsingStatement);
     }
 
@@ -29,7 +32,7 @@ public class UsingStatementAnalyzer: DiagnosticAnalyzer
         if(lastStatement != usingStatement)
             return;
         
-        if (usingStatement.Declaration is not VariableDeclarationSyntax )
+        if (usingStatement.Declaration is null )
         {
             return;
         }
@@ -55,7 +58,8 @@ public class UsingStatementAnalyzer: DiagnosticAnalyzer
         var parentStatements = usingStatement.Parent switch
         {
             BlockSyntax b => b.Statements,
-            SwitchSectionSyntax s => s.Statements
+            SwitchSectionSyntax s => s.Statements,
+            _ => throw new ArgumentOutOfRangeException()
         };
         foreach (StatementSyntax statement in parentStatements)
         {

@@ -105,7 +105,7 @@ public sealed class Commands
         var prettyBuilder = new StringBuilder();
         foreach (var res in results)
         {
-            prettyBuilder.Append(await DisplayResults.GetPrettySummaryOfResultsAsync(res, gitRepo));
+            prettyBuilder.Append(await DisplayResults.GetPrettySummaryOfResultsAsync(res, gitRepo).ConfigureAwait(false));
         }
 
         Logger.LogInformation(prettyBuilder.ToString());
@@ -281,9 +281,9 @@ public sealed class Commands
 
         if (includeUncommittedChanges == IncludeUncommittedChanges.None) return ghostRepo;
         
-        var patchFilepath = new AbsolutePath(Path.Join(ScratchSpacePath, "tmp.patch")); //TODO add a guid here
+        var patchFilepath = new AbsolutePath(Path.Join(ScratchSpacePath, $"tmp_{new Guid()}.patch"));
 
-        var hasLocalChanges = await localChangesRepo.CreatePatchFileOfLocalChanges(patchFilepath, includeUncommittedChanges);
+        var hasLocalChanges = await localChangesRepo.CreatePatchFileOfLocalChanges(patchFilepath, includeUncommittedChanges).ConfigureAwait(false);
 
         if (!hasLocalChanges) return ghostRepo;
         
