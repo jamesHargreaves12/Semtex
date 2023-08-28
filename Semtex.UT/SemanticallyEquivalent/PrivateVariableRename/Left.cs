@@ -22,5 +22,4 @@ public class Left
         Console.WriteLine(YY);
         Console.WriteLine(new ZZ());
     }
-
 }

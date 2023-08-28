@@ -1,17 +1,13 @@
+using Semtex.Models;
+
 namespace Semtex;
 
 public class CantFindDocumentException : Exception
 {
-    public CantFindDocumentException()
-    {
-    }
-    
-    public CantFindDocumentException(string message) : base(message)
-    {
-    }
+    public readonly AbsolutePath Path;
 
-
-    public CantFindDocumentException(string message, Exception innerException) : base(message, innerException)
+    public CantFindDocumentException(AbsolutePath path)
     {
+        Path = path;
     }
 }

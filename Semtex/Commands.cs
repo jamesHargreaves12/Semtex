@@ -94,7 +94,7 @@ public sealed class Commands
             var jsonSummaries = results.Select(res => JsonSerializer.Serialize(res));
             await File.WriteAllLinesAsync($"{outputPath.Path}/Results.jsonl", jsonSummaries).ConfigureAwait(false);
             var sw = Stopwatch.StartNew();
-            // TODO Test without these
+
             GC.Collect();
             GC.WaitForPendingFinalizers();
             Logger.LogInformation(SemtexLog.GetPerformanceStr("GC", sw.ElapsedMilliseconds));

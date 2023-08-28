@@ -39,7 +39,7 @@ internal class SemanticSimplifier
     private static List<CSharpSyntaxRewriter> _rewriters = new()
     {
         new RemoveTriviaRewriter(),
-        // new ConsistentOrderRewriter(), want to do this after renaming
+        // new ConsistentOrderRewriter(), want to do this after renaming so it is called from CoSimplifySolutions
         new RemoveSuppressNullableWarningRewriter(),
         new ApplySimplificationServiceRewriter(),
         new TrailingCommaRewriter()

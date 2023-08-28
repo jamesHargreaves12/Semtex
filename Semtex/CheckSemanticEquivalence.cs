@@ -137,7 +137,6 @@ public sealed class CheckSemanticEquivalence
         {
             try
             {
-                // Right now we get now advantage by doing this once we have both solutions in context TODO change this
                 var sourceDoc = GetDocumentFromProjects(srcSln.Projects.Where(p=>sourceProjectIds.Contains(p.Id)), sourceFilepath);
                 var sourceRootNode = (await sourceDoc.GetSyntaxRootAsync().ConfigureAwait(false))!;
                 var srcCompilation = await sourceDoc.Project.GetCompilationAsync().ConfigureAwait(false);
@@ -145,10 +144,6 @@ public sealed class CheckSemanticEquivalence
                 var sourceRenamablePrivateSymbolsWalker = new SemanticSimplifier.AllRenameablePrivateSymbols(srcSemanticModel);
                 sourceRenamablePrivateSymbolsWalker.Visit(sourceRootNode);
                 var srcRenamableSymbols = sourceRenamablePrivateSymbolsWalker.PrivateSymbols;
-                // TODO there is no need to keep this as any resembelance to what was there before. We should probably just make it semtex_{i} or something
-                // TODO make this a mapping based on what the targetRenameMapping returns
-                // I think a good method is to remove all those that match and then come up some heuristic for matching and then use that. If you can rename a private variable and make two things equal then they are equal.
-                // Does the same hold true when you are doing partial renames? It feels like it would have to be fail facetious for this not to be true?
 
                 var targetDoc = GetDocumentFromProjects(targetSln.Projects.Where(p=>targetProjectIds.Contains(p.Id)), targetFilepath);
                 var targetRootNode = (await targetDoc.GetSyntaxRootAsync().ConfigureAwait(false))!;
@@ -167,9 +162,9 @@ public sealed class CheckSemanticEquivalence
                 targetRootNode = new ConsistentOrderRewriter().Visit(targetRootNode);
                 targetSln = targetSln.WithDocumentSyntaxRoot(targetDoc.Id, targetRootNode);
             }
-            catch (CantFindDocumentException)
+            catch (CantFindDocumentException e)
             {
-                // TODO
+                Logger.LogWarning("Unable to find unique document in solution for Document at {path}", e.Path.Path);
                 continue; 
             }
         }
@@ -179,6 +174,8 @@ public sealed class CheckSemanticEquivalence
     
     private static Dictionary<ISymbol, string> GetRenameMapping(HashSet<ISymbol> srcPrivateVariables, HashSet<ISymbol> targetPrivateVariables)
     { 
+        // Could also use type of private variable and declaring type here but I think the assumption that renames will likely be closer than other renames is probably a good enough proxy.
+        // O(N^2) complexity on the number of unmatched variables is fine - for almost all cases we expect the N to be small.
         var unmatchedSrcVariables = srcPrivateVariables.Select(s => s.Name).ToHashSet().Except(targetPrivateVariables.Select(s=>s.Name));
         var unmatchedTargetVariables = targetPrivateVariables.Select(s => s.Name).ToHashSet().Except(srcPrivateVariables.Select(s=>s.Name)).ToList();
         var queue = new PriorityQueue<(string,string), int>();
@@ -479,7 +476,7 @@ public sealed class CheckSemanticEquivalence
     private static Document GetDocumentFromProjects(IEnumerable<Project>? simplifiedProjects, AbsolutePath filepath)
     {
         if(simplifiedProjects is null)
-            throw new CantFindDocumentException();
+            throw new CantFindDocumentException(filepath);
         
         switch (simplifiedProjects.SelectMany(p => p.Documents).Where(d => d.FilePath == filepath.Path).ToList())
         {
@@ -487,12 +484,12 @@ public sealed class CheckSemanticEquivalence
                 return x;
             case []:
                 Logger.LogWarning("Document not found in source projects {Path}", filepath.Path);
-                throw new CantFindDocumentException();
+                throw new CantFindDocumentException(filepath);
             default:
                 // This indicates that the same document is in multiple projects. Something that is not worth supporting.
                 Logger.LogWarning("Document in multiple projects, reporting unable to find project {Path}",
                     filepath.Path);
-                throw new CantFindDocumentException();
+                throw new CantFindDocumentException(filepath);
         }
     }
 }

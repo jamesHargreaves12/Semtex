@@ -1,13 +1,12 @@
 using CliWrap;
 using CliWrap.Buffered;
-using CliWrap.Exceptions;
 using Microsoft.Extensions.Logging;
 using Semtex.Logging;
 using Semtex.Models;
 
 namespace Semtex;
 
-public record LineDiff(int Start, int Count)
+internal record LineDiff(int Start, int Count)
 {
     private int End => Start + Count;
 
@@ -104,13 +103,14 @@ internal class GitRepo
             Logger.LogInformation("Folder {RootFolder} already exists. Checking if it has the correct origin", rootFolder.Path);
             try
             {
-
                 var existingRepo = await SetupFromExistingFolder(rootFolder).ConfigureAwait(false);
                 // TODO Probably should do some clean here etc for sanity sake.
                 if (existingRepo.RemoteUrl.Replace(".git","") == repoUrl.Replace(".git",""))
                 {
                     await existingRepo.Fetch().ConfigureAwait(false);
-                    return existingRepo;
+                    if (await existingRepo.IsClean().ConfigureAwait(false))
+                        return existingRepo;
+                    Logger.LogWarning("Folder is not clean - it will be deleted and then checked out from scratch");
                 }
             }
             catch (Exception e)
@@ -126,6 +126,23 @@ internal class GitRepo
         // Clone the repo into the temp directory 
         var gitRepo = await Clone(repoUrl, rootFolder).ConfigureAwait(false);
         return gitRepo;
+    }
+
+    private async Task<bool> IsClean()
+    {
+        var gitDiffCmd = Cli.Wrap("git")
+            .WithArguments(new[]
+            {
+                "status",
+                "--porcelain",
+            })
+            .WithWorkingDirectory(RootFolder.Path)
+            .WithStandardOutputPipe(StdOutPipe)
+            .WithStandardErrorPipe(StdErrPipe);
+        Logger.LogInformation("Executing {GitDiffCmd}",gitDiffCmd);
+        var cmdResult = await gitDiffCmd.ExecuteBufferedAsync();
+        Logger.LogInformation("Finished");
+        return !cmdResult.StandardOutput.Any();
     }
 
     internal string GetRelativePath(AbsolutePath fullPath)
@@ -465,7 +482,7 @@ internal class GitRepo
             .Where(pair => pair.line.StartsWith("@@"))
             .Select(pair => pair.i).ToList(); 
 
-        foreach (var (start,end) in diffLines.Zip(diffLines.Skip(1).Concat(new[] {lines.Length})))
+        foreach (var (start,_) in diffLines.Zip(diffLines.Skip(1).Concat(new[] {lines.Length})))
         {
             var parts = lines[start].Split(" ");
             var leftParts = parts[1];
@@ -552,17 +569,12 @@ internal class GitRepo
     private static LineDiff GetLineDiff(string gitDescriptionOfDiff)
     {
         var parts = gitDescriptionOfDiff.Replace("+","").Replace("-","").Split(",");
-        if (parts.Length == 1)
+        return parts.Length switch
         {
-            return new LineDiff(int.Parse(parts[0]),1);
-        }
-        
-        if(parts.Length == 2)
-        {
-            return new LineDiff(int.Parse(parts[0]), int.Parse(parts[1]));
-        }
-
-        throw new Exception("TODO");
+            1 => new LineDiff(int.Parse(parts[0]), 1),
+            2 => new LineDiff(int.Parse(parts[0]), int.Parse(parts[1])),
+            _ => throw new ArgumentException(nameof(gitDescriptionOfDiff))
+        };
     }
 
     internal async Task<string> GetFileTextAtCommit(string commit, AbsolutePath filepath)

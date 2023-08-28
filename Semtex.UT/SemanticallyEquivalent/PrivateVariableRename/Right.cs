@@ -22,5 +22,4 @@ public class Right
         Console.WriteLine(Yy);
         Console.WriteLine(new Zz());
     }
-
 }
