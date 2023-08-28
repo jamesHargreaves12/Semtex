@@ -21,7 +21,7 @@ public sealed class AnalyzerConfigOverwrite
     /// in. This is done through the analyzer config file.
     /// </summary>
 
-    internal static async Task<Solution> ReplaceAnyAnalyzerConfigDocuments(Solution sln, ProjectId projId, IEnumerable<AbsolutePath> filesThatChanged, AbsolutePath? analyzerConfigPath)
+    internal static async Task<Solution> ReplaceAnyAnalyzerConfigDocuments(Solution sln, ProjectId projId, IEnumerable<DocumentId> changedDocumentIds, AbsolutePath? analyzerConfigPath)
     {
         var project = sln.GetProject(projId)!;
         // Strip out all existing config docs. TODO perhaps it would be better to try do some kinda merge here? But this is better then letting it be overriden by actual editor config files.
@@ -47,7 +47,7 @@ public sealed class AnalyzerConfigOverwrite
             configText = await File.ReadAllTextAsync(Path.Join(analyzerConfigFolder, ".analyzerconfig")).ConfigureAwait(false);
 
             analyzerConfigPath = new AbsolutePath(Path.Join(Path.GetDirectoryName(project.FilePath), ".analyzerconfig")); 
-            configText += GetAnalyzerConfigOnlyForFilesThatChanged(filesThatChanged);
+            configText += GetAnalyzerConfigOnlyForFilesThatChanged(changedDocumentIds.Select(project.GetDocument));
         }
 
         // Add in a the analyzer config as if it was in the same folder as the project.
@@ -55,16 +55,19 @@ public sealed class AnalyzerConfigOverwrite
         return newSln;
     }
 
-    private static string GetAnalyzerConfigOnlyForFilesThatChanged(IEnumerable<AbsolutePath> filesThatChanged)
+    private static string GetAnalyzerConfigOnlyForFilesThatChanged(IEnumerable<Document?> documents)
     {
         var suppressAnalyzerLines = GetAnalyzerConfigLines("none");
         var warningLines = GetAnalyzerConfigLines("warning");
         var result = new StringBuilder();
         result.Append((string?)suppressAnalyzerLines);
         result.AppendLine();
-        foreach (var fp in filesThatChanged)
+        foreach (var document in documents)
         {
-            result.AppendLine($"[{fp.Path}]");
+            if(document?.FilePath is null)
+                continue;
+            
+            result.AppendLine($"[{document.FilePath}]");
             result.Append((string?)warningLines);
             result.AppendLine();
         }

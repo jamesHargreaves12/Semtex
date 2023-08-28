@@ -24,12 +24,19 @@ internal class SemanticSimplifier
         {
             var proj = sln.GetProject(projId)!;
             Logger.LogInformation("Processing {ProjName}", proj.Name);
-            // TODO why don't we calculate the DocumentId?
-            var docsToSimplify = proj.Documents.Select(d=>new AbsolutePath(d.FilePath!)).Where(documentsToSimplify.Contains).ToList();
+            var docsToSimplify = proj.Documents.Where(d=>documentsToSimplify.Contains(new AbsolutePath(d.FilePath!))).ToList();
+            var docIdsToSimplify = docsToSimplify.Select(d => d.Id).ToList();
 
+            var idToChangedMethodsMap = docsToSimplify
+                .Where(d => changedMethodsMap.ContainsKey(new AbsolutePath(d.FilePath!)))
+                .ToDictionary(
+                    d => d.Id,
+                    d => changedMethodsMap[new AbsolutePath(d.FilePath!)]
+                );
+            
             // Simplify docs
-            sln = await SafeAnalyzers.Apply(sln, projId, docsToSimplify, analyzerConfigPath, changedMethodsMap).ConfigureAwait(false);
-            sln = await ApplyRewriters(sln, projId, docsToSimplify).ConfigureAwait(false);
+            sln = await SafeAnalyzers.Apply(sln, projId, docIdsToSimplify, analyzerConfigPath, idToChangedMethodsMap).ConfigureAwait(false);
+            sln = await ApplyRewriters(sln, projId, docIdsToSimplify).ConfigureAwait(false);
         }
 
         return sln;
@@ -45,15 +52,14 @@ internal class SemanticSimplifier
         new TrailingCommaRewriter()
     };
     private static async Task<Solution> ApplyRewriters(Solution sln, ProjectId projectId,
-        IEnumerable<AbsolutePath> docsToSimplify)
+        IEnumerable<DocumentId> docsToSimplify)
     {
         var sw = Stopwatch.StartNew();
-        var docsToSimplifyString = docsToSimplify.Select(d => d.Path).ToHashSet(); 
-        var simplifiedDocs = sln.GetProject(projectId)!.Documents
-            .Where(d => docsToSimplifyString.Contains(d.FilePath!));
+        var proj = sln.GetProject(projectId)!;
 
-        foreach (var doc in simplifiedDocs)
+        foreach (var docId in docsToSimplify)
         {
+            var doc = proj.GetDocument(docId)!;
             var rootNode = (await doc.GetSyntaxRootAsync().ConfigureAwait(false))!;
             foreach (var rewriter in _rewriters)
             {

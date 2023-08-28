@@ -166,12 +166,12 @@ public sealed class SafeAnalyzers
     {
         "RCS1213", // Unused Member
     };
-    internal static async Task<Solution> Apply(Solution sln, ProjectId projId, IEnumerable<AbsolutePath> documentFilepaths,
-        AbsolutePath? analyzerConfigPath, Dictionary<AbsolutePath, HashSet<string>> changedMethodsMap)
+    internal static async Task<Solution> Apply(Solution sln, ProjectId projId, List<DocumentId> documentIds,
+        AbsolutePath? analyzerConfigPath, Dictionary<DocumentId, HashSet<string>> changedMethodsMap)
     {
         // Clone the set so that any edits don't effect caller.
-        var documentFilepathsSet = new HashSet<AbsolutePath>(documentFilepaths);
-        var currentSolution = await AnalyzerConfigOverwrite.ReplaceAnyAnalyzerConfigDocuments(sln, projId, documentFilepathsSet, analyzerConfigPath).ConfigureAwait(false);
+        var currentDocumentIds = new HashSet<DocumentId>(documentIds);
+        var currentSolution = await AnalyzerConfigOverwrite.ReplaceAnyAnalyzerConfigDocuments(sln, projId, currentDocumentIds, analyzerConfigPath).ConfigureAwait(false);
         
         Logger.LogInformation("Starting Applying Diagnostic Fixes");
         
@@ -187,7 +187,7 @@ public sealed class SafeAnalyzers
             var project = currentSolution.GetProject(projId)!;
 
             var relevantDiagnostics =
-                await CompileAndGetRelevantDiagnostics(project, documentFilepathsSet, analyzerOptions).ConfigureAwait(false);
+                await CompileAndGetRelevantDiagnostics(project, currentDocumentIds, analyzerOptions).ConfigureAwait(false);
 
             relevantDiagnostics = relevantDiagnostics
                 .Where(d => CodeFixProviders.ContainsKey(d.Descriptor.Id))
@@ -201,24 +201,22 @@ public sealed class SafeAnalyzers
 
             var sw = Stopwatch.StartNew();
             // Apply one diagnostic for each file that we care about. This makes the assumption that changes to one file wont invalidate the diagnostic in another.
-            foreach (var documentFilepath in documentFilepathsSet)
+            foreach (var documentId in currentDocumentIds)
             {
                 var document = currentSolution
-                    .GetProject(projId)!
-                    .Documents
-                    .FirstOrDefault(d => d.FilePath == documentFilepath.Path);
+                    .GetDocument(documentId);
+                
                 if (document is null)
                 {
-                    Logger.LogWarning("Unable to find {documetFilePath} in project, skipping", documentFilepath.Path);
+                    Logger.LogWarning("Unable to find document in solution, skipping");
                     continue; // The .cs file is not actually compiled by the project this can happen if the file is a test case for something that acts on .cs files
                 }
 
                 var root = await document.GetSyntaxRootAsync().ConfigureAwait(false);
-
                 var groupedDiagnostics = relevantDiagnostics
-                    .Where(d => documentFilepath.Path == d.Location.GetLineSpan().Path)
-                    .Where(d=> !changedMethodsMap.ContainsKey(documentFilepath) 
-                               || IsDiagnosticsInChangedMethod(root, d, changedMethodsMap[documentFilepath]) 
+                    .Where(d => document.FilePath == d.Location.GetLineSpan().Path)
+                    .Where(d=> !changedMethodsMap.ContainsKey(documentId) 
+                               || IsDiagnosticsInChangedMethod(root, d, changedMethodsMap[documentId]) 
                                || DiagnosticToApplyEvenIfNotInChangeMap.Contains(d.Descriptor.Id))
                     .GroupBy(d => d.Descriptor.Id)
                     .OrderByDescending(g => (GetPriority(g.Key), g.Count()))
@@ -226,8 +224,8 @@ public sealed class SafeAnalyzers
 
                 if (!groupedDiagnostics.Any())
                 {
-                    // (Optimization) Remove it from the set of filepaths that we are looking from analyzers in
-                    documentFilepathsSet.Remove(documentFilepath);
+                    // (Optimization) Remove it from the set that we are looking from analyzers in
+                    currentDocumentIds.Remove(documentId);
                     continue;
                 }
                 var diagnosticsToApply = groupedDiagnostics.First();
@@ -248,7 +246,7 @@ public sealed class SafeAnalyzers
                 }
                 else
                 {
-                    diagnosticsThatDidntMakeFix.Add((documentFilepath.Path, descriptorId));
+                    diagnosticsThatDidntMakeFix.Add((document.FilePath!, descriptorId));
                 }
             }
 
@@ -264,24 +262,25 @@ public sealed class SafeAnalyzers
         var node = root.FindNode(diagnostic.Location.SourceSpan);
         while (true)
         {
-            if (node is MethodDeclarationSyntax methodDeclarationSyntax) // need other cases here e.g. getters
+            switch (node)
             {
-                var methodIdentifier = SemanticSimplifier.GetMethodIdentifier(methodDeclarationSyntax);
-                return changedMethods.Contains(methodIdentifier);
+                // need other cases here e.g. getters
+                case MethodDeclarationSyntax methodDeclarationSyntax:
+                {
+                    var methodIdentifier = SemanticSimplifier.GetMethodIdentifier(methodDeclarationSyntax);
+                    return changedMethods.Contains(methodIdentifier);
+                }
+                case ClassDeclarationSyntax or CompilationUnitSyntax or NamespaceDeclarationSyntax:
+                    return true;
+                default:
+                    node = node.Parent;
+                    break;
             }
-
-            if (node is ClassDeclarationSyntax or CompilationUnitSyntax or NamespaceDeclarationSyntax)
-            {
-                return true;
-            }
-
-            node = node.Parent;
         }
     }
 
     private static readonly ImmutableArray<AdditionalText> EmptyAdditionalFiles = Array.Empty<AdditionalText>().ToImmutableArray();
-    private static async Task<IEnumerable<Diagnostic>> CompileAndGetRelevantDiagnostics(Project proj,
-        HashSet<AbsolutePath> documentFilePaths, AnalyzerOptions analyzerOptions)
+    private static async Task<IEnumerable<Diagnostic>> CompileAndGetRelevantDiagnostics(Project proj, IEnumerable<DocumentId> documentIds, AnalyzerOptions analyzerOptions)
     {
         var compilation = await proj.GetCompilationAsync().ConfigureAwait(false);
         var stopwatch = Stopwatch.StartNew();
@@ -296,11 +295,10 @@ public sealed class SafeAnalyzers
 
         // These diagnostics come from the manually added Analyzers.
         var stopwatch2 = Stopwatch.StartNew();
-        var stringDocumentFilePaths = documentFilePaths.Select(s => s.Path).ToHashSet();
-        var tasks = proj.Documents
-            .Where(x => stringDocumentFilePaths.Contains(x.FilePath!))
-            .Select(d => GetManuallyAddedAnalyzerDiagnostics(d, compilationWithAnalyzers, compilation));
-        var finishedTasks = await Task.WhenAll(tasks);
+        var documents = documentIds.Select(docId => proj.GetDocument(docId)!);
+        var enumerable = documents.ToList();
+        var tasks = enumerable.Select(d => GetManuallyAddedAnalyzerDiagnostics(d, compilationWithAnalyzers, compilation));
+        var finishedTasks = await Task.WhenAll(tasks).ConfigureAwait(false);
         foreach (var ds in finishedTasks)
         {
             diagnostics.AddRange(ds);
@@ -337,9 +335,9 @@ public sealed class SafeAnalyzers
             Logger.LogError(sourceWithIssue!.ToString());
             throw new SemtexCompileException(new AbsolutePath(proj.FilePath!),$"Compile Failed {firstIssue}");
         }
-        
-        return diagnostics
-            .Where(d => stringDocumentFilePaths.Contains(d.Location.GetLineSpan().Path));
+
+        var documentPaths = enumerable.Select(d => d.FilePath!).ToHashSet();
+        return diagnostics.Where(d => documentPaths.Contains(d.Location.GetLineSpan().Path));
     }
 
     private static async Task<ImmutableArray<Diagnostic>> GetManuallyAddedAnalyzerDiagnostics(Document document,
