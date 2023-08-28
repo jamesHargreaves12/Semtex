@@ -156,6 +156,7 @@ public sealed class CheckSemanticEquivalence
                 var srcRenameMapping = GetRenameMapping(srcRenamableSymbols, targetRenamableSymbols);
 
                 sourceRootNode = new RenameSymbolRewriter(srcSemanticModel, srcRenameMapping).Visit(sourceRootNode);
+                sourceRootNode = sourceRootNode.NormalizeWhitespace();
                 sourceRootNode = new ConsistentOrderRewriter().Visit(sourceRootNode);
                 srcSln = srcSln.WithDocumentSyntaxRoot(sourceDoc.Id, sourceRootNode);
 
