@@ -149,11 +149,6 @@ public sealed class CheckSemanticEquivalence
                 // TODO make this a mapping based on what the targetRenameMapping returns
                 // I think a good method is to remove all those that match and then come up some heuristic for matching and then use that. If you can rename a private variable and make two things equal then they are equal.
                 // Does the same hold true when you are doing partial renames? It feels like it would have to be fail facetious for this not to be true?
-                var srcRenameMapping = srcRenamableSymbols.ToDictionary(s => s, s => $"p_{s.Name.ToLower().Trim('_')}");
-                
-                sourceRootNode = new RenameSymbolRewriter(srcSemanticModel, srcRenameMapping).Visit(sourceRootNode);
-                sourceRootNode = new ConsistentOrderRewriter().Visit(sourceRootNode);
-                srcSln = srcSln.WithDocumentSyntaxRoot(sourceDoc.Id, sourceRootNode);
 
                 var targetDoc = GetDocumentFromProjects(targetSln.Projects.Where(p=>targetProjectIds.Contains(p.Id)), targetFilepath);
                 var targetRootNode = (await targetDoc.GetSyntaxRootAsync().ConfigureAwait(false))!;
@@ -162,8 +157,13 @@ public sealed class CheckSemanticEquivalence
                 var targetRenamablePrivateSymbolsWalker = new SemanticSimplifier.AllRenameablePrivateSymbols(targetSemanticModel);
                 targetRenamablePrivateSymbolsWalker.Visit(targetRootNode);
                 var targetRenamableSymbols = targetRenamablePrivateSymbolsWalker.PrivateSymbols;
-                var targetRenameMapping = targetRenamableSymbols.ToDictionary(s => s, s => $"p_{s.Name.ToLower().Trim('_')}");
-                targetRootNode = new RenameSymbolRewriter(targetSemanticModel, targetRenameMapping).Visit(targetRootNode);
+
+                var srcRenameMapping = GetRenameMapping(srcRenamableSymbols, targetRenamableSymbols);
+
+                sourceRootNode = new RenameSymbolRewriter(srcSemanticModel, srcRenameMapping).Visit(sourceRootNode);
+                sourceRootNode = new ConsistentOrderRewriter().Visit(sourceRootNode);
+                srcSln = srcSln.WithDocumentSyntaxRoot(sourceDoc.Id, sourceRootNode);
+
                 targetRootNode = new ConsistentOrderRewriter().Visit(targetRootNode);
                 targetSln = targetSln.WithDocumentSyntaxRoot(targetDoc.Id, targetRootNode);
             }
@@ -175,6 +175,35 @@ public sealed class CheckSemanticEquivalence
         }
 
         return (srcSln,targetSln);
+    }
+    
+    private static Dictionary<ISymbol, string> GetRenameMapping(HashSet<ISymbol> srcPrivateVariables, HashSet<ISymbol> targetPrivateVariables)
+    { 
+        var unmatchedSrcVariables = srcPrivateVariables.Select(s => s.Name).ToHashSet().Except(targetPrivateVariables.Select(s=>s.Name));
+        var unmatchedTargetVariables = targetPrivateVariables.Select(s => s.Name).ToHashSet().Except(srcPrivateVariables.Select(s=>s.Name)).ToList();
+        var queue = new PriorityQueue<(string,string), int>();
+        foreach (var unmatchedSrcVariable in unmatchedSrcVariables)
+        {
+            foreach (var unmatchedTargetVariable in unmatchedTargetVariables)
+            {
+                queue.Enqueue((unmatchedSrcVariable,unmatchedTargetVariable),LevenshteinDistance.Calculate(unmatchedSrcVariable,unmatchedTargetVariable));
+            }
+        }
+
+        var matchedSrc = new HashSet<string>();
+        var matchedTrg = new HashSet<string>();
+        var mapping = new Dictionary<ISymbol, string>();
+        while (queue.TryDequeue(out var pair, out var _))
+        {
+            var (src, target) = pair;
+            if (matchedSrc.Contains(src) || matchedTrg.Contains(target))
+                continue;
+            matchedSrc.Add(src);
+            matchedTrg.Add(target);
+            mapping.Add(srcPrivateVariables.First(x => x.Name == src), target);
+        }
+
+        return mapping;
     }
 
     private static string GetReproCommandline(GitRepo gitRepo, string target, string source, AbsolutePath? projectPath)
