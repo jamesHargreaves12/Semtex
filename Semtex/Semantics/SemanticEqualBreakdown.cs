@@ -174,25 +174,19 @@ public class SemanticEqualBreakdown
            )
             return new DifferencesLimitedToFunctions(new List<string> {SemanticSimplifier.GetMethodIdentifier(left)});
 
-        if (left.Body == null && right.Body == null)
+        switch (left.Body, right.Body)
         {
-            return new DifferencesLimitedToFunctions();
-        }
-        
-        // Check the body for equality
-        if (left.Body == null && right.Body != null)
-        {
-            return new DifferencesLimitedToFunctions(new List<string> {SemanticSimplifier.GetMethodIdentifier(left)});
-        }
-
-        if (left.Body != null && right.Body == null)
-        {
-            return new DifferencesLimitedToFunctions(new List<string> {SemanticSimplifier.GetMethodIdentifier(left)});
+            case (null,null):
+                return new DifferencesLimitedToFunctions();
+            case (null, {}):
+                return new DifferencesLimitedToFunctions(new List<string> {SemanticSimplifier.GetMethodIdentifier(left)});
+            case ({},null):
+                return new DifferencesLimitedToFunctions(new List<string> {SemanticSimplifier.GetMethodIdentifier(left)});
         }
         
         // Calculating Renames is more expensive so lets only do it for methods that are not equal before renaming:
         if (LocalStatementsEquality.SemanticallyEqualLocalStatements(left.Body.Statements, right.Body.Statements,
-                leftSemanticModel, rightSemanticModel, new List<(string left, string right)>()))
+                leftSemanticModel, rightSemanticModel, new List<(ISymbol left, string right)>()))
         {
             return new DifferencesLimitedToFunctions();
         }

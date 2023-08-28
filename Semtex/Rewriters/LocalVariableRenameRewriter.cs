@@ -9,48 +9,69 @@ namespace Semtex.Rewriters;
 public class LocalVariableRenameRewriter: CSharpSyntaxRewriter
 {
     private readonly SemanticModel _semanticModel;
-    private readonly Dictionary<string, string> _mapping;
+    private readonly Dictionary<ISymbol, string> _mapping;
+    private readonly HashSet<string> leftNames;
 
-    public LocalVariableRenameRewriter(List<(string, string)> renames, SemanticModel semanticModel)
+    public LocalVariableRenameRewriter(List<(ISymbol, string)> renames, SemanticModel semanticModel)
     {
         _semanticModel = semanticModel;
         _mapping = renames.ToDictionary(x => x.Item1, x => x.Item2);
+        leftNames = renames.Select(x => x.Item1.Name).ToHashSet();
     }
     
     public override SyntaxNode? VisitIdentifierName(IdentifierNameSyntax node)
     {
-        if (_mapping.ContainsKey(node.Identifier.ValueText) 
-            && _semanticModel.GetSymbolInfo(node).Symbol is ILocalSymbol or IParameterSymbol or IRangeVariableSymbol)
-            return node.WithIdentifier(SyntaxFactory.Identifier(node.Identifier.LeadingTrivia, _mapping[node.Identifier.ValueText], node.Identifier.TrailingTrivia));
+        if (!leftNames.Contains(node.Identifier.ValueText))
+            return base.VisitIdentifierName(node);
 
-        return base.VisitIdentifierName(node);
+        var symbol = _semanticModel.GetSymbolInfo(node).Symbol;
+        if(symbol is not (ILocalSymbol or IParameterSymbol or IRangeVariableSymbol) || !_mapping.ContainsKey(symbol))
+            return base.VisitIdentifierName(node);
+        
+        return node.WithIdentifier(SyntaxFactory.Identifier(node.Identifier.LeadingTrivia, _mapping[symbol], node.Identifier.TrailingTrivia));
     }
 
     public override SyntaxNode? VisitFromClause(FromClauseSyntax node)
     {
-        return _mapping.ContainsKey(node.Identifier.ValueText) 
-            ? node.WithIdentifier(SyntaxFactory.Identifier(node.Identifier.LeadingTrivia, _mapping[node.Identifier.ValueText], node.Identifier.TrailingTrivia)) 
+        if (!leftNames.Contains(node.Identifier.ValueText))
+            return base.VisitFromClause(node);
+
+        var symbol = _semanticModel.GetDeclaredSymbol(node);
+        return symbol is not null && _mapping.TryGetValue(symbol, out var value) 
+            ? node.WithIdentifier(SyntaxFactory.Identifier(node.Identifier.LeadingTrivia, value, node.Identifier.TrailingTrivia)) 
             : base.VisitFromClause(node);
     }
     
     public override SyntaxNode? VisitParameter(ParameterSyntax node)
     {
-        return _mapping.ContainsKey(node.Identifier.ValueText) 
-            ? node.WithIdentifier(SyntaxFactory.Identifier(node.Identifier.LeadingTrivia, _mapping[node.Identifier.ValueText], node.Identifier.TrailingTrivia)) 
+        if (!leftNames.Contains(node.Identifier.ValueText))
+            base.VisitParameter(node);
+        var symbol = _semanticModel.GetDeclaredSymbol(node);
+        
+        return symbol is not null && _mapping.TryGetValue(symbol, out var value) 
+            ? node.WithIdentifier(SyntaxFactory.Identifier(node.Identifier.LeadingTrivia, value, node.Identifier.TrailingTrivia)) 
             : base.VisitParameter(node);
     }
     
     public override SyntaxNode? VisitVariableDeclarator(VariableDeclaratorSyntax node)
     {
-        return _mapping.ContainsKey(node.Identifier.ValueText) 
-            ? node.WithIdentifier(SyntaxFactory.Identifier(node.Identifier.LeadingTrivia, _mapping[node.Identifier.ValueText], node.Identifier.TrailingTrivia)) 
+        if (!leftNames.Contains(node.Identifier.ValueText))
+            base.VisitVariableDeclarator(node);
+        var symbol = _semanticModel.GetDeclaredSymbol(node);
+
+        return symbol is not null && _mapping.TryGetValue(symbol, out var value) 
+            ? node.WithIdentifier(SyntaxFactory.Identifier(node.Identifier.LeadingTrivia, value, node.Identifier.TrailingTrivia)) 
             : base.VisitVariableDeclarator(node);
     }
     
     public override SyntaxNode? VisitSingleVariableDesignation(SingleVariableDesignationSyntax node)
     {
-        return _mapping.ContainsKey(node.Identifier.ValueText) 
-            ? node.WithIdentifier(SyntaxFactory.Identifier(node.Identifier.LeadingTrivia, _mapping[node.Identifier.ValueText], node.Identifier.TrailingTrivia)) 
+        if (!leftNames.Contains(node.Identifier.ValueText))
+            base.VisitSingleVariableDesignation(node);
+        var symbol = _semanticModel.GetDeclaredSymbol(node);
+
+        return symbol is not null && _mapping.TryGetValue(symbol, out var value) 
+            ? node.WithIdentifier(SyntaxFactory.Identifier(node.Identifier.LeadingTrivia, value, node.Identifier.TrailingTrivia)) 
             : base.VisitSingleVariableDesignation(node);
     }
 

@@ -24,7 +24,7 @@ public sealed class AnalyzerConfigOverwrite
     internal static async Task<Solution> ReplaceAnyAnalyzerConfigDocuments(Solution sln, ProjectId projId, IEnumerable<DocumentId> changedDocumentIds, AbsolutePath? analyzerConfigPath)
     {
         var project = sln.GetProject(projId)!;
-        // Strip out all existing config docs. TODO perhaps it would be better to try do some kinda merge here? But this is better then letting it be overriden by actual editor config files.
+        // Strip out all existing config docs.
         var whitelistConfigDocumentName = $"{project.Name}.GeneratedMSBuildEditorConfig.editorconfig";
         var configDocuments = project.AnalyzerConfigDocuments
             .Where(x=>x.Name != whitelistConfigDocumentName)

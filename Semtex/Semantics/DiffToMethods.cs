@@ -29,7 +29,7 @@ public sealed class DiffToMethods
 
             var fileText = await File.ReadAllTextAsync(filepath.Path).ConfigureAwait(false);
 
-            var changedMethods = new Dictionary<string,List<LineDiff>>();
+            var changedMethods = new HashSet<string>();
 
             var fileLines = SourceText.From(fileText).Lines;
 
@@ -37,21 +37,18 @@ public sealed class DiffToMethods
             var changeOutsideMethod = false;
             foreach (var lineDiff in lineDiffs)
             {
-                if (!TryGetMethodIdentifier(lineDiff, fileLines, root, out var methodIdentifier))
+                if (!TryGetMethodIdentifier(lineDiff, fileLines, root, out var methodIdentifier) || methodIdentifier is null)
                 {
                     changeOutsideMethod = true;
-                    continue; // TODO this should probably be a break but I don't think it makes much difference
+                    break;
                 }
 
-                if (!changedMethods.ContainsKey(methodIdentifier!))
-                    changedMethods[methodIdentifier!] = new List<LineDiff>();
-                changedMethods[methodIdentifier!].Add(lineDiff);
-
+                changedMethods.Add(methodIdentifier);
             }
             
             if (!changeOutsideMethod)
             {
-                result[filepath] = changedMethods.Keys.ToHashSet();
+                result[filepath] = changedMethods;
             }
         }
 

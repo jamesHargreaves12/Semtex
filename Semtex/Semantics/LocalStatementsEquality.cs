@@ -22,9 +22,9 @@ namespace Semtex.Semantics;
 
 public static class LocalStatementsEquality
 {
-    public static bool SemanticallyEqualLocalStatements(SyntaxList<StatementSyntax> left,
+    internal static bool SemanticallyEqualLocalStatements(SyntaxList<StatementSyntax> left,
         SyntaxList<StatementSyntax> right, SemanticModel leftSemanticModel, SemanticModel rightSemanticModel,
-        List<(string left, string right)> proposedRenames)
+        List<(ISymbol left, string right)> proposedRenames)
     {
         var localVariableRenameRewriter = new LocalVariableRenameRewriter(proposedRenames, leftSemanticModel);
 
@@ -42,8 +42,9 @@ public static class LocalStatementsEquality
             // By doing the renaming at this point we avoids need for an extra compile, and avoids us having to manually
             // walk down the left and right syntax trees together more than once. However its quite possible that the
             // increase in complexity isn't worth it in which case we should just pull this out into its own pipeline step. That is done before the Semantic Equality.
-            var renamedLeftSimpleBlock =
-                simpleBlockLeft.Select(l => (StatementSyntax)localVariableRenameRewriter.Visit(l));
+            var renamedLeftSimpleBlock = proposedRenames.Count > 0
+                ? simpleBlockLeft.Select(l => (StatementSyntax)localVariableRenameRewriter.Visit(l))
+                : simpleBlockLeft;
             if (simpleBlockLeft.Count == 1)
             {
                 if (renamedLeftSimpleBlock.Single().NormalizeWhitespace().ToString() != simpleBlockRight.Single().NormalizeWhitespace().ToString()) return false;

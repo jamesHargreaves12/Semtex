@@ -141,7 +141,7 @@ public sealed class CheckSemanticEquivalence
                 var sourceRootNode = (await sourceDoc.GetSyntaxRootAsync().ConfigureAwait(false))!;
                 var srcCompilation = await sourceDoc.Project.GetCompilationAsync().ConfigureAwait(false);
                 var srcSemanticModel = srcCompilation!.GetSemanticModel(sourceRootNode.SyntaxTree);
-                var sourceRenamablePrivateSymbolsWalker = new SemanticSimplifier.AllRenameablePrivateSymbols(srcSemanticModel);
+                var sourceRenamablePrivateSymbolsWalker = new AllRenameablePrivateSymbols(srcSemanticModel);
                 sourceRenamablePrivateSymbolsWalker.Visit(sourceRootNode);
                 var srcRenamableSymbols = sourceRenamablePrivateSymbolsWalker.PrivateSymbols;
 
@@ -149,7 +149,7 @@ public sealed class CheckSemanticEquivalence
                 var targetRootNode = (await targetDoc.GetSyntaxRootAsync().ConfigureAwait(false))!;
                 var targetCompilation = await targetDoc.Project.GetCompilationAsync().ConfigureAwait(false);
                 var targetSemanticModel = targetCompilation!.GetSemanticModel(targetRootNode.SyntaxTree);
-                var targetRenamablePrivateSymbolsWalker = new SemanticSimplifier.AllRenameablePrivateSymbols(targetSemanticModel);
+                var targetRenamablePrivateSymbolsWalker = new AllRenameablePrivateSymbols(targetSemanticModel);
                 targetRenamablePrivateSymbolsWalker.Visit(targetRootNode);
                 var targetRenamableSymbols = targetRenamablePrivateSymbolsWalker.PrivateSymbols;
 

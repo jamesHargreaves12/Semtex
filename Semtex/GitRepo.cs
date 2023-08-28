@@ -104,7 +104,6 @@ internal class GitRepo
             try
             {
                 var existingRepo = await SetupFromExistingFolder(rootFolder).ConfigureAwait(false);
-                // TODO Probably should do some clean here etc for sanity sake.
                 if (existingRepo.RemoteUrl.Replace(".git","") == repoUrl.Replace(".git",""))
                 {
                     await existingRepo.Fetch().ConfigureAwait(false);
