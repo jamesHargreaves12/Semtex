@@ -25,7 +25,7 @@ public sealed class CheckSemanticEquivalence
         if (diffConfig.SourceCsFilepaths.Count == 0)
         {
             Logger.LogInformation("Skipping commit {Target} as it has no c# diffs",target);
-            var fileModels = await GetFileModels(gitRepo, diffConfig, SimplifiedSolutionSummary.Empty(), SimplifiedSolutionSummary.Empty(), new Dictionary<AbsolutePath, HashSet<string>>())
+            var fileModels = await GetFileModels(gitRepo, diffConfig, SimplifiedSolutionSummary.Empty(), SimplifiedSolutionSummary.Empty(), new Dictionary<AbsolutePath, HashSet<MethodIdentifier>>())
                 .ConfigureAwait(false);
 
             return new CommitModel(target, fileModels, stopWatch.ElapsedMilliseconds, diffConfig)
@@ -63,8 +63,8 @@ public sealed class CheckSemanticEquivalence
             var sourceChangedMethods =
                 await DiffToMethods.GetChangesFilter(sourceFilesToSimplify, sourceLineChangeMapping).ConfigureAwait(false);
 
-            var sourceChangedMethodsMap = new Dictionary<AbsolutePath, HashSet<string>>();
-            var targetChangedMethodsMap = new Dictionary<AbsolutePath, HashSet<string>>();
+            var sourceChangedMethodsMap = new Dictionary<AbsolutePath, HashSet<MethodIdentifier>>();
+            var targetChangedMethodsMap = new Dictionary<AbsolutePath, HashSet<MethodIdentifier>>();
             foreach (var key in sourceChangedMethods.Keys)
             {
                 var targetKey = diffConfig.GetTargetFilepath(key);
@@ -345,7 +345,7 @@ public sealed class CheckSemanticEquivalence
     // This needs a better name
     private static async Task<List<FileModel>> GetFileModels(GitRepo gitRepo, DiffConfig diffConfig,
         SimplifiedSolutionSummary simplifiedSrcSolution, SimplifiedSolutionSummary simplifiedTargetSolution,
-        Dictionary<AbsolutePath, HashSet<string>> sourceChangedMethods)
+        Dictionary<AbsolutePath, HashSet<MethodIdentifier>> sourceChangedMethods)
     {
         Stopwatch? stopwatch = null;
         var fileResults = diffConfig.AddedFilepaths.Select(addedFp => 
@@ -444,20 +444,20 @@ public sealed class CheckSemanticEquivalence
             var result = semanticallyUnequal.Match(
                 functions =>
                 {
-                    if (!functions.FunctionNames.Any())
+                    if (!functions.MethodIdentifiers.Any())
                         return new FileModel(relativePath, Status.SemanticallyEquivalent);
                     
                     if (!sourceChangedMethods.ContainsKey(sourceFilepath) || 
-                        functions.FunctionNames.ToHashSet().IsProperSubsetOf(sourceChangedMethods[sourceFilepath]))
+                        functions.MethodIdentifiers.ToHashSet().IsProperSubsetOf(sourceChangedMethods[sourceFilepath]))
                     {
                         // We have limited the set of semantic changes to a smaller subset than the diff.
-                        return new FileModel(relativePath, Status.SubsetOfDiffEquivalent, functions.FunctionNames.ToHashSet());
+                        return new FileModel(relativePath, Status.SubsetOfDiffEquivalent, functions.MethodIdentifiers.ToHashSet());
                     }
                     
                     if(!sourceChangedMethods.ContainsKey(sourceFilepath))
                         return new FileModel(relativePath, Status.ContainsSemanticChanges);
 
-                    var newDiffs = functions.FunctionNames.Where(x => !sourceChangedMethods[sourceFilepath].Contains(x));
+                    var newDiffs = functions.MethodIdentifiers.Where(x => !sourceChangedMethods[sourceFilepath].Contains(x));
                     // ReSharper disable once PossibleMultipleEnumeration
                     if (newDiffs.Count() != 0)
                     {

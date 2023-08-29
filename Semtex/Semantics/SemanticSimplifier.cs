@@ -17,7 +17,7 @@ internal class SemanticSimplifier
 
     internal static async Task<Solution> GetSolutionWithFilesSimplified(
         Solution sln, HashSet<ProjectId> projectIds, HashSet<AbsolutePath> documentsToSimplify, AbsolutePath? analyzerConfigPath,
-        Dictionary<AbsolutePath, HashSet<string>> changedMethodsMap)
+        Dictionary<AbsolutePath, HashSet<MethodIdentifier>> changedMethodsMap)
     {
         foreach (var projId in projectIds) // This could 100% be parallelized for speed - for now won't do this as the logging becomes more difficult.
         {
@@ -73,15 +73,11 @@ internal class SemanticSimplifier
         return sln;
     }
 
-    /// <summary>
-    /// TODO improve this.
-    /// </summary>
-    /// <param name="method"></param>
-    /// <returns></returns>
-    public static string GetMethodIdentifier(MethodDeclarationSyntax method)
+    public static MethodIdentifier GetMethodIdentifier(MethodDeclarationSyntax method)
     {
         var overloadIdentifier = string.Join("_",
             method.ParameterList.Parameters.Select(x => x.Type!.ToString()).ToArray());
-        return $"{method.Identifier}_{overloadIdentifier}";
+         
+        return new MethodIdentifier(method.Identifier.ToString(), overloadIdentifier);
     }
 }

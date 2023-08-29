@@ -4,6 +4,7 @@ using Microsoft.CodeAnalysis.CSharp.Syntax;
 using Microsoft.Extensions.Logging;
 using OneOf;
 using Semtex.Logging;
+using Semtex.Models;
 
 namespace Semtex.Semantics;
 
@@ -14,19 +15,19 @@ public struct CouldntLimitToFunctions
 public struct DifferencesLimitedToFunctions
 {
     //EmptyList => no differences.
-    public List<string> FunctionNames { get; }
+    public List<MethodIdentifier> MethodIdentifiers { get; }
 
-    public DifferencesLimitedToFunctions(List<string> functionNames)
+    public DifferencesLimitedToFunctions(List<MethodIdentifier> methodIdentifiers)
     {
-        FunctionNames = functionNames;
+        MethodIdentifiers = methodIdentifiers;
     }
     public DifferencesLimitedToFunctions()
     {
-        FunctionNames = new List<string>();
+        MethodIdentifiers = new List<MethodIdentifier>();
     }
 }
 
-public class SemanticEqualBreakdown
+public sealed class SemanticEqualBreakdown
 {
     private static readonly ILogger<SemanticEqualBreakdown> Logger = SemtexLog.LoggerFactory.CreateLogger<SemanticEqualBreakdown>();
 
@@ -50,9 +51,9 @@ public class SemanticEqualBreakdown
 
 
         var res = await GetSemanticallyUnequal(leftRoot, rightRoot, leftSemanticModel, rightSemanticModel, left, right).ConfigureAwait(false); // We can just push down the semantic model getting now that we are passing down the document.
-        if (res.IsT0 && res.AsT0.FunctionNames.Any())
+        if (res.IsT0 && res.AsT0.MethodIdentifiers.Any())
         {
-            Logger.LogInformation("Resulting diffs = " + string.Join(",", res.AsT0.FunctionNames));
+            Logger.LogInformation("Resulting diffs = " + string.Join(",", res.AsT0.MethodIdentifiers));
         }
         
         return res;
@@ -124,8 +125,8 @@ public class SemanticEqualBreakdown
         if (memberResult.IsT1 || SemanticallyEqualUsings(left.Usings, right.Usings))
             return memberResult;
 
-        return new DifferencesLimitedToFunctions(memberResult.AsT0.FunctionNames
-            .Append(DiffToMethods.TOP_LEVEL_USING_IDENTIFIER).ToList());
+        return new DifferencesLimitedToFunctions(memberResult.AsT0.MethodIdentifiers
+            .Append(DiffToMethods.TOP_LEVEL_USING_FAKE_METHOD_IDENTIFIER).ToList());
 
     }
 
@@ -172,16 +173,16 @@ public class SemanticEqualBreakdown
             !StringEqual(left.ReturnType, right.ReturnType) ||
             !NullableStringEqual(left.TypeParameterList, right.TypeParameterList) // Not checkint arity as it is covered by TypeParameterList
            )
-            return new DifferencesLimitedToFunctions(new List<string> {SemanticSimplifier.GetMethodIdentifier(left)});
+            return new DifferencesLimitedToFunctions(new List<MethodIdentifier> {SemanticSimplifier.GetMethodIdentifier(left)});
 
         switch (left.Body, right.Body)
         {
             case (null,null):
                 return new DifferencesLimitedToFunctions();
             case (null, {}):
-                return new DifferencesLimitedToFunctions(new List<string> {SemanticSimplifier.GetMethodIdentifier(left)});
+                return new DifferencesLimitedToFunctions(new List<MethodIdentifier> {SemanticSimplifier.GetMethodIdentifier(left)});
             case ({},null):
-                return new DifferencesLimitedToFunctions(new List<string> {SemanticSimplifier.GetMethodIdentifier(left)});
+                return new DifferencesLimitedToFunctions(new List<MethodIdentifier> {SemanticSimplifier.GetMethodIdentifier(left)});
         }
         
         // Calculating Renames is more expensive so lets only do it for methods that are not equal before renaming:
@@ -201,7 +202,7 @@ public class SemanticEqualBreakdown
             return new DifferencesLimitedToFunctions();
         }
 
-        return new DifferencesLimitedToFunctions(new List<string> {SemanticSimplifier.GetMethodIdentifier(left)});
+        return new DifferencesLimitedToFunctions(new List<MethodIdentifier> {SemanticSimplifier.GetMethodIdentifier(left)});
     }
     
     private static bool SemanticallyEqualUsings(SyntaxList<UsingDirectiveSyntax> left, SyntaxList<UsingDirectiveSyntax> right)
@@ -216,7 +217,7 @@ public class SemanticEqualBreakdown
         if (left.Count != right.Count)
             return OneOf<DifferencesLimitedToFunctions, CouldntLimitToFunctions>.FromT1(new CouldntLimitToFunctions());
 
-        var accumulator = new List<string>();
+        var accumulator = new List<MethodIdentifier>();
         foreach (var (lMem,rMem) in left.Zip(right))
         {
 
@@ -224,7 +225,7 @@ public class SemanticEqualBreakdown
                     .ConfigureAwait(false);
 
             if (memberResult.IsT1) return memberResult;
-            accumulator.AddRange(memberResult.AsT0.FunctionNames);
+            accumulator.AddRange(memberResult.AsT0.MethodIdentifiers);
         }
 
         return OneOf<DifferencesLimitedToFunctions, CouldntLimitToFunctions>.FromT0(new DifferencesLimitedToFunctions(accumulator));

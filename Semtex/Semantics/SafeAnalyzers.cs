@@ -167,7 +167,7 @@ public sealed class SafeAnalyzers
         "RCS1213", // Unused Member
     };
     internal static async Task<Solution> Apply(Solution sln, ProjectId projId, List<DocumentId> documentIds,
-        AbsolutePath? analyzerConfigPath, Dictionary<DocumentId, HashSet<string>> changedMethodsMap)
+        AbsolutePath? analyzerConfigPath, Dictionary<DocumentId, HashSet<MethodIdentifier>> changedMethodsMap)
     {
         // Clone the set so that any edits don't effect caller.
         var currentDocumentIds = new HashSet<DocumentId>(documentIds);
@@ -257,7 +257,7 @@ public sealed class SafeAnalyzers
     }
 
     private static bool IsDiagnosticsInChangedMethod(SyntaxNode root, Diagnostic diagnostic,
-        HashSet<string> changedMethods)
+        HashSet<MethodIdentifier> changedMethods)
     {
         var node = root.FindNode(diagnostic.Location.SourceSpan);
         while (true)

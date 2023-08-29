@@ -374,7 +374,7 @@ public static class NoOpProgram{public static void Main(){}}// Needed to avoid C
         var rightRaw = await rightSimplified.GetSyntaxRootAsync().ConfigureAwait(false);
 
         var equal = result.Match(
-            x => x.FunctionNames.Count == 0,
+            x => x.MethodIdentifiers.Count == 0,
             x => false
         );
         // this is slightly weird when all we care about is the result of match for test pass / fail but gives us a nicer output with the simplified form
@@ -430,7 +430,7 @@ public static class NoOpProgram{public static void Main(){}}// Needed to avoid C
         var rightRaw = await rightSimplified.GetSyntaxRootAsync().ConfigureAwait(false);
 
         var equal = result.Match(
-            x => x.FunctionNames.Count == 0,
+            x => x.MethodIdentifiers.Count == 0,
             x => false
         );
         // this is slightly weird when all we care about is the result of match for test pass / fail but gives us a nicer output with the simplified form
@@ -449,7 +449,7 @@ public static class NoOpProgram{public static void Main(){}}// Needed to avoid C
     private static async Task<Solution> SimplifySolution(Solution sln, AbsolutePath fpToSimplify)
     {
         // Empty indicates just apply it to the whole solution
-        var changeMethodsMap = new Dictionary<AbsolutePath, HashSet<string>>();
+        var changeMethodsMap = new Dictionary<AbsolutePath, HashSet<MethodIdentifier>>();
         
         var projectIds = sln.Projects
             .Where(p => p.FilePath == ProjectFilepath)

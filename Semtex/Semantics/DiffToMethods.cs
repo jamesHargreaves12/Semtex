@@ -11,7 +11,7 @@ namespace Semtex.Semantics;
 
 public sealed class DiffToMethods
 {
-    public const string TOP_LEVEL_USING_IDENTIFIER = "<top_level_using>";
+    public static readonly MethodIdentifier TOP_LEVEL_USING_FAKE_METHOD_IDENTIFIER = new MethodIdentifier("<top-level-usings>", "<top-level-usings>");
     private static readonly ILogger<DiffToMethods> Logger = SemtexLog.LoggerFactory.CreateLogger<DiffToMethods>();
     /// <summary>
     /// If all the changes in a function are within functions then we will only apply the analyzers that are located within those functions.
@@ -19,17 +19,17 @@ public sealed class DiffToMethods
     /// <param name="filepaths"></param>
     /// <param name="lineChangeMapping"></param>
     /// <returns></returns>
-    internal static async Task<Dictionary<AbsolutePath, HashSet<string>>> GetChangesFilter(
+    internal static async Task<Dictionary<AbsolutePath, HashSet<MethodIdentifier>>> GetChangesFilter(
         HashSet<AbsolutePath> filepaths, Dictionary<AbsolutePath, List<LineDiff>> lineChangeMapping)
     {
-        var result = new Dictionary<AbsolutePath, HashSet<string>>();
+        var result = new Dictionary<AbsolutePath, HashSet<MethodIdentifier>>();
         foreach (var filepath in filepaths)
         {
             if (!lineChangeMapping.TryGetValue(filepath, out var lineDiffs)) continue;
 
             var fileText = await File.ReadAllTextAsync(filepath.Path).ConfigureAwait(false);
 
-            var changedMethods = new HashSet<string>();
+            var changedMethods = new HashSet<MethodIdentifier>();
 
             var fileLines = SourceText.From(fileText).Lines;
 
@@ -43,7 +43,7 @@ public sealed class DiffToMethods
                     break;
                 }
 
-                changedMethods.Add(methodIdentifier);
+                changedMethods.Add(methodIdentifier!.Value);
             }
             
             if (!changeOutsideMethod)
@@ -55,7 +55,7 @@ public sealed class DiffToMethods
         return result;
     }
 
-    private static bool TryGetMethodIdentifier(LineDiff lineDiff, TextLineCollection fileLines, SyntaxNode root, out string? methodIdentifier)
+    private static bool TryGetMethodIdentifier(LineDiff lineDiff, TextLineCollection fileLines, SyntaxNode root, out MethodIdentifier? methodIdentifier)
     {
         var startI = Math.Max(0, lineDiff.Start - 1);
         var start = fileLines[startI].Start;
@@ -73,7 +73,7 @@ public sealed class DiffToMethods
                     methodIdentifier = SemanticSimplifier.GetMethodIdentifier(methodDeclarationSyntax);
                     return true;
                 case UsingDirectiveSyntax { Parent: CompilationUnitSyntax }:
-                    methodIdentifier = TOP_LEVEL_USING_IDENTIFIER; // Special casing top level using as they will often change, methodIdentifier should be a union.
+                    methodIdentifier = TOP_LEVEL_USING_FAKE_METHOD_IDENTIFIER; // Special casing top level using as they will often change, methodIdentifier should be a union.
                     return true;
                 case ClassDeclarationSyntax or CompilationUnitSyntax or NamespaceDeclarationSyntax:
                     methodIdentifier = null;
@@ -86,7 +86,7 @@ public sealed class DiffToMethods
 
     internal static (string semanticDiff, string unsemanticDiff) SplitDiffByChanged(string sourceText,
         string targetText,
-        HashSet<string> changedMethodIdentifiers, List<(LineDiff, LineDiff)> diffs,
+        HashSet<MethodIdentifier> changedMethodIdentifiers, List<(LineDiff, LineDiff)> diffs,
         List<(LineDiff left, LineDiff right, string text)> diffWithContext)
     {
         var srcFileLines = SourceText.From(sourceText).Lines;
@@ -98,23 +98,24 @@ public sealed class DiffToMethods
         foreach (var (srcDiff, targetDiff) in diffs)
         {
             var lineChangesWithContext = diffWithContext
-                .Select((val,i)=>(val, i))
+                .Select((val, i) => (val, i))
                 .Where(item => item.val.left.Contains(srcDiff))
                 .ToList();
-            
+
             switch (lineChangesWithContext.Count)
             {
                 case 0:
                     Logger.LogWarning("--unified=0 diff {Src} not contained in normal diff hunk", srcDiff);
                     return (string.Join("\n", diffWithContext.Select(x => x.text)), "");
                 case > 1:
-                    Logger.LogWarning("--unified=0 diff {Src} contained in {Count} normal diff hunks", srcDiff, lineChangesWithContext.Count);
+                    Logger.LogWarning("--unified=0 diff {Src} contained in {Count} normal diff hunks", srcDiff,
+                        lineChangesWithContext.Count);
                     return (string.Join("\n", diffWithContext.Select(x => x.text)), "");
             }
 
             var (withContext, i) = lineChangesWithContext.Single();
-            
-            if(!withContext.right.Contains(targetDiff))
+
+            if (!withContext.right.Contains(targetDiff))
             {
                 Logger.LogWarning(
                     "targetDiff not contained in same hunk as srcDiff: \n{SrcDiff} in {Left}\n{TargetDiff} not in {Right}",
@@ -122,19 +123,27 @@ public sealed class DiffToMethods
                 return (string.Join("\n", diffWithContext.Select(x => x.text)), "");
             }
 
-
-            if (!TryGetMethodIdentifier(srcDiff, srcFileLines, srcRoot, out var srcMethodIdentifier)
-                || !TryGetMethodIdentifier(targetDiff, targetFileLines, targetRoot, out var targetMethodIdentifier)
-                || srcMethodIdentifier != targetMethodIdentifier // TODO think about this line some more
-               )
+            var srcDiffInMethod = TryGetMethodIdentifier(srcDiff, srcFileLines, srcRoot, out var srcMethodIdentifier);
+            var tgtDiffInMethod = TryGetMethodIdentifier(targetDiff, targetFileLines, targetRoot, out var targetMethodIdentifier); 
+            
+            if (!srcDiffInMethod && !tgtDiffInMethod)
             {
-                return (string.Join("\n", diffWithContext.Select(x => x.text)), "");
+                continue; // If they are both at class level and we have limited semantic changes to a set of methods then this change must not be semantic
             }
 
-            if (changedMethodIdentifiers.Contains(srcMethodIdentifier!))
+            if (srcDiffInMethod && !tgtDiffInMethod && !changedMethodIdentifiers.Contains(srcMethodIdentifier!.Value))
             {
-                semanticIndices.Add(i);
+                continue; // If target diff outside method and source diff in a method that is shown to be safe then change is safe
             }
+
+            if (srcMethodIdentifier == targetMethodIdentifier && !changedMethodIdentifiers.Contains(srcMethodIdentifier!.Value))
+            {
+                continue; // If the methods are in the same method and that method is shown safe then change is safe.
+            }
+
+            // either src and target in different methods or they are in a method that contains semantic change. 
+            semanticIndices.Add(i);
+
         }
 
         var semanticDiff = new StringBuilder();
