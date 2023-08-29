@@ -32,11 +32,22 @@ public class UsingStatementAnalyzer: DiagnosticAnalyzer
         if(lastStatement != usingStatement)
             return;
         
-        if (usingStatement.Declaration is null )
+        if (usingStatement.Declaration is null)
         {
             return;
         }
+
+        var statements = usingStatement.Statement;
+        while (statements is not BlockSyntax)
+        {
+            if (statements is not UsingStatementSyntax childUsingStatement || childUsingStatement.Declaration is not VariableDeclarationSyntax )
+            {
+                return;
+            }
+            statements = childUsingStatement.Statement;
         
+        }
+
         if(DoDeclaredVariablesOverlapWithOuterScope(usingStatement, context.SemanticModel))
             return;
 
@@ -59,7 +70,7 @@ public class UsingStatementAnalyzer: DiagnosticAnalyzer
         {
             BlockSyntax b => b.Statements,
             SwitchSectionSyntax s => s.Statements,
-            _ => throw new ArgumentOutOfRangeException()
+            _ => throw new ArgumentOutOfRangeException(nameof(usingStatement))
         };
         foreach (StatementSyntax statement in parentStatements)
         {

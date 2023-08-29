@@ -26,6 +26,16 @@ public class Left
         }
     }
     
+    public void M3(ExternalObj x)
+    {
+        using (var f = new FileStream("arosnt", FileMode.Open, FileAccess.Read))
+        using (x)
+        {
+            Console.WriteLine(x);
+            Console.WriteLine(f);
+        }
+    }
+    
     
     public void M3()
     {
