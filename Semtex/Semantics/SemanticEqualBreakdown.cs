@@ -54,13 +54,7 @@ public class SemanticEqualBreakdown
         {
             Logger.LogInformation("Resulting diffs = " + string.Join(",", res.AsT0.FunctionNames));
         }
-
-        if (res.IsT1 || res.AsT0.FunctionNames.Any())
-        {
-            File.WriteAllText($"/Users/jameshargreaves/dev/Semtex/Tmp/Left/{left.Name}", leftRoot.ToFullString());
-            File.WriteAllText($"/Users/jameshargreaves/dev/Semtex/Tmp/Right/{right.Name}", rightRoot.ToFullString());
-        }
-
+        
         return res;
     }
 
