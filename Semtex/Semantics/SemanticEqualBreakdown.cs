@@ -55,6 +55,12 @@ public class SemanticEqualBreakdown
             Logger.LogInformation("Resulting diffs = " + string.Join(",", res.AsT0.FunctionNames));
         }
 
+        if (res.IsT1 || res.AsT0.FunctionNames.Any())
+        {
+            File.WriteAllText($"/Users/jameshargreaves/dev/Semtex/Tmp/Left/{left.Name}", leftRoot.ToFullString());
+            File.WriteAllText($"/Users/jameshargreaves/dev/Semtex/Tmp/Right/{right.Name}", rightRoot.ToFullString());
+        }
+
         return res;
     }
 
@@ -160,7 +166,7 @@ public class SemanticEqualBreakdown
         var rightId = SemanticSimplifier.GetMethodIdentifier(right);
 
         if (leftId != rightId)
-            return new CouldntLimitToFunctions(); // If function identifier has changed then I think the best we can do is opt out. TODO is there something better?
+            return new CouldntLimitToFunctions();
 
         if (!SemanticallyEqualSyntaxList(left.AttributeLists, right.AttributeLists) ||
             !SemanticallyEqualSyntaxList(left.ConstraintClauses, right.ConstraintClauses) ||

@@ -21,6 +21,7 @@ public class LocalVariableRenamer
             return new List<(ISymbol, string)>();
         var leftDeclaredVariables = leftSemanticModel.AnalyzeDataFlow(left.Body).VariablesDeclared;
         var rightDeclaredVariables = rightSemanticModel.AnalyzeDataFlow(right.Body).VariablesDeclared;
+        Logger.LogInformation(SemtexLog.GetPerformanceStr("GetVariableIdentifiers", sw.ElapsedMilliseconds));
 
         var leftOccursSingleTime = leftDeclaredVariables.GroupBy(x => x.Name)
             .Where(x => x.Count() == 1)
@@ -37,9 +38,6 @@ public class LocalVariableRenamer
         
         var leftVariableIdentifiers = await Task.WhenAll(leftCandidates.Select(x => GetSymbolIdentifier(leftSemanticModel, leftDocument, x))).ConfigureAwait(false);
         var rightVariableIdentifiers = await Task.WhenAll(rightCandidates.Select(x => GetSymbolIdentifier(rightSemanticModel, rightDocument, x))).ConfigureAwait(false);
-        Logger.LogInformation(SemtexLog.GetPerformanceStr("GetVariableIdentifiers", sw.ElapsedMilliseconds));
-        // strip out any local variables that occur twice.
-        
         
         // Group by type + ref count and look at any see if there are any obvious matches.
         var leftMapping = leftVariableIdentifiers

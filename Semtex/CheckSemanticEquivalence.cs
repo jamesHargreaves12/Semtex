@@ -153,13 +153,13 @@ public sealed class CheckSemanticEquivalence
                 targetRenamablePrivateSymbolsWalker.Visit(targetRootNode);
                 var targetRenamableSymbols = targetRenamablePrivateSymbolsWalker.PrivateSymbols;
 
-                var srcRenameMapping = GetRenameMapping(srcRenamableSymbols, targetRenamableSymbols);
-
-                sourceRootNode = new RenameSymbolRewriter(srcSemanticModel, srcRenameMapping).Visit(sourceRootNode);
-                sourceRootNode = sourceRootNode.NormalizeWhitespace();
                 sourceRootNode = new ConsistentOrderRewriter().Visit(sourceRootNode);
                 srcSln = srcSln.WithDocumentSyntaxRoot(sourceDoc.Id, sourceRootNode);
 
+                // By renaming the target we don't change the method identifiers of the source 
+                var renameMapping = GetRenameMapping(targetRenamableSymbols, srcRenamableSymbols);
+                targetRootNode = new RenameSymbolRewriter(targetSemanticModel, renameMapping).Visit(targetRootNode);
+                targetRootNode = targetRootNode.NormalizeWhitespace();
                 targetRootNode = new ConsistentOrderRewriter().Visit(targetRootNode);
                 targetSln = targetSln.WithDocumentSyntaxRoot(targetDoc.Id, targetRootNode);
             }
@@ -173,32 +173,32 @@ public sealed class CheckSemanticEquivalence
         return (srcSln,targetSln);
     }
     
-    private static Dictionary<ISymbol, string> GetRenameMapping(HashSet<ISymbol> srcPrivateVariables, HashSet<ISymbol> targetPrivateVariables)
+    private static Dictionary<ISymbol, string> GetRenameMapping(HashSet<ISymbol> tgtPrivateVariables, HashSet<ISymbol> srcPrivateVariables)
     { 
         // Could also use type of private variable and declaring type here but I think the assumption that renames will likely be closer than other renames is probably a good enough proxy.
         // O(N^2) complexity on the number of unmatched variables is fine - for almost all cases we expect the N to be small.
-        var unmatchedSrcVariables = srcPrivateVariables.Select(s => s.Name).ToHashSet().Except(targetPrivateVariables.Select(s=>s.Name));
-        var unmatchedTargetVariables = targetPrivateVariables.Select(s => s.Name).ToHashSet().Except(srcPrivateVariables.Select(s=>s.Name)).ToList();
+        var unmatchedTgtVariables = tgtPrivateVariables.Select(s => s.Name).ToHashSet().Except(srcPrivateVariables.Select(s=>s.Name));
+        var unmatchedSrcVariables = srcPrivateVariables.Select(s => s.Name).ToHashSet().Except(tgtPrivateVariables.Select(s=>s.Name)).ToList();
         var queue = new PriorityQueue<(string,string), int>();
-        foreach (var unmatchedSrcVariable in unmatchedSrcVariables)
+        foreach (var unmatchedTgtVariable in unmatchedTgtVariables)
         {
-            foreach (var unmatchedTargetVariable in unmatchedTargetVariables)
+            foreach (var unmatchedSrcVariable in unmatchedSrcVariables)
             {
-                queue.Enqueue((unmatchedSrcVariable,unmatchedTargetVariable),LevenshteinDistance.Calculate(unmatchedSrcVariable,unmatchedTargetVariable));
+                queue.Enqueue((unmatchedTgtVariable,unmatchedSrcVariable),LevenshteinDistance.Calculate(unmatchedTgtVariable,unmatchedSrcVariable));
             }
         }
 
-        var matchedSrc = new HashSet<string>();
-        var matchedTrg = new HashSet<string>();
+        var matchedTarget = new HashSet<string>();
+        var matchedSource = new HashSet<string>();
         var mapping = new Dictionary<ISymbol, string>();
         while (queue.TryDequeue(out var pair, out var _))
         {
-            var (src, target) = pair;
-            if (matchedSrc.Contains(src) || matchedTrg.Contains(target))
+            var (tgt, src) = pair;
+            if (matchedTarget.Contains(tgt) || matchedSource.Contains(src))
                 continue;
-            matchedSrc.Add(src);
-            matchedTrg.Add(target);
-            mapping.Add(srcPrivateVariables.First(x => x.Name == src), target);
+            matchedTarget.Add(tgt);
+            matchedSource.Add(src);
+            mapping.Add(tgtPrivateVariables.First(x => x.Name == tgt), src);
         }
 
         return mapping;

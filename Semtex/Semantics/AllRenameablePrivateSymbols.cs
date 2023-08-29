@@ -14,7 +14,7 @@ public class AllRenameablePrivateSymbols : CSharpSyntaxWalker
         _semanticModel = semanticModel;
     }
 
-    public readonly HashSet<ISymbol> PrivateSymbols = new();
+    public HashSet<ISymbol> PrivateSymbols { get; } = new();
 
     public override void VisitClassDeclaration(ClassDeclarationSyntax node)
     {
@@ -104,5 +104,22 @@ public class AllRenameablePrivateSymbols : CSharpSyntaxWalker
         base.VisitPropertyDeclaration(node);
     }
 
-    // Not doing method as we don't want to change the identifier TODO can we dot this and just return the mapping?
+    public override void VisitMethodDeclaration(MethodDeclarationSyntax node)
+    {
+        if (node.Modifiers.All(m =>
+                !m.IsKind(SyntaxKind.PublicKeyword)
+                && !m.IsKind(SyntaxKind.ProtectedKeyword) 
+                && !m.IsKind(SyntaxKind.InternalKeyword))
+            && (node.Parent is ClassDeclarationSyntax cds && cds.Modifiers.All(m => !m.IsKind(SyntaxKind.PartialKeyword))
+                || node.Parent is StructDeclarationSyntax sds && sds.Modifiers.All(m => !m.IsKind(SyntaxKind.PartialKeyword))
+                || node.Parent is RecordDeclarationSyntax rds && rds.Modifiers.All(m => !m.IsKind(SyntaxKind.PartialKeyword))
+            ))
+        {
+            var symbol = _semanticModel.GetDeclaredSymbol(node);
+            if (symbol is not null)
+                PrivateSymbols.Add(symbol);
+        }
+
+        base.VisitMethodDeclaration(node);
+    }
 }

@@ -18,8 +18,15 @@ public class Right
 
     public void EvenPlusOne()
     {
+        ConsoleWriter("arnesiirsnt");
         Console.WriteLine(_xx);
         Console.WriteLine(Yy);
         Console.WriteLine(new Zz());
     }
+    
+    private static void ConsoleWriter(string x)
+    {
+        Console.WriteLine(x);
+    }
+
 }

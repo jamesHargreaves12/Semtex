@@ -94,7 +94,7 @@ public sealed class DiffToMethods
         var targetFileLines = SourceText.From(targetText).Lines;
         var targetRoot = CSharpSyntaxTree.ParseText(targetText).GetRoot();
 
-        var semanticIndecies = new HashSet<int>();
+        var semanticIndices = new HashSet<int>();
         foreach (var (srcDiff, targetDiff) in diffs)
         {
             var lineChangesWithContext = diffWithContext
@@ -102,15 +102,14 @@ public sealed class DiffToMethods
                 .Where(item => item.val.left.Contains(srcDiff))
                 .ToList();
             
-            if (lineChangesWithContext.Count == 0)
+            switch (lineChangesWithContext.Count)
             {
-                Logger.LogWarning("--unified=0 diff {Src} not contained in normal diff hunk", srcDiff);
-                return (string.Join("\n", diffWithContext.Select(x => x.text)), "");
-            }
-            if (lineChangesWithContext.Count > 1)
-            {
-                Logger.LogWarning("--unified=0 diff {Src} contained in {Count} normal diff hunks", srcDiff, lineChangesWithContext.Count);
-                return (string.Join("\n", diffWithContext.Select(x => x.text)), "");
+                case 0:
+                    Logger.LogWarning("--unified=0 diff {Src} not contained in normal diff hunk", srcDiff);
+                    return (string.Join("\n", diffWithContext.Select(x => x.text)), "");
+                case > 1:
+                    Logger.LogWarning("--unified=0 diff {Src} contained in {Count} normal diff hunks", srcDiff, lineChangesWithContext.Count);
+                    return (string.Join("\n", diffWithContext.Select(x => x.text)), "");
             }
 
             var (withContext, i) = lineChangesWithContext.Single();
@@ -134,7 +133,7 @@ public sealed class DiffToMethods
 
             if (changedMethodIdentifiers.Contains(srcMethodIdentifier!))
             {
-                semanticIndecies.Add(i);
+                semanticIndices.Add(i);
             }
         }
 
@@ -142,7 +141,7 @@ public sealed class DiffToMethods
         var unsemanticDiff = new StringBuilder();
         foreach (var ((src, trg, text), i) in diffWithContext.Select((val, i) => (val, i)))
         {
-            if (semanticIndecies.Contains(i))
+            if (semanticIndices.Contains(i))
             {
                 semanticDiff.AppendLine(text);
             }

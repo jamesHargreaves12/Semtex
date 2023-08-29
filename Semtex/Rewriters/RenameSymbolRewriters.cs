@@ -106,4 +106,19 @@ internal class RenameSymbolRewriter: CSharpSyntaxRewriter
         return node.WithIdentifier(SyntaxFactory.Identifier(_renameMapping[symbol]));
     }
 
+    public override SyntaxNode? VisitMethodDeclaration(MethodDeclarationSyntax node)
+    {
+        if (!_oldSymbolNames.Contains(node.Identifier.Text))
+            return base.VisitMethodDeclaration(node);
+
+        var currentSymbol = _semanticModel.GetDeclaredSymbol(node);
+        if (currentSymbol == null)
+            return base.VisitMethodDeclaration(node);
+
+        var symbol = _oldSymbols.SingleOrDefault(s => currentSymbol.Equals(s));
+        if (symbol is null)
+            return base.VisitMethodDeclaration(node);
+        
+        return node.WithIdentifier(SyntaxFactory.Identifier(_renameMapping[symbol]));
+    }
 }
