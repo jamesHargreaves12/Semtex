@@ -398,8 +398,12 @@ public sealed class SafeAnalyzers
         }
 
         if (CannotFixAllDiagnosticIds.Contains(diagnosticDescriptorId))
-            return await MakeCodeFixForDiagnostic(document, nonOverlappingDiagnostic.First(d => d.Descriptor.Id == diagnosticDescriptorId), fixProvider).ConfigureAwait(false);
-        
+        {
+            Logger.LogInformation("Only fixing first due to diagnostic id");
+            return await MakeCodeFixForDiagnostic(document, nonOverlappingDiagnostic.First(d => d.Descriptor.Id == diagnosticDescriptorId), fixProvider)
+                .ConfigureAwait(false);
+        }
+
         // Compute the equivalence key of the first diagnostic
         var sw = Stopwatch.StartNew();
         var codeActions = new List<CodeAction>();
