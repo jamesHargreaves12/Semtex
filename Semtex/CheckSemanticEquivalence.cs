@@ -126,12 +126,12 @@ public sealed class CheckSemanticEquivalence
             var commandline = GetReproCommandline(gitRepo, target, source, e.ProjectPath);
             Logger.LogWarning("Unexpected error: to reproduce the error use the following commandline args: \n {Commandline}",
                 commandline);
+            Logger.LogError(e.ToString());
+
             if (failFast)
             {
                 throw;
             }
-
-            Logger.LogError(e.ToString());
 
             var srcUnexpectErrorSummary = new UnsimplifiedFilesSummary(
                 new HashSet<AbsolutePath>(),

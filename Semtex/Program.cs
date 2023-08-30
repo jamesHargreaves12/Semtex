@@ -1,6 +1,7 @@
 ﻿using System.CommandLine;
 using System.CommandLine.Builder;
 using System.CommandLine.Parsing;
+using Microsoft.Extensions.Logging;
 using Semtex;
 using Semtex.Logging;
 using Semtex.Models;
@@ -9,7 +10,13 @@ using Semtex.Models;
 var returnCode = 0;
 // This should be a tmp dir by default.
 var homeDir = Environment.GetEnvironmentVariable("HOME");
-var outputPath = $"{homeDir}/dev/Semtex/Semtex/Out";
+#if DEBUG
+    var outputPath = $"{homeDir}/dev/Semtex/Semtex/Out/Logs";
+    var shouldLogToFile = true;
+#else
+    var shouldLogToFile = false;
+    var outputPath = ""; 
+#endif
 
 Command GetCheckCommand(){
     var checkCommand = new Command("check");
@@ -21,6 +28,7 @@ Command GetCheckCommand(){
     var explicitProjectMapOption = new Option<string?>("--explicit-project-map-filepath", "Pass a file containing a map from document path to list of projects that that document is part of. If not passed then it is assumed that the document is a member of the closest project that is an ancestor.");
     // TODO Test this
     var analyzerConfigPathOption = new Option<string?>("--analyzer-config-path","custom configuration to pass to the analyzers");
+    var verbosityOption = new Option<LogLevel>("--verbosity", () => LogLevel.Information, "Set the logging verbosity level");
     checkCommand.AddArgument(repoArgument);
     checkCommand.AddArgument(targetArgument);
     checkCommand.AddOption(sourceOption);
@@ -28,9 +36,10 @@ Command GetCheckCommand(){
     checkCommand.AddOption(analyzerConfigPathOption);
     checkCommand.AddOption(projFilterOption);
     checkCommand.AddOption(explicitProjectMapOption);
-    checkCommand.SetHandler(async (repo, target, source, allAncestors, analyzerConfigPath, projFilter, explicitProjectMap) =>
+    checkCommand.AddOption(verbosityOption);
+    checkCommand.SetHandler(async (repo, target, source, allAncestors, analyzerConfigPath, projFilter, explicitProjectMap, verbosity) =>
     {
-        SemtexLog.InitializeLogging(outputPath);
+        SemtexLog.InitializeLogging(verbosity, shouldLogToFile, outputPath);
         var analyzerConfigPathTyped = analyzerConfigPath == null ? null : new AbsolutePath(analyzerConfigPath);
         var explicitProjectMapTyped = explicitProjectMap == null ? null : new AbsolutePath(explicitProjectMap);
 
@@ -51,39 +60,7 @@ Command GetCheckCommand(){
         {
             returnCode = 1;
         }
-    }, repoArgument, targetArgument, sourceOption, allAncestorsOption, analyzerConfigPathOption, projFilterOption,explicitProjectMapOption);
-    return checkCommand;
-}
-
-Command GetCheckUncommittedCommand(){
-    // TODO descriptions need work.
-    var checkCommand = new Command("modified");
-    var pathArgument = new Argument<string>("path", "path to local git repo");
-    var stagedArgument = new Option<bool>("--staged", ()=> false ,"If true we will look at staged files");
-    var projFilterOption = new Option<string?>("--project-filter", "Only consider changes in one project. Useful for debugging any issues.");
-    var analyzerConfigPathOption = new Option<string?>("--analyzer-config-path","custom configuration to pass to the analyzers");
-    var explicitProjectMapOption = new Option<string?>("--explicit-project-map-filepath", "Pass a file containing a map from document path to list of projects that that document is part of. If not passed then it is assumed that the document is a member of the closest project that is an ancestor.");
-    
-    checkCommand.AddArgument(pathArgument);
-    checkCommand.AddOption(stagedArgument);
-    checkCommand.AddOption(analyzerConfigPathOption);
-    checkCommand.AddOption(projFilterOption);
-    checkCommand.AddOption(explicitProjectMapOption);
-    checkCommand.SetHandler(async (path, staged, analyzerConfigPath, projFilter, explicitProjectMap) =>
-    {
-        SemtexLog.InitializeLogging(outputPath);
-        var analyzerConfigPathTyped = analyzerConfigPath == null ? null : new AbsolutePath(analyzerConfigPath);
-        var pathTyped = new AbsolutePath(path);
-        var projFilterTyped = new AbsolutePath(path);
-        var explicitProjectMapTyped = new AbsolutePath(path);
-        var passedCheck = await Commands.RunModified(pathTyped, analyzerConfigPathTyped, staged, projFilterTyped, explicitProjectMapTyped)
-            .ConfigureAwait(false);
-
-        if (!passedCheck)
-        {
-            returnCode = 1;
-        }
-    }, pathArgument, stagedArgument, analyzerConfigPathOption, projFilterOption, explicitProjectMapOption);
+    }, repoArgument, targetArgument, sourceOption, allAncestorsOption, analyzerConfigPathOption, projFilterOption,explicitProjectMapOption, verbosityOption);
     return checkCommand;
 }
 
@@ -92,13 +69,15 @@ Command GetComputeProjectMappingCommand()
     var projMappingCommand = new Command("computeProjectFileMap");
     var slnPathArg = new Argument<string>("sln-path", "Path to .sln file");
     var outPathArg = new Argument<string>("output-file-path", "where to write the result");
+    var verbosityOption = new Option<LogLevel>("--verbosity", () => LogLevel.Information, "Set the logging verbosity level");
     projMappingCommand.AddArgument(slnPathArg);
     projMappingCommand.AddArgument(outPathArg);
-    projMappingCommand.SetHandler(async (slnPath, outPath) =>
+    projMappingCommand.AddOption(verbosityOption);
+    projMappingCommand.SetHandler(async (slnPath, outPath, verbosity) =>
     {
-        SemtexLog.InitializeLogging(outputPath);
+        SemtexLog.InitializeLogging(verbosity, shouldLogToFile, outputPath);
         await Commands.ComputeProjectMapping(new AbsolutePath(slnPath), outPath).ConfigureAwait(false);
-    }, slnPathArg, outPathArg);
+    }, slnPathArg, outPathArg,verbosityOption);
     return projMappingCommand;
 }
 
@@ -110,15 +89,18 @@ Command GetSplitCommand()
     var baseArg = new Argument<string>("base", () => "HEAD", "branch or sha to compare against");
     var includeUncommittedOption = new Option<IncludeUncommittedChanges>("--includeUncommitted", ()=>IncludeUncommittedChanges.Staged, "Include uncommitted changes");
     var projectMapOption = new Option<string?>("--project-map", "Location of the file -> project mapping. See the computeProjectFileMap command for more information");
+    var verbosityOption = new Option<LogLevel>("--verbosity", () => LogLevel.Information, "Set the logging verbosity level");
     splitCommand.AddArgument(repoArg);
     splitCommand.AddArgument(baseArg);
     splitCommand.AddOption(includeUncommittedOption);
     splitCommand.AddOption(projectMapOption);
-    splitCommand.SetHandler(async (repoPath, baseValue, includeUncommited, projectMap) =>
+    splitCommand.AddOption(verbosityOption);
+
+    splitCommand.SetHandler(async (repoPath, baseValue, includeUncommited, projectMap, verbosity) =>
     {
-        SemtexLog.InitializeLogging(outputPath);
+        SemtexLog.InitializeLogging(verbosity, shouldLogToFile, outputPath);
         await Commands.Split(repoPath, baseValue, includeUncommited, projectMap).ConfigureAwait(false);
-    }, repoArg, baseArg,includeUncommittedOption,projectMapOption);
+    }, repoArg, baseArg,includeUncommittedOption,projectMapOption,verbosityOption);
     return splitCommand;
 }
 
@@ -129,22 +111,23 @@ Command GetSplitRemoteCommand()
     var targetArg = new Argument<string>("target", "branch or sha to compare against");
     var baseOption = new Option<string>("--base", () => "master", "base branch or sha");
     var projectMapOption = new Option<string?>("--project-map", "Location of the file -> project mapping. See the computeProjectFileMap command for more information");
+    var verbosityOption = new Option<LogLevel>("--verbosity", () => LogLevel.Information, "Set the logging verbosity level");
     splitCommand.AddArgument(repoArg);
     splitCommand.AddArgument(targetArg);
     splitCommand.AddOption(baseOption);
     splitCommand.AddOption(projectMapOption);
-    splitCommand.SetHandler(async (repo, target, baseCommit, projectMap) =>
+    splitCommand.AddOption(verbosityOption);
+    splitCommand.SetHandler(async (repo, target, baseCommit, projectMap, verbosity) =>
     {
-        SemtexLog.InitializeLogging(outputPath);
+        SemtexLog.InitializeLogging(verbosity, shouldLogToFile, outputPath);
         await Commands.SplitRemote(repo, target, baseCommit, projectMap).ConfigureAwait(false);
-    }, repoArg, targetArg, baseOption, projectMapOption);
+    }, repoArg, targetArg, baseOption, projectMapOption,verbosityOption);
     return splitCommand;
 }
 
 
 var rootCommand = new RootCommand("Semtex - Remove the Git friction that is discouraging you from making improvements to your C# codebase");
 rootCommand.AddCommand(GetCheckCommand());
-rootCommand.AddCommand(GetCheckUncommittedCommand());
 rootCommand.AddCommand(GetComputeProjectMappingCommand());
 rootCommand.AddCommand(GetSplitCommand());
 rootCommand.AddCommand(GetSplitRemoteCommand());

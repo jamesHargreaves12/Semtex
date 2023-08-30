@@ -10,8 +10,6 @@ internal class FileLogger : ILogger
     private readonly string _timestampFormat;
     private static object _lock = new object();
     
-    // Cheap and dirty way of turning off file logging in the tests.
-    internal static bool ActuallyWriteToFile = true; 
     public FileLogger(string path, string category, string timestampFormat)
     {
         _filePath = path;
@@ -34,9 +32,6 @@ internal class FileLogger : ILogger
         var message = formatter(state, exception);
         var logLine = SemtexLogFormatting.FormatLog(logLevel, _timestampFormat, _category, message);
         
-        if(!ActuallyWriteToFile)
-            return;
-
         lock (_lock)
         {
             File.AppendAllText(_filePath, logLine + "\n");

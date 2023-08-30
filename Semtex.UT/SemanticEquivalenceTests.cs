@@ -9,6 +9,7 @@ using FluentAssertions;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.Text;
+using Microsoft.Extensions.Logging;
 using Semtex.Logging;
 using Semtex.Models;
 
@@ -330,9 +331,8 @@ public class SemanticEquivalenceTests
 
     static SemanticEquivalenceTests()
     {
-        SemtexLog.InitializeLogging(".");
+        SemtexLog.InitializeLogging(LogLevel.Debug, false, "");
 
-        FileLogger.ActuallyWriteToFile = false;
         // Using the fact that stuff is all immutable in Roslyn we can pay a one off setup cost for this workspace and utils.
         // This also improves the caching of compiles between multiple tests for 91 tests this results in a approx 50% reduction in test time.
         (BaseProjectId, BaseSolution) = SetupProjectAndSolution();

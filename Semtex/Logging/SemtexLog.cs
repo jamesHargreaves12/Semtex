@@ -8,15 +8,16 @@ internal static class SemtexLog
     // This is trash.
     public static ILoggerFactory LoggerFactory = null!;
 
-    public static void InitializeLogging(string outputPath)
+    public static void InitializeLogging(LogLevel verbosity, bool shouldLogToFile, string logDirectory)
     {
         const string timestampFormat = "HH:mm:ss.fff";
-        var logPath = $"{outputPath}/Logs/{DateTime.Now:yyyy-M-d_HH-mm-ss}.txt";
+        var logPath = $"{logDirectory}/{DateTime.Now:yyyy-M-d_HH-mm-ss}.txt";
         var logFolder = Directory.GetParent(logPath)!.ToString();
         if (!Directory.Exists(logFolder)) Directory.CreateDirectory(logFolder);
         LoggerFactory = Microsoft.Extensions.Logging.LoggerFactory.Create(builder =>
         {
             builder
+                .AddFilter("", verbosity)
                 .AddFilter("Microsoft", LogLevel.Warning)
                 .AddFilter("System", LogLevel.Warning)
                 .AddFilter("LoggingConsoleApp.Program", LogLevel.Debug)
@@ -28,8 +29,8 @@ internal static class SemtexLog
                 {
                     options.TimestampFormat = timestampFormat;
                 });
-
-            builder.AddProvider(new SemtexLoggingProvider(logPath, timestampFormat));
+            if(shouldLogToFile)
+                builder.AddProvider(new SemtexLoggingProvider(logPath, timestampFormat));
         });
     }
 

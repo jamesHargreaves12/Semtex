@@ -382,7 +382,6 @@ public sealed class SafeAnalyzers
     {
         "RCS1056", // Since fixing the first might change the fix you need to apply for the second its just safest to ignore this for now.
         "RCS1220", // Adds variables and is not smart enough to ensure they are distinct, TODO fix the code fix provider.
-        "CS0219" // not entirely sure why not as it looks like it should be supported but this one fails: check https://github.com/cyanfish/naps2.git 0fa3d47edfbef159f986d9581bf9177bd52d4d1e --source 0fa3d47edfbef159f986d9581bf9177bd52d4d1e~1
     };
     private static async Task<Solution> MakeCodeFixForAllDiagnostic(Document document,
         // this arg should not exist = simplify the interface
