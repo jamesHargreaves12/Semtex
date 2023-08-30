@@ -13,9 +13,8 @@ namespace Semtex;
 public sealed class CheckSemanticEquivalence
 {
     private static readonly ILogger<CheckSemanticEquivalence> Logger = SemtexLog.LoggerFactory.CreateLogger<CheckSemanticEquivalence>();
-    public static bool FailFast = true;// TODO
     internal static async Task<CommitModel> CheckSemanticallyEquivalent(GitRepo gitRepo, string target,
-        AbsolutePath? analyzerConfigPath, AbsolutePath? projFilter, AbsolutePath? projectMappingFilepath)
+        AbsolutePath? analyzerConfigPath, AbsolutePath? projFilter, AbsolutePath? projectMappingFilepath, bool failFast)
     {
         var source = $"{target}~1";
         var stopWatch = Stopwatch.StartNew();
@@ -127,7 +126,7 @@ public sealed class CheckSemanticEquivalence
             var commandline = GetReproCommandline(gitRepo, target, source, e.ProjectPath);
             Logger.LogWarning("Unexpected error: to reproduce the error use the following commandline args: \n {Commandline}",
                 commandline);
-            if (FailFast)
+            if (failFast)
             {
                 throw;
             }

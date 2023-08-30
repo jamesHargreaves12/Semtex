@@ -14,6 +14,15 @@ public sealed class Commands
     private static readonly string ScratchSpacePath = Path.Join(Path.GetTempPath(), "Semtex");
 
     private static readonly ILogger<Commands> Logger = SemtexLog.LoggerFactory.CreateLogger<Commands>();
+    // If true then any errors that we unhandled errors within the solution logic will be unhandled. If false then the
+    // run will complete reporting the status for the C# files as UnexpectedError - Matters most in
+    // the case of --all-ancestors.
+    private const bool DefaultFailFast =
+#if DEBUG
+    true;
+#else
+    false;
+#endif
 
     public static async Task<bool> Run(string repoPathOrUrl, string target, string source, AbsolutePath? analyzerConfigPath, string? relativeProjFilter, AbsolutePath? explicitProjectFileMap)
     {
@@ -40,7 +49,7 @@ public sealed class Commands
         foreach (var c in commits)
         {
             Logger.LogInformation("Checking {C}",c);
-            var result = await CheckSemanticEquivalence.CheckSemanticallyEquivalent(gitRepo,c, analyzerConfigPath, projFilter, explicitProjectFileMap).ConfigureAwait(false);
+            var result = await CheckSemanticEquivalence.CheckSemanticallyEquivalent(gitRepo,c, analyzerConfigPath, projFilter, explicitProjectFileMap, DefaultFailFast).ConfigureAwait(false);
             var resultSummary = await DisplayResults.GetPrettySummaryOfResultsAsync(result, gitRepo).ConfigureAwait(false);
             Logger.LogInformation("Results for {C}", c);
             Logger.LogInformation("\n\n{ResultSummary}", resultSummary);
@@ -85,7 +94,7 @@ public sealed class Commands
         foreach (var (c,i) in commits.Select((x,i)=> (x,i)))
         {
             Logger.LogInformation("Progress = {Pct}%, Now checking {C} ", i*100/commits.Count , c);
-            var result = await CheckSemanticEquivalence.CheckSemanticallyEquivalent(gitRepo, c, analyzerConfigPath, projFilter, projectMappingFilepath)
+            var result = await CheckSemanticEquivalence.CheckSemanticallyEquivalent(gitRepo, c, analyzerConfigPath, projFilter, projectMappingFilepath, DefaultFailFast)
                 .ConfigureAwait(false);
             var prettySummary = await DisplayResults.GetPrettySummaryOfResultsAsync(result, gitRepo).ConfigureAwait(false);
             Logger.LogInformation("Results for {C}",c);
@@ -122,7 +131,7 @@ public sealed class Commands
         var gitRepo = await CreateGitRepoWithLocalChangesCommitted(path, staged ? IncludeUncommittedChanges.Staged : IncludeUncommittedChanges.Unstaged);
         var commitSha = await gitRepo.GetCurrentCommitSha().ConfigureAwait(false);
         
-        var result = await CheckSemanticEquivalence.CheckSemanticallyEquivalent(gitRepo, commitSha, analyzerConfigPath, projFilter, explicitProjectFileMap)
+        var result = await CheckSemanticEquivalence.CheckSemanticallyEquivalent(gitRepo, commitSha, analyzerConfigPath, projFilter, explicitProjectFileMap, DefaultFailFast)
             .ConfigureAwait(false);
         var prettySummary = await DisplayResults.GetPrettySummaryOfResultsAsync(result, gitRepo, "A commit with local changes").ConfigureAwait(false);
         Logger.LogInformation("\n\n{PrettySummary}",prettySummary);
@@ -191,7 +200,7 @@ public sealed class Commands
     private static async Task FindSplit(GitRepo gitRepo, string commit, AbsolutePath? projectMapPath)
     {
         var result = await CheckSemanticEquivalence
-            .CheckSemanticallyEquivalent(gitRepo, commit, null, null, projectMappingFilepath: projectMapPath)
+            .CheckSemanticallyEquivalent(gitRepo, commit, null, null, projectMappingFilepath: projectMapPath, DefaultFailFast)
             .ConfigureAwait(false);
         // Create a patch of the difference between target and source and then apply that.
         var semanticallyEquivalentStatuses = new[] {Status.SemanticallyEquivalent, Status.OnlyRename, Status.SafeFile }; // Need to Consider SomeMethodsEquivalent
