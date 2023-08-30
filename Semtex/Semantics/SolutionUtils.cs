@@ -380,8 +380,11 @@ internal sealed class SolutionUtils
         "netstandard2.0",
         "netstandard2.1",
         "net5.0",
+        "net5",
         "net6.0",
+        "net6",
         "net7.0",
+        "net7",
     };
 
 
