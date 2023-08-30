@@ -42,7 +42,9 @@ internal sealed class SolutionUtils
         var stopwatch = Stopwatch.StartNew();
         var (sln, failedToRestore) = await LoadSolutionImpl(projectPaths).ConfigureAwait(false);
         Logger.LogInformation(SemtexLog.GetPerformanceStr(nameof(LoadSolutionImpl), stopwatch.ElapsedMilliseconds));
-
+        var toSimplify = projectPaths.Where(p => !failedToRestore.Contains(p)).ToHashSet();
+        sln = FilterSolutionToHighestTargetVersionOfProjects(sln, toSimplify);
+        
         stopwatch.Restart();
         HashSet<AbsolutePath> failedToCompile;
         try
@@ -68,7 +70,8 @@ internal sealed class SolutionUtils
             }
             Logger.LogInformation("Reloading solution");
             (sln, var failedToRestore2) = await LoadSolutionImpl(projectPaths).ConfigureAwait(false);
-            
+            sln = FilterSolutionToHighestTargetVersionOfProjects(sln, toSimplify);
+
             failedToRestore.AddRange(failedToRestore2);
             failedToCompile = await CheckProjectsCompile(sln, projectPaths).ConfigureAwait(false);
             if (failedToCompile.Any())
@@ -84,7 +87,7 @@ internal sealed class SolutionUtils
             Logger.LogInformation(SemtexLog.GetPerformanceStr(nameof(LoadSolution)+"-Reload", stopwatch.ElapsedMilliseconds));
         }
 
-        var toSimplify = projectPaths.Where(p => !failedToRestore.Contains(p) && !failedToRestore.Contains(p)).ToHashSet();
+        toSimplify = projectPaths.Where(p => !failedToCompile.Contains(p) && !failedToRestore.Contains(p)).ToHashSet();
         // TODO can we pull this up so that we never load them. Would help with the long load times of big solutions.
         sln = FilterSolutionToHighestTargetVersionOfProjects(sln, toSimplify);
 
