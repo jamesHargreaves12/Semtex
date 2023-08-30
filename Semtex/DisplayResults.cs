@@ -134,6 +134,15 @@ public static class DisplayResults
             "❌",
             "Unable to find .csproj file:"
         );
+        var unexpectedError = result.FileModels
+            .Where(f => f.Status == Status.UnexpectedError)
+            .ToList();
+        AddSectionIfNotEmpty(
+            resultSummary,
+            unexpectedError,
+            "❌",
+            "Unexpected Error Occurred"
+        );
 
         return resultSummary.ToString();
     }

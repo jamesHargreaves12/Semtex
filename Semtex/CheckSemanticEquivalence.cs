@@ -13,7 +13,7 @@ namespace Semtex;
 public sealed class CheckSemanticEquivalence
 {
     private static readonly ILogger<CheckSemanticEquivalence> Logger = SemtexLog.LoggerFactory.CreateLogger<CheckSemanticEquivalence>();
-
+    public static bool FailFast = true;// TODO
     internal static async Task<CommitModel> CheckSemanticallyEquivalent(GitRepo gitRepo, string target,
         AbsolutePath? analyzerConfigPath, AbsolutePath? projFilter, AbsolutePath? projectMappingFilepath)
     {
@@ -125,12 +125,44 @@ public sealed class CheckSemanticEquivalence
         catch (SemtexCompileException e)
         {
             var commandline = GetReproCommandline(gitRepo, target, source, e.ProjectPath);
-            Logger.LogInformation("To reproduce the error use the following commandline args: \n {Commandline}", commandline);
-            throw;
+            Logger.LogWarning("Unexpected error: to reproduce the error use the following commandline args: \n {Commandline}",
+                commandline);
+            if (FailFast)
+            {
+                throw;
+            }
+
+            Logger.LogError(e.ToString());
+
+            var srcUnexpectErrorSummary = new UnsimplifiedFilesSummary(
+                new HashSet<AbsolutePath>(),
+                new HashSet<AbsolutePath>(),
+                new HashSet<AbsolutePath>(),
+                new HashSet<AbsolutePath>(),
+                diffConfig.SourceCsFilepaths.ToHashSet()
+            );
+            var tgtUnexpectedErrorSummary = new UnsimplifiedFilesSummary(
+                new HashSet<AbsolutePath>(),
+                new HashSet<AbsolutePath>(),
+                new HashSet<AbsolutePath>(),
+                new HashSet<AbsolutePath>(),
+                diffConfig.TargetCsFilepaths.ToHashSet()
+            );
+            var result = await GetFileModels(
+                gitRepo,
+                diffConfig,
+                new SimplifiedSolutionSummary(null, new HashSet<ProjectId>(), srcUnexpectErrorSummary),
+                new SimplifiedSolutionSummary(null, new HashSet<ProjectId>(),tgtUnexpectedErrorSummary),
+                new Dictionary<AbsolutePath, HashSet<MethodIdentifier>>()
+            ).ConfigureAwait(false);
+            return new CommitModel(target, result, stopWatch.ElapsedMilliseconds, diffConfig)
+            {
+                CommitHash = target
+            };
         }
         
     }
-
+    
     internal static async Task<(Solution srcSln, Solution targetSln)> CoSimplifySolutions(Solution srcSln, Solution targetSln, HashSet<ProjectId> sourceProjectIds, HashSet<ProjectId> targetProjectIds, IEnumerable<(AbsolutePath, AbsolutePath)> filepaths)
     {
         foreach (var (sourceFilepath,targetFilepath) in filepaths)
@@ -271,7 +303,7 @@ public sealed class CheckSemanticEquivalence
         // Because a single project can appear multiple times in a solution if it has multiple target frameworks then we should only pick one.
         // Even though we do a best effort attempt at removing multiple target versions above this can still occur due to the need to check dependencies.
         return (slnStart,new UnsimplifiedFilesSummary(filepathsWithIfPreprocessor, filepathsInFailedToCompile, unableToFindProj,
-            filepathsInFailedToRestore),projectIdsToSimplify);
+            filepathsInFailedToRestore, new HashSet<AbsolutePath>()),projectIdsToSimplify);
     }
 
 
@@ -377,6 +409,13 @@ public sealed class CheckSemanticEquivalence
                     renamed => renamed.Source == sourceFilepath && renamed.Similarity == 100))
             {
                 fileResults.Add(new FileModel(relativePath, Status.OnlyRename));
+                continue;
+            }
+            
+            if (simplifiedTargetSolution.UnsimplifiedFilesSummary.FilepathsWithUnexpectedErrors.Contains(targetFilepath)
+                || simplifiedSrcSolution.UnsimplifiedFilesSummary.FilepathsWithUnexpectedErrors.Contains(sourceFilepath))
+            {
+                fileResults.Add(new FileModel(relativePath, Status.UnexpectedError));
                 continue;
             }
 

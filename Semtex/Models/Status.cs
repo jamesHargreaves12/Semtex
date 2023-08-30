@@ -14,4 +14,5 @@ public enum Status
     OnlyRename = 9,
     SafeFile = 10,
     SubsetOfDiffEquivalent = 11,
+    UnexpectedError = 12
 }
