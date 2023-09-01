@@ -21,7 +21,7 @@ public class LocalVariableRenamer
             return new List<(ISymbol, string)>();
         var leftDeclaredVariables = leftSemanticModel.AnalyzeDataFlow(left.Body).VariablesDeclared;
         var rightDeclaredVariables = rightSemanticModel.AnalyzeDataFlow(right.Body).VariablesDeclared;
-        Logger.LogInformation(SemtexLog.GetPerformanceStr("GetVariableIdentifiers", sw.ElapsedMilliseconds));
+        Logger.LogDebug(SemtexLog.GetPerformanceStr("GetVariableIdentifiers", sw.ElapsedMilliseconds));
 
         var leftOccursSingleTime = leftDeclaredVariables.GroupBy(x => x.Name)
             .Where(x => x.Count() == 1)
@@ -96,7 +96,7 @@ public class LocalVariableRenamer
                 var type = node is FromClauseSyntax fromClause
                     ? semanticModel.GetTypeInfo(fromClause.Expression).Type?.ToDisplayString()
                     : null;
-                Logger.LogInformation("Unable to get type info for {NameofIRangeVariableSymbol} {Symbol}, will use UNKNOWN",
+                Logger.LogDebug("Unable to get type info for {NameofIRangeVariableSymbol} {Symbol}, will use UNKNOWN",
                     nameof(IRangeVariableSymbol), symbol);
 
                 // The type will actually be the type of the 

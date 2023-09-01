@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using System.Diagnostics;
 using Semtex.Rewriters;
 using Microsoft.CodeAnalysis;
@@ -19,10 +20,11 @@ internal class SemanticSimplifier
         Solution sln, HashSet<ProjectId> projectIds, HashSet<AbsolutePath> documentsToSimplify, AbsolutePath? analyzerConfigPath,
         Dictionary<AbsolutePath, HashSet<MethodIdentifier>> changedMethodsMap)
     {
-        foreach (var projId in projectIds) // This could 100% be parallelized for speed - for now won't do this as the logging becomes more difficult.
+        var progressBar = new ProgressBar<SemanticSimplifier>(projectIds.Count, Logger);
+        foreach (var (i,projId) in projectIds.Select((x,i)=>(i,x))) // This could 100% be parallelized for speed - for now won't do this as the logging becomes more difficult.
         {
+            progressBar.Update(i);
             var proj = sln.GetProject(projId)!;
-            Logger.LogInformation("Processing {ProjName}", proj.Name);
             var docsToSimplify = proj.Documents.Where(d=>documentsToSimplify.Contains(new AbsolutePath(d.FilePath!))).ToList();
             var docIdsToSimplify = docsToSimplify.Select(d => d.Id).ToList();
 
@@ -34,9 +36,13 @@ internal class SemanticSimplifier
                 );
             
             // Simplify docs
-            sln = await SafeAnalyzers.Apply(sln, projId, docIdsToSimplify, analyzerConfigPath, idToChangedMethodsMap).ConfigureAwait(false);
+            var progress = new Progress<double>();
+            progress.ProgressChanged += (_, value) => progressBar.Update(i + 0.9 * value);
+            sln = await SafeAnalyzers.Apply(sln, projId, docIdsToSimplify, analyzerConfigPath, idToChangedMethodsMap, progress).ConfigureAwait(false);
+            progressBar.Update(i+0.9);
             sln = await ApplyRewriters(sln, docIdsToSimplify).ConfigureAwait(false);
         }
+        progressBar.Update(projectIds.Count);
 
         return sln;
     }
@@ -69,7 +75,7 @@ internal class SemanticSimplifier
             sln = sln.WithDocumentSyntaxRoot(doc.Id, (await simplifiedDoc.GetSyntaxRootAsync().ConfigureAwait(false))!);
         }
         
-        Logger.LogInformation(SemtexLog.GetPerformanceStr(nameof(ApplyRewriters), sw.ElapsedMilliseconds));
+        Logger.LogDebug(SemtexLog.GetPerformanceStr(nameof(ApplyRewriters), sw.ElapsedMilliseconds));
         return sln;
     }
 

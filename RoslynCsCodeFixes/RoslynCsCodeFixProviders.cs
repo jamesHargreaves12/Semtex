@@ -32,9 +32,10 @@ public static class RoslynCsCodeFixProviders
     public static Dictionary<string, CodeFixProvider> SupportedCodeFixes =
         new()
         {
+            ["CS8019"]= GetRoslynCodeFixProvider("Microsoft.CodeAnalysis.CSharp.RemoveUnnecessaryImports.CSharpRemoveUnnecessaryImportsCodeFixProvider"),
+            // TODO I checked out this guy and its really not doing anything smart. I should just reimplementl it.
             ["CS0219"]= GetRoslynCodeFixProvider("Microsoft.CodeAnalysis.CSharp.RemoveUnusedVariable.CSharpRemoveUnusedVariableCodeFixProvider"),
             ["CS0168"]= GetRoslynCodeFixProvider("Microsoft.CodeAnalysis.CSharp.RemoveUnusedVariable.CSharpRemoveUnusedVariableCodeFixProvider"),
-            ["CS8019"]= GetRoslynCodeFixProvider("Microsoft.CodeAnalysis.CSharp.RemoveUnnecessaryImports.CSharpRemoveUnnecessaryImportsCodeFixProvider")
         };
 
     public static Dictionary<string, string?> SupportedCodeFixesEquivalentKeys =

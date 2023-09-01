@@ -34,26 +34,26 @@ public sealed class SemanticEqualBreakdown
 
     internal static async Task<OneOf<DifferencesLimitedToFunctions, CouldntLimitToFunctions>> GetSemanticallyUnequal(Document left, Document right)
     {
-        Logger.LogInformation("Checking Semantic Equality for {LeftFilePath}", left.FilePath);
+        Logger.LogDebug("Checking Semantic Equality for {LeftFilePath}", left.FilePath);
         var leftTree = await left.GetSyntaxTreeAsync().ConfigureAwait(false);
         var rightTree = await right.GetSyntaxTreeAsync().ConfigureAwait(false);
         var leftRoot = await leftTree!.GetRootAsync().ConfigureAwait(false);
         var rightRoot = await rightTree!.GetRootAsync().ConfigureAwait(false);
 
         // return leftRoot.ToString() == rightRoot.ToString();
-        Logger.LogInformation("Getting left semantic model");
+        Logger.LogDebug("Getting left semantic model");
         var leftCompilation = await left.Project.GetCompilationAsync().ConfigureAwait(false);
         var leftSemanticModel = leftCompilation!.GetSemanticModel(leftTree!);
-        Logger.LogInformation("Getting right semantic model");
+        Logger.LogDebug("Getting right semantic model");
         var rightCompilation = await right.Project.GetCompilationAsync().ConfigureAwait(false);
         var rightSemanticModel = rightCompilation!.GetSemanticModel(rightTree!);
-        Logger.LogInformation("Evaluating Equality");
+        Logger.LogDebug("Evaluating Equality");
 
 
         var res = await GetSemanticallyUnequal(leftRoot, rightRoot, leftSemanticModel, rightSemanticModel, left, right).ConfigureAwait(false); // We can just push down the semantic model getting now that we are passing down the document.
         if (res.IsT0 && res.AsT0.MethodIdentifiers.Any())
         {
-            Logger.LogInformation("Resulting diffs = " + string.Join(",", res.AsT0.MethodIdentifiers));
+            Logger.LogDebug("Resulting diffs = " + string.Join(",", res.AsT0.MethodIdentifiers));
         }
         
         return res;
@@ -195,7 +195,7 @@ public sealed class SemanticEqualBreakdown
         var sw = Stopwatch.StartNew();
         var proposedRenames = await LocalVariableRenamer.GetProposedLocalVariableRenames(left, right, leftSemanticModel, rightSemanticModel,
             leftDocument, rightDocument).ConfigureAwait(false);
-        Logger.LogInformation(SemtexLog.GetPerformanceStr(nameof(LocalVariableRenamer.GetProposedLocalVariableRenames), sw.ElapsedMilliseconds));
+        Logger.LogDebug(SemtexLog.GetPerformanceStr(nameof(LocalVariableRenamer.GetProposedLocalVariableRenames), sw.ElapsedMilliseconds));
 
         if (LocalStatementsEquality.SemanticallyEqualLocalStatements(left.Body.Statements, right.Body.Statements, leftSemanticModel, rightSemanticModel, proposedRenames))
         {

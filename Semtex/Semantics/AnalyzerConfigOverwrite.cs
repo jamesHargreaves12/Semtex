@@ -30,19 +30,19 @@ public sealed class AnalyzerConfigOverwrite
             .Where(x=>x.Name != whitelistConfigDocumentName)
             .ToList();
         
-        Logger.LogWarning(
+        Logger.LogDebug(
             $"Stripping out Existing config documents {string.Join(",", configDocuments.Select(c => c.FilePath))}");
         var newSln = sln.RemoveAnalyzerConfigDocuments(configDocuments.Select(d => d.Id).ToImmutableArray());
 
         string configText;
         if (analyzerConfigPath is not null)
         {
-            Logger.LogInformation("Adding {AnalyzerConfigPath} to the proj", analyzerConfigPath.Path);
+            Logger.LogDebug("Adding {AnalyzerConfigPath} to the proj", analyzerConfigPath.Path);
             configText = await File.ReadAllTextAsync(analyzerConfigPath.Path).ConfigureAwait(false);
         }
         else
         {
-            Logger.LogInformation("Adding a dynamically generated analyzer config to the project");
+            Logger.LogDebug("Adding a dynamically generated analyzer config to the project");
             var analyzerConfigFolder = Directory.GetParent(typeof(AnalyzerConfigOverwrite).Assembly.Location)!.ToString();
             configText = await File.ReadAllTextAsync(Path.Join(analyzerConfigFolder, ".analyzerconfig")).ConfigureAwait(false);
 

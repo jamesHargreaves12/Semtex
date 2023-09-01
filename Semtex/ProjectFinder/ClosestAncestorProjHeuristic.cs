@@ -14,14 +14,14 @@ public sealed class ClosestAncestorProjHeuristic : IProjFinder
 
         if(projFilter is not null)
         {
-            Logger.LogInformation("Project filter limiting project to only {FilePath}", projFilter.Path);
+            Logger.LogDebug("Project filter limiting project to only {FilePath}", projFilter.Path);
         }
 
         var fileToProj = new List<(AbsolutePath Path, AbsolutePath projPath)>();
         var unableToFindProj = new HashSet<AbsolutePath>();
         foreach (var filepath in filepaths)
         {
-            Logger.LogInformation("Finding .csproj file for {FilePath}", filepath.Path);
+            Logger.LogDebug("Finding .csproj file for {FilePath}", filepath.Path);
             try
             {
                 var projPath = GetProjByClosestAncestorHeuristic(filepath);
@@ -67,7 +67,7 @@ public sealed class ClosestAncestorProjHeuristic : IProjFinder
                     continue;
                 case 1:
                     var projFile = csProjFilesInDir.Single();
-                    Logger.LogInformation("Project {ProjFile} is closest ancestor", projFile);
+                    Logger.LogDebug("Project {ProjFile} is closest ancestor", projFile);
                     return new AbsolutePath(projFile);
                 default:
                     throw new UnableToFindProjectException(

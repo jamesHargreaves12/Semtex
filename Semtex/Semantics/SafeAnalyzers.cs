@@ -167,13 +167,13 @@ public sealed class SafeAnalyzers
         "RCS1213", // Unused Member
     };
     internal static async Task<Solution> Apply(Solution sln, ProjectId projId, List<DocumentId> documentIds,
-        AbsolutePath? analyzerConfigPath, Dictionary<DocumentId, HashSet<MethodIdentifier>> changedMethodsMap)
+        AbsolutePath? analyzerConfigPath, Dictionary<DocumentId, HashSet<MethodIdentifier>> changedMethodsMap, IProgress<double> progress)
     {
         // Clone the set so that any edits don't effect caller.
         var currentDocumentIds = new HashSet<DocumentId>(documentIds);
         var currentSolution = await AnalyzerConfigOverwrite.ReplaceAnyAnalyzerConfigDocuments(sln, projId, currentDocumentIds, analyzerConfigPath).ConfigureAwait(false);
         
-        Logger.LogInformation("Starting Applying Diagnostic Fixes");
+        Logger.LogDebug("Starting Applying Diagnostic Fixes");
         
         // We tried to fix it but it didn't change the solution so we pull it from the set of diagnostics that will be considered for this file.
         var diagnosticsThatDidntMakeFix = new HashSet<(string filename,string diagnosticId)>();
@@ -184,6 +184,7 @@ public sealed class SafeAnalyzers
 
         foreach (var _ in Enumerable.Range(0,1000)) // If we hit 1000 we have almost certainly hit an inf loop
         {
+            progress.Report(1 - (double)currentDocumentIds.Count / documentIds.Count);
             var project = currentSolution.GetProject(projId)!;
 
             var relevantDiagnostics =
@@ -231,7 +232,7 @@ public sealed class SafeAnalyzers
                 var diagnosticsToApply = groupedDiagnostics.First();
                 var descriptorId = diagnosticsToApply.Key;
 
-                Logger.LogInformation("Fixing {DescriptorId} x {N} on {LineSpan}", descriptorId, diagnosticsToApply.Count(),
+                Logger.LogDebug("Fixing {DescriptorId} x {N} on {LineSpan}", descriptorId, diagnosticsToApply.Count(),
                     diagnosticsToApply.First().Location.GetLineSpan());
 
                 var fixProvider = CodeFixProviders[descriptorId];
@@ -250,7 +251,7 @@ public sealed class SafeAnalyzers
                 }
             }
 
-            Logger.LogInformation(SemtexLog.GetPerformanceStr(nameof(MakeCodeFixForAllDiagnostic), sw.ElapsedMilliseconds));
+            Logger.LogDebug(SemtexLog.GetPerformanceStr(nameof(MakeCodeFixForAllDiagnostic), sw.ElapsedMilliseconds));
         }
 
         return currentSolution;
@@ -304,8 +305,8 @@ public sealed class SafeAnalyzers
             diagnostics.AddRange(ds);
         }
 
-        Logger.LogInformation(SemtexLog.GetPerformanceStr("CompilationAndDiagnostics", stopwatch.ElapsedMilliseconds));
-        Logger.LogInformation("{Percent}% from custom analyzers)", (int)(stopwatch2.ElapsedMilliseconds/(float)stopwatch.ElapsedMilliseconds*100));
+        Logger.LogDebug(SemtexLog.GetPerformanceStr("CompilationAndDiagnostics", stopwatch.ElapsedMilliseconds));
+        Logger.LogDebug("{Percent}% from custom analyzers)", (int)(stopwatch2.ElapsedMilliseconds/(float)stopwatch.ElapsedMilliseconds*100));
         
         var analyzerErrors = diagnostics
             .Where(d => d.Descriptor.Id == "AD0001")
@@ -398,7 +399,7 @@ public sealed class SafeAnalyzers
 
         if (CannotFixAllDiagnosticIds.Contains(diagnosticDescriptorId))
         {
-            Logger.LogInformation("Only fixing first due to diagnostic id");
+            Logger.LogDebug("Only fixing first due to diagnostic id");
             return await MakeCodeFixForDiagnostic(document, nonOverlappingDiagnostic.First(d => d.Descriptor.Id == diagnosticDescriptorId), fixProvider)
                 .ConfigureAwait(false);
         }
@@ -414,7 +415,7 @@ public sealed class SafeAnalyzers
         );
         await fixProvider.RegisterCodeFixesAsync(context).ConfigureAwait(false);
         if (sw.ElapsedMilliseconds > 500)
-            Logger.LogInformation(SemtexLog.GetPerformanceStr(nameof(fixProvider.RegisterCodeFixesAsync), sw.ElapsedMilliseconds));
+            Logger.LogDebug(SemtexLog.GetPerformanceStr(nameof(fixProvider.RegisterCodeFixesAsync), sw.ElapsedMilliseconds));
 
         if (!codeActions.Any())
         {
@@ -444,7 +445,7 @@ public sealed class SafeAnalyzers
             var fixAll = await fixAllProvider.GetFixAsync(fixAllContext).ConfigureAwait(false);
             
             if (sw.ElapsedMilliseconds > 500)
-                Logger.LogInformation(SemtexLog.GetPerformanceStr(nameof(fixAllProvider.GetFixAsync), sw.ElapsedMilliseconds));
+                Logger.LogDebug(SemtexLog.GetPerformanceStr(nameof(fixAllProvider.GetFixAsync), sw.ElapsedMilliseconds));
 
             if (fixAll != null)
             {
@@ -453,7 +454,7 @@ public sealed class SafeAnalyzers
                     await fixAll.GetOperationsAsync(CancellationToken.None).ConfigureAwait(false);
                 
                 if (sw.ElapsedMilliseconds > 500)
-                    Logger.LogInformation(SemtexLog.GetPerformanceStr(nameof(fixAll.GetOperationsAsync), sw.ElapsedMilliseconds));
+                    Logger.LogDebug(SemtexLog.GetPerformanceStr(nameof(fixAll.GetOperationsAsync), sw.ElapsedMilliseconds));
 
                 return operations
                     .OfType<ApplyChangesOperation>()
@@ -465,7 +466,7 @@ public sealed class SafeAnalyzers
         {
             Logger.LogError("Failed to apply fixes. {E}", e);
             var source = await document.GetSyntaxTreeAsync();
-            Logger.LogInformation(source!.ToString());
+            Logger.LogDebug(source!.ToString());
             throw;
         }
 

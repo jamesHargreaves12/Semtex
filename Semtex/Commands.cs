@@ -51,8 +51,8 @@ public sealed class Commands
             Logger.LogInformation("Checking {C}",c);
             var result = await CheckSemanticEquivalence.CheckSemanticallyEquivalent(gitRepo,c, analyzerConfigPath, projFilter, explicitProjectFileMap, DefaultFailFast).ConfigureAwait(false);
             var resultSummary = await DisplayResults.GetPrettySummaryOfResultsAsync(result, gitRepo).ConfigureAwait(false);
-            Logger.LogInformation("Results for {C}", c);
-            Logger.LogInformation("\n\n{ResultSummary}", resultSummary);
+            Logger.LogDebug("Results for {C}", c);
+            Logger.LogDebug("\n\n{ResultSummary}", resultSummary);
             results.Add(result);
         }
 
@@ -97,8 +97,8 @@ public sealed class Commands
             var result = await CheckSemanticEquivalence.CheckSemanticallyEquivalent(gitRepo, c, analyzerConfigPath, projFilter, projectMappingFilepath, DefaultFailFast)
                 .ConfigureAwait(false);
             var prettySummary = await DisplayResults.GetPrettySummaryOfResultsAsync(result, gitRepo).ConfigureAwait(false);
-            Logger.LogInformation("Results for {C}",c);
-            Logger.LogInformation("\n\n{PrettySummary}",prettySummary);
+            Logger.LogDebug("Results for {C}",c);
+            Logger.LogDebug("\n\n{PrettySummary}",prettySummary);
 
             var jsonSummaries = results.Select(res => JsonSerializer.Serialize(res));
             await File.WriteAllLinesAsync($"{outputPath.Path}/Results.jsonl", jsonSummaries).ConfigureAwait(false);
@@ -106,7 +106,7 @@ public sealed class Commands
 
             GC.Collect();
             GC.WaitForPendingFinalizers();
-            Logger.LogInformation(SemtexLog.GetPerformanceStr("GC", sw.ElapsedMilliseconds));
+            Logger.LogDebug(SemtexLog.GetPerformanceStr("GC", sw.ElapsedMilliseconds));
             results.Add(result);
         }
 
@@ -134,7 +134,7 @@ public sealed class Commands
         var result = await CheckSemanticEquivalence.CheckSemanticallyEquivalent(gitRepo, commitSha, analyzerConfigPath, projFilter, explicitProjectFileMap, DefaultFailFast)
             .ConfigureAwait(false);
         var prettySummary = await DisplayResults.GetPrettySummaryOfResultsAsync(result, gitRepo, "A commit with local changes").ConfigureAwait(false);
-        Logger.LogInformation("\n\n{PrettySummary}",prettySummary);
+        Logger.LogDebug("\n\n{PrettySummary}",prettySummary);
 
         return result.SemanticallyEquivalent;
     }

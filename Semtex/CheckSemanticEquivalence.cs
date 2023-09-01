@@ -23,7 +23,7 @@ public sealed class CheckSemanticEquivalence
 
         if (diffConfig.SourceCsFilepaths.Count == 0)
         {
-            Logger.LogInformation("Skipping commit {Target} as it has no c# diffs",target);
+            Logger.LogDebug("Skipping commit {Target} as it has no c# diffs",target);
             var fileModels = await GetFileModels(gitRepo, diffConfig, SimplifiedSolutionSummary.Empty(), SimplifiedSolutionSummary.Empty(), new Dictionary<AbsolutePath, HashSet<MethodIdentifier>>())
                 .ConfigureAwait(false);
 
@@ -33,10 +33,11 @@ public sealed class CheckSemanticEquivalence
             };
         }
 
-        Logger.LogInformation("{Count} C# files need to be checked for differences", diffConfig.SourceCsFilepaths.Count);
+        Logger.LogDebug("{Count} C# files need to be checked for differences", diffConfig.SourceCsFilepaths.Count);
 
         try
         {
+            Logger.LogInformation("Setting up Solution...");
             var sourceLineChangeMapping = new Dictionary<AbsolutePath, List<LineDiff>>();
             var targetLineChangeMapping = new Dictionary<AbsolutePath, List<LineDiff>>();
             // If the git diff is R100 then we don't need to bother simplifying as both sides will match.
@@ -73,7 +74,7 @@ public sealed class CheckSemanticEquivalence
                 targetChangedMethodsMap[targetKey] = toCheck;
             }
 
-            Logger.LogInformation("We have a method filter for {Percentage}% of methods ({ChangedCount} files)",(int)(sourceChangedMethodsMap.Count/(float)sourceFilesToSimplify.Count), sourceChangedMethodsMap.Count);
+            Logger.LogDebug("We have a method filter for {Percentage}% of methods ({ChangedCount} files)",(int)(sourceChangedMethodsMap.Count/(float)sourceFilesToSimplify.Count), sourceChangedMethodsMap.Count);
             // Setup the solutions
             await gitRepo.Checkout(target).ConfigureAwait(false);
             var targetProjFinder = GetProjFinder(gitRepo.RootFolder, projectMappingFilepath);
@@ -86,16 +87,17 @@ public sealed class CheckSemanticEquivalence
             sourceFilesToSimplify = sourceFilesToSimplify.Where(fp => !srcUnsimplified.IsUnsimplified(fp)).ToHashSet();
             targetFilesToSimplify = targetFilesToSimplify.Where(fp => !targetUnsimplified.IsUnsimplified(fp)).ToHashSet();
             
+            Logger.LogInformation("Simplifying LHS...");
             // Simplify the solutions by apply rewriters and Analyzers/Code Fixes
             var simplifiedSrcSln = await SemanticSimplifier
                 .GetSolutionWithFilesSimplified(srcSolution, sourceProjectIds, sourceFilesToSimplify, analyzerConfigPath, sourceChangedMethodsMap)
                 .ConfigureAwait(false);
             
+            Logger.LogInformation("Simplifying RHS...");
             var simplifiedTargetSln = await SemanticSimplifier
                 .GetSolutionWithFilesSimplified(targetSolution, targetProjectIds, targetFilesToSimplify, analyzerConfigPath, targetChangedMethodsMap)
                 .ConfigureAwait(false);
 
-            
             // Co simplify here - some changes like renaming make much more sense to do once we have both left and right. Aim is to keep this set of operation small though.
             var filePathsToSimplify = diffConfig.SourceCsFilepaths
                 .Select(p => (p, diffConfig.GetTargetFilepath(p)))
@@ -109,7 +111,7 @@ public sealed class CheckSemanticEquivalence
             var simplifiedSrcSolutionSummary = new SimplifiedSolutionSummary(simplifiedSrcSln, sourceProjectIds, srcUnsimplified);
             var simplifiedTargetSolutionSummary = new SimplifiedSolutionSummary(simplifiedTargetSln, targetProjectIds, targetUnsimplified);
             
-            
+            Logger.LogInformation("Calculating Equivalence...");
             var result = await GetFileModels(gitRepo, diffConfig, simplifiedSrcSolutionSummary, simplifiedTargetSolutionSummary, sourceChangedMethods).ConfigureAwait(false);
             // I am not sure why the GC is not smart enough to do this itself. But these lines prevent a linear increase in memory usage that just kills the process after a while.
             // Could it be the caching within Roslyn is holding references to some nodes which are then causing the reference to the wholue workspace to be held.  
@@ -477,7 +479,7 @@ public sealed class CheckSemanticEquivalence
             }
 
 
-            Logger.LogInformation(SemtexLog.GetPerformanceStr(nameof(SemanticEqualBreakdown.GetSemanticallyUnequal), stopwatch.ElapsedMilliseconds));
+            Logger.LogDebug(SemtexLog.GetPerformanceStr(nameof(SemanticEqualBreakdown.GetSemanticallyUnequal), stopwatch.ElapsedMilliseconds));
 
             var result = semanticallyUnequal.Match(
                 functions =>
@@ -500,7 +502,7 @@ public sealed class CheckSemanticEquivalence
                     if (newDiffs.Count() != 0)
                     {
                         // ReSharper disable once PossibleMultipleEnumeration
-                        Logger.LogWarning("Functions is not a subset of the input methods for file {Filepath}: {NewDiffs}", sourceFilepath, string.Join(",",newDiffs));
+                        Logger.LogDebug("Functions is not a subset of the input methods for file {Filepath}: {NewDiffs}", sourceFilepath, string.Join(",",newDiffs));
                     }
                     
                     return new FileModel(relativePath, Status.ContainsSemanticChanges);

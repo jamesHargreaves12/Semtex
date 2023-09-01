@@ -41,7 +41,7 @@ internal sealed class SolutionUtils
     {
         var stopwatch = Stopwatch.StartNew();
         var (sln, failedToRestore) = await LoadSolutionImpl(projectPaths).ConfigureAwait(false);
-        Logger.LogInformation(SemtexLog.GetPerformanceStr(nameof(LoadSolutionImpl), stopwatch.ElapsedMilliseconds));
+        Logger.LogDebug(SemtexLog.GetPerformanceStr(nameof(LoadSolutionImpl), stopwatch.ElapsedMilliseconds));
         var toSimplify = projectPaths.Where(p => !failedToRestore.Contains(p)).ToHashSet();
         sln = FilterSolutionToHighestTargetVersionOfProjects(sln, toSimplify);
         
@@ -57,18 +57,18 @@ internal sealed class SolutionUtils
             failedToCompile = projectPaths.ToHashSet();
         }
 
-        Logger.LogInformation(SemtexLog.GetPerformanceStr(nameof(CheckProjectsCompile), stopwatch.ElapsedMilliseconds));
+        Logger.LogDebug(SemtexLog.GetPerformanceStr(nameof(CheckProjectsCompile), stopwatch.ElapsedMilliseconds));
         
         stopwatch.Restart();
         if (failedToCompile.Any())
         {
             Logger.LogWarning("The following projects failed initial compile: {ProjPaths}", string.Join("\n",failedToCompile.Select(p=> p.Path)));
-            Logger.LogInformation("Will attempt to restore project and then try again");
+            Logger.LogDebug("Will attempt to restore project and then try again");
             foreach (var path in failedToCompile)
             {
                 await RunDotnetRestore(path).ConfigureAwait(false);
             }
-            Logger.LogInformation("Reloading solution");
+            Logger.LogDebug("Reloading solution");
             (sln, var failedToRestore2) = await LoadSolutionImpl(projectPaths).ConfigureAwait(false);
             sln = FilterSolutionToHighestTargetVersionOfProjects(sln, toSimplify);
 
@@ -82,9 +82,9 @@ internal sealed class SolutionUtils
             }
             else
             {
-                Logger.LogInformation("All projects now compiling");
+                Logger.LogDebug("All projects now compiling");
             }
-            Logger.LogInformation(SemtexLog.GetPerformanceStr(nameof(LoadSolution)+"-Reload", stopwatch.ElapsedMilliseconds));
+            Logger.LogDebug(SemtexLog.GetPerformanceStr(nameof(LoadSolution)+"-Reload", stopwatch.ElapsedMilliseconds));
         }
 
         toSimplify = projectPaths.Where(p => !failedToCompile.Contains(p) && !failedToRestore.Contains(p)).ToHashSet();
@@ -103,7 +103,7 @@ internal sealed class SolutionUtils
 
         var sln = await LoadSolutionIntoWorkspace(workspace, projectPaths).ConfigureAwait(false);
 
-        Logger.LogInformation("Loaded Solution with projects: {Projs}",
+        Logger.LogDebug("Loaded Solution with projects: {Projs}",
             string.Join(",", sln.Projects.Select(p => p.Name).ToList()));
 
         // If the project has WarnAsError we want to override this.
@@ -133,7 +133,7 @@ internal sealed class SolutionUtils
         foreach (var projId in projectIds) // This could 100% be parallelized for speed - for now won't do this as the logging becomes more difficult.
         {
             var proj = sln.GetProject(projId)!;
-            Logger.LogInformation("Processing {ProjName}", proj.Name);
+            Logger.LogDebug("Processing {ProjName}", proj.Name);
 
             // Confirm that there are no issues by compiling it once without analyzers.
             var compileStopWatch = Stopwatch.StartNew();
@@ -146,7 +146,7 @@ internal sealed class SolutionUtils
             }
 
             compileStopWatch.Stop();
-            Logger.LogInformation(SemtexLog.GetPerformanceStr("Initial Compilation", compileStopWatch.ElapsedMilliseconds));
+            Logger.LogDebug(SemtexLog.GetPerformanceStr("Initial Compilation", compileStopWatch.ElapsedMilliseconds));
         }
 
         return failedToCompile;
@@ -162,13 +162,13 @@ internal sealed class SolutionUtils
             {
                 continue;
             }          
-            Logger.LogInformation("Loading {projectPath}", projPath.Path);
+            Logger.LogDebug("Loading {projectPath}", projPath.Path);
             
             await workspace.OpenProjectAsync(projPath.Path).ConfigureAwait(false);
         }
 
         var sln = workspace.CurrentSolution;
-        Logger.LogInformation(SemtexLog.GetPerformanceStr("Load projects took:", sw.ElapsedMilliseconds));
+        Logger.LogDebug(SemtexLog.GetPerformanceStr("Load projects took:", sw.ElapsedMilliseconds));
         return sln;
     }
     
@@ -241,7 +241,7 @@ internal sealed class SolutionUtils
                     continue;
                 }
 
-                Logger.LogInformation("Restored {RestoredFilesFirst} and {OtherProjCount} other projects",restoredFiles[0].Path, restoredFiles.Count-1);
+                Logger.LogDebug("Restored {RestoredFilesFirst} and {OtherProjCount} other projects",restoredFiles[0].Path, restoredFiles.Count-1);
                 AlreadyRunDotNetRestoreOnProj.UnionWith(restoredFiles);
 
             }
@@ -251,7 +251,7 @@ internal sealed class SolutionUtils
             }
         }
 
-        Logger.LogInformation(SemtexLog.GetPerformanceStr(nameof(RunDotnetRestoreOnAllProjects), sw.ElapsedMilliseconds));
+        Logger.LogDebug(SemtexLog.GetPerformanceStr(nameof(RunDotnetRestoreOnAllProjects), sw.ElapsedMilliseconds));
         return failedToRestore;
     }
 
@@ -272,13 +272,13 @@ internal sealed class SolutionUtils
                         { "MSBUILD_EXE_PATH", null }
                     })
             .WithWorkingDirectory(directory)
-            .WithStandardOutputPipe(PipeTarget.ToDelegate(s => Logger.LogInformation("[dotnet-restore] {S}", s)))
+            .WithStandardOutputPipe(PipeTarget.ToDelegate(s => Logger.LogDebug("[dotnet-restore] {S}", s)))
             .WithStandardErrorPipe(PipeTarget.ToDelegate(s => Logger.LogError("[dotnet-restore] {S}", s)));
-        Logger.LogInformation("Executing {DotnetRestoreCmd} @ {Location}", dotnetRestoreCmd, directory);
+        Logger.LogDebug("Executing {DotnetRestoreCmd} @ {Location}", dotnetRestoreCmd, directory);
         try
         {
             var cmdResult = await dotnetRestoreCmd.ExecuteBufferedAsync();
-            Logger.LogInformation("Finished");
+            Logger.LogDebug("Finished");
             return ExtractFilePaths(cmdResult.StandardOutput);
         }
         catch (Exception e)
@@ -345,7 +345,7 @@ internal sealed class SolutionUtils
         }
 
         if(sb.Length > 0)
-            Logger.LogInformation("Removed unneeded projects from the sln: {Projs}",sb.ToString());
+            Logger.LogDebug("Removed unneeded projects from the sln: {Projs}",sb.ToString());
         // Removing 
         return sln;
     }
@@ -401,7 +401,7 @@ internal sealed class SolutionUtils
                 (Array.IndexOf(FrameworkPreferenceOrder, pair.Item1.Split("-")[0]), // index in the framework list above ignoring environment specific modifiers
                     pair.Item1.Contains("-") ? 0 : 1) // non environment specific should be higher.
         ).proj; 
-        Logger.LogInformation("Multiple versions of project, chose {Name}", result.Name);
+        Logger.LogDebug("Multiple versions of project, chose {Name}", result.Name);
         return result;
     }
 }
