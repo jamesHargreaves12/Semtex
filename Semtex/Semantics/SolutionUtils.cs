@@ -27,8 +27,8 @@ internal sealed class SolutionUtils
         }
         catch (Exception e)
         {
-            Logger.LogWarning($"dotnet restore failed on the solution with error {e}");
-            Logger.LogWarning("This is a bad sign but there is very little we can do about it so lets continue");
+            Logger.LogDebug($"dotnet restore failed on the solution with error {e}");
+            Logger.LogDebug("This is a bad sign but there is very little we can do about it so lets continue");
         }
 
         var workspace = GetMsBuildWorkspace();
