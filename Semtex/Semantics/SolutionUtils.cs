@@ -106,7 +106,7 @@ internal sealed class SolutionUtils
     {
         var failedToRestore = await RunDotnetRestoreOnAllProjects(projectPaths).ConfigureAwait(false);
 
-        // TODO these first two lines are fairly slow. I assume it is the serial loading perhaps we should just create a very simple solution file upfront and then use that to load workspace in one go and assume that msft has optimized it under the hood?
+        // Slow af
         var workspace = GetMsBuildWorkspace();
 
         var sln = await LoadSolutionIntoWorkspace(workspace, projectPaths).ConfigureAwait(false);
