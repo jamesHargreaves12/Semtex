@@ -18,6 +18,7 @@ public class Left:Wrapper
     {
         Console.WriteLine($"Something {F} {w?.X}");
         Console.WriteLine($"Something {F} {w.X}");
+        Console.WriteLine($"Something {F} {w!.X}");
     }
     
     private void CannotBeStatic(Wrapper w)
