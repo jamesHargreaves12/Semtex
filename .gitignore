@@ -407,3 +407,5 @@ FodyWeavers.xsd
 CommandLineCache.txt
 
 *.ipynb_checkpoints
+
+**/venv/**
