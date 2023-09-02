@@ -41,7 +41,7 @@ await new CommandLineBuilder(rootCommand)
     .Build()
     .InvokeAsync(args)
     .ConfigureAwait(false);
-
+Thread.Sleep(50); // This ensures any logs come in before the next line of the terminal is rendered
 return returnCode;
 
 Command GetSplitCommand()
