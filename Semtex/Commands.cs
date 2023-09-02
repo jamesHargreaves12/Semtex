@@ -14,17 +14,10 @@ public sealed class Commands
     private static readonly AbsolutePath ScratchSpacePath = new AbsolutePath(Path.Join(Path.GetTempPath(), "Semtex"));
 
     private static readonly ILogger<Commands> Logger = SemtexLog.LoggerFactory.CreateLogger<Commands>();
-    // If true then any errors that we unhandled errors within the solution logic will be unhandled. If false then the
-    // run will complete reporting the status for the C# files as UnexpectedError - Matters most in
-    // the case of --all-ancestors.
-    private const bool DefaultFailFast =
-#if DEBUG
-    true;
-#else
-    false;
-#endif
 
-    internal static async Task<bool> Run(string repoPathOrUrl, string target, string source, AbsolutePath? analyzerConfigPath, string? relativeProjFilter, AbsolutePath? explicitProjectFileMap)
+    internal static async Task<bool> Run(string repoPathOrUrl, string target, string source,
+        AbsolutePath? analyzerConfigPath, string? relativeProjFilter, AbsolutePath? explicitProjectFileMap,
+        bool failFast)
     {
         GitRepo gitRepo;
         if (Path.Exists(repoPathOrUrl))
@@ -49,7 +42,7 @@ public sealed class Commands
         foreach (var c in commits)
         {
             Logger.LogInformation("Checking {C}", c);
-            var result = await CheckSemanticEquivalence.CheckSemanticallyEquivalent(gitRepo, c, analyzerConfigPath, projFilter, explicitProjectFileMap, DefaultFailFast).ConfigureAwait(false);
+            var result = await CheckSemanticEquivalence.CheckSemanticallyEquivalent(gitRepo, c, analyzerConfigPath, projFilter, explicitProjectFileMap, failFast).ConfigureAwait(false);
             var resultSummary = await DisplayResults.GetPrettySummaryOfResultsAsync(result, gitRepo).ConfigureAwait(false);
             Logger.LogDebug("Results for {C}", c);
             Logger.LogDebug("\n\n{ResultSummary}", resultSummary);
@@ -68,8 +61,9 @@ public sealed class Commands
         return results.All(r => r.SemanticallyEquivalent);
     }
 
-    internal static async Task<bool> RunAllAncestors(string repoPathOrUrl, string target, AbsolutePath? analyzerConfigPath,
-        string? relativeProjFilter, AbsolutePath? projectMappingFilepath, AbsolutePath outputPath)
+    internal static async Task<bool> RunAllAncestors(string repoPathOrUrl, string target,
+        AbsolutePath? analyzerConfigPath,
+        string? relativeProjFilter, AbsolutePath? projectMappingFilepath, AbsolutePath outputPath, bool failFast)
     {
         GitRepo gitRepo;
         if (Path.Exists(repoPathOrUrl))
@@ -94,7 +88,7 @@ public sealed class Commands
         foreach (var (c, i) in commits.Select((x, i) => (x, i)))
         {
             Logger.LogInformation("Checking {C} ({Prc}%)", c, i * 100 / commits.Count);
-            var result = await CheckSemanticEquivalence.CheckSemanticallyEquivalent(gitRepo, c, analyzerConfigPath, projFilter, projectMappingFilepath, DefaultFailFast)
+            var result = await CheckSemanticEquivalence.CheckSemanticallyEquivalent(gitRepo, c, analyzerConfigPath, projFilter, projectMappingFilepath, failFast)
                 .ConfigureAwait(false);
             var prettySummary = await DisplayResults.GetPrettySummaryOfResultsAsync(result, gitRepo).ConfigureAwait(false);
             Logger.LogDebug("Results for {C}", c);
@@ -139,7 +133,8 @@ public sealed class Commands
         await File.WriteAllTextAsync(filepath, JsonSerializer.Serialize(relativeMapping)).ConfigureAwait(false);
     }
 
-    internal static async Task Split(string repoPath, string baseCommit, IncludeUncommittedChanges includeUncommitted, string? projectMap)
+    internal static async Task Split(string repoPath, string baseCommit, IncludeUncommittedChanges includeUncommitted,
+        string? projectMap, bool failFast)
     {
         var (gitRepo, localRepoHead) = await CreateGitRepoWithLocalChangesCommitted(new AbsolutePath(repoPath), includeUncommitted).ConfigureAwait(false);
         // Check that git push has been run TODO
@@ -153,10 +148,11 @@ public sealed class Commands
         // Generate a patch so that we are only comparing a single commit.
         var patchText = await gitRepo.Diff(baseCommit, "HEAD").ConfigureAwait(false);
 
-        await SplitPatch(gitRepo, baseCommit, patchText, projectMapPath).ConfigureAwait(false);
+        await SplitPatch(gitRepo, baseCommit, patchText, projectMapPath, failFast).ConfigureAwait(false);
     }
 
-    internal static async Task SplitRemote(string repoUrl, string target, string baseCommit, string? projectMap)
+    internal static async Task SplitRemote(string repoUrl, string target, string baseCommit, string? projectMap,
+        bool failFast)
     {
         var gitRepo = await GitRepo.CreateGitRepoFromUrl(repoUrl).ConfigureAwait(false);
 
@@ -167,10 +163,11 @@ public sealed class Commands
         var patchText = await gitRepo.Diff(baseCommit, target).ConfigureAwait(false);
         var projectMapPath = projectMap is null ? null : new AbsolutePath(projectMap);
 
-        await SplitPatch(gitRepo, baseCommit, patchText, projectMapPath).ConfigureAwait(false);
+        await SplitPatch(gitRepo, baseCommit, patchText, projectMapPath, failFast).ConfigureAwait(false);
     }
 
-    private static async Task SplitPatch(GitRepo gitRepo, string baseCommit, string patchText, AbsolutePath? projectMapPath)
+    private static async Task SplitPatch(GitRepo gitRepo, string baseCommit, string patchText,
+        AbsolutePath? projectMapPath, bool failFast)
     {
         var patchFilepath = ScratchSpacePath.Join($"test-{Guid.NewGuid()}.patch");
         await File.WriteAllTextAsync(patchFilepath.Path, patchText).ConfigureAwait(false);
@@ -182,13 +179,13 @@ public sealed class Commands
 
         var commitWithPatch = await gitRepo.GetCurrentCommitSha().ConfigureAwait(false);
 
-        await FindSplit(gitRepo, commitWithPatch, projectMapPath).ConfigureAwait(false);
+        await FindSplit(gitRepo, commitWithPatch, projectMapPath, failFast).ConfigureAwait(false);
     }
 
-    private static async Task FindSplit(GitRepo gitRepo, string commit, AbsolutePath? projectMapPath)
+    private static async Task FindSplit(GitRepo gitRepo, string commit, AbsolutePath? projectMapPath, bool failFast)
     {
         var result = await CheckSemanticEquivalence
-            .CheckSemanticallyEquivalent(gitRepo, commit, null, null, projectMappingFilepath: projectMapPath, DefaultFailFast)
+            .CheckSemanticallyEquivalent(gitRepo, commit, null, null, projectMappingFilepath: projectMapPath, failFast)
             .ConfigureAwait(false);
         // Create a patch of the difference between target and source and then apply that.
         var unsemanticChangesBuilder = new StringBuilder();

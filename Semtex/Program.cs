@@ -20,6 +20,16 @@ var outputPath = "";
 var logPath = $"";
 #endif
 
+// If true then any errors that we unhandled errors within the solution logic will be unhandled. If false then the
+// run will complete reporting the status for the C# files as UnexpectedError - Matters most in
+// the case of --all-ancestors.
+var failFast =
+#if DEBUG
+    true;
+#else
+    false;
+#endif
+
 var rootCommand = new RootCommand("Semtex - Remove the Git friction that is discouraging you from making improvements to your C# codebase");
 rootCommand.AddCommand(GetSplitCommand());
 rootCommand.AddCommand(GetSplitRemoteCommand());
@@ -52,7 +62,7 @@ Command GetSplitCommand()
     splitCommand.SetHandler(async (repoPath, baseValue, includeUncommited, projectMap, verbosity) =>
     {
         SemtexLog.InitializeLogging(verbosity, shouldLogToFile, logPath, verbosity == LogLevel.Information);
-        await Commands.Split(repoPath, baseValue, includeUncommited, projectMap).ConfigureAwait(false);
+        await Commands.Split(repoPath, baseValue, includeUncommited, projectMap, failFast).ConfigureAwait(false);
     }, repoOption, baseArg, includeUncommittedOption, projectMapOption, verbosityOption);
     return splitCommand;
 }
@@ -74,7 +84,7 @@ Command GetSplitRemoteCommand()
     splitCommand.SetHandler(async (repo, target, baseCommit, projectMap, verbosity) =>
     {
         SemtexLog.InitializeLogging(verbosity, shouldLogToFile, outputPath, verbosity == LogLevel.Information);
-        await Commands.SplitRemote(repo, target, baseCommit, projectMap).ConfigureAwait(false);
+        await Commands.SplitRemote(repo, target, baseCommit, projectMap, failFast).ConfigureAwait(false);
     }, repoArg, targetArg, baseOption, projectMapOption, verbosityOption);
     return splitCommand;
 }
@@ -109,11 +119,11 @@ Command GetCheckCommand()
             if (source is not "origin/master")
                 throw new ArgumentException("You can set both --all-ancestors and --base");
 
-            passedCheck = await Commands.RunAllAncestors(repo, target, analyzerConfigPathTyped, projFilter, explicitProjectMapTyped, new AbsolutePath(outputPath)).ConfigureAwait(false);
+            passedCheck = await Commands.RunAllAncestors(repo, target, analyzerConfigPathTyped, projFilter, explicitProjectMapTyped, new AbsolutePath(outputPath), failFast).ConfigureAwait(false);
         }
         else
         {
-            passedCheck = await Commands.Run(repo, target, source, analyzerConfigPathTyped, projFilter, explicitProjectMapTyped).ConfigureAwait(false);
+            passedCheck = await Commands.Run(repo, target, source, analyzerConfigPathTyped, projFilter, explicitProjectMapTyped, failFast).ConfigureAwait(false);
         }
 
         if (!passedCheck)
