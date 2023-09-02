@@ -4,7 +4,8 @@ namespace Semtex;
 
 public record DiffConfig
 {
-    public DiffConfig(HashSet<AbsolutePath> addedFilepaths, HashSet<AbsolutePath> removedFilepaths,
+    public DiffConfig(
+        HashSet<AbsolutePath> addedFilepaths, HashSet<AbsolutePath> removedFilepaths,
         HashSet<(AbsolutePath Source, AbsolutePath Target, int Similarity)> renamedFilepaths,
         List<AbsolutePath> allSourceFilePaths, HashSet<AbsolutePath> sourceCsFilepaths,
         HashSet<AbsolutePath> targetCsFilepaths, string targetSha, string sourceSha)
