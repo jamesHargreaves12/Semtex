@@ -20,9 +20,8 @@ var outputPath = "";
 var logPath = $"";
 #endif
 
-// If true then any errors that we unhandled errors within the solution logic will be unhandled. If false then the
-// run will complete reporting the status for the C# files as UnexpectedError - Matters most in
-// the case of --all-ancestors.
+// If true then any errors that are unhandled within the solution simplification will crash program. If false then the
+// run will complete reporting the status for the C# files as UnexpectedError - Matters most in the case of --all-ancestors.
 var failFast =
 #if DEBUG
     true;
