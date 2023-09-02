@@ -142,7 +142,8 @@ public sealed class Commands
         var userRepoBaseCommit = await userRepo.GetCurrentCommitSha().ConfigureAwait(false);
         if (!await userRepo.IsAvailableOnOrigin(userRepoBaseCommit))
         {
-            Logger.LogError("Unable to find commit on remote repository. Please ensure you have run `git push` and try again");
+            Logger.LogError("Unable to find commit on remote repository. Please ensure you have run `git push` and try again. Exiting");
+            return;
         }
 
         var ghostRepo = await GitRepo.CreateGitRepoFromUrl(userRepo.RemoteUrl).ConfigureAwait(false);
@@ -333,8 +334,15 @@ public sealed class Commands
 
         var userRepo = await GitRepo.SetupFromExistingFolder(repoPath);
         var userRepoBaseCommit = await userRepo.GetCurrentCommitSha().ConfigureAwait(false);
-        // Get the ghost repo in a state that matches the users repo
         var ghostRepo = await GitRepo.CreateGitRepoFromUrl(userRepo.RemoteUrl).ConfigureAwait(false);
+
+        if (!await ghostRepo.IsAvailable(userRepoBaseCommit))
+        {
+            Logger.LogError("Unable to find current commit on remote repository. Please ensure you have run `git push` and try again. Exiting");
+            return;
+        }
+
+        // Get the ghost repo in a state that matches the users repo
         await ghostRepo.Checkout(userRepoBaseCommit).ConfigureAwait(false);
         await ghostRepo.ApplyPatch(PatchFileLookup(commitType));
         await ghostRepo.AddAllAndCommit(message);
