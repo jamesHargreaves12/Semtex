@@ -149,7 +149,7 @@ internal sealed class SolutionUtils
             var diagnostics = compilation!.GetDiagnostics();
             if (diagnostics.Any(d => d.Severity == DiagnosticSeverity.Error))
             {
-                Logger.LogError("Failed to compile before applying simplifications {Message}", diagnostics.First());
+                Logger.LogDebug("Failed to compile before applying simplifications {Message}", diagnostics.First());
                 failedToCompile.Add(new AbsolutePath(proj.FilePath!));
             }
 
@@ -281,7 +281,7 @@ internal sealed class SolutionUtils
                     })
             .WithWorkingDirectory(directory)
             .WithStandardOutputPipe(PipeTarget.ToDelegate(s => Logger.LogDebug("[dotnet-restore] {S}", s)))
-            .WithStandardErrorPipe(PipeTarget.ToDelegate(s => Logger.LogError("[dotnet-restore] {S}", s)));
+            .WithStandardErrorPipe(PipeTarget.ToDelegate(s => Logger.LogDebug("[dotnet-restore] {S}", s)));
         Logger.LogDebug("Executing {DotnetRestoreCmd} @ {Location}", dotnetRestoreCmd, directory);
         try
         {
@@ -291,7 +291,7 @@ internal sealed class SolutionUtils
         }
         catch (Exception e)
         {
-            Logger.LogError("Dotnet restore failed for {Path}", path.Path);
+            Logger.LogDebug("Dotnet restore failed for {Path}", path.Path);
             // Not much that we can do here so lets just return anyway.
             return new List<AbsolutePath>();
         }
