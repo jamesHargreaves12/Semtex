@@ -178,7 +178,7 @@ public sealed class Commands
         await gitRepo.Checkout(baseCommit).ConfigureAwait(false);
 
         await gitRepo.ApplyPatch(patchFilepath).ConfigureAwait(false);
-        await gitRepo.AddAllAndCommit().ConfigureAwait(false);
+        await gitRepo.AddAllAndCommit("All local changes").ConfigureAwait(false);
 
         var commitWithPatch = await gitRepo.GetCurrentCommitSha().ConfigureAwait(false);
 
@@ -297,31 +297,30 @@ public sealed class Commands
         if (!hasLocalChanges) return (ghostRepo, baseCommit);
 
         await ghostRepo.ApplyPatch(patchFilepath).ConfigureAwait(false);
-        await ghostRepo.AddAllAndCommit().ConfigureAwait(false);
+        await ghostRepo.AddAllAndCommit("All local changes").ConfigureAwait(false);
 
         return (ghostRepo,baseCommit);
     }
 
     public static async Task Commit(AbsolutePath repoPath, CommitType commitType, string message)
-    { 
-        var gitRepo = await GitRepo.SetupFromExistingFolder(repoPath);
-        var patchPath = PatchFileLookup(commitType);
-        var stashStatePath = ScratchSpacePath.Join($"full-{Guid.NewGuid()}.patch");
-        // If the user has any currently stashed files we cache a patch and then stash them. The reason to do both is that
-        // if something happens we can point them to the stashed files however it is not trivial to apply the stash only to
-        // the staging and so we apply the changes to staging by reapplying the stash file.
-        var hasStagedFiles = await gitRepo.CreatePatchFileOfLocalChanges(stashStatePath, IncludeUncommittedChanges.Staged);
-        if (hasStagedFiles)
-        {
-            await gitRepo.StashStaged().ConfigureAwait(false);
-        }
-        await gitRepo.ApplyPathToStaging(patchPath);
-        await gitRepo.Commit(message);
-        if (hasStagedFiles)
-        {
-            await gitRepo.ApplyPathToStaging(stashStatePath);
-            await gitRepo.StashPop();
-        }
+    {
+        var bundlePath = ScratchSpacePath.Join($"{Guid.NewGuid()}.bundle");
+        Logger.LogInformation("Creating Bundle at {Path}", bundlePath.Path);
+
+        var userRepo = await GitRepo.SetupFromExistingFolder(repoPath);
+        var userRepoBaseCommit = await userRepo.GetCurrentCommitSha().ConfigureAwait(false);
+        // Get the ghost repo in a state that matches the users repo
+        var ghostRepo = await GitRepo.CreateGitRepoFromUrl(userRepo.RemoteUrl).ConfigureAwait(false);
+        await ghostRepo.Checkout(userRepoBaseCommit).ConfigureAwait(false);
+        await ghostRepo.ApplyPatch(PatchFileLookup(commitType));
+        await ghostRepo.AddAllAndCommit(message);
+        
+        // Now transfer the commit from the ghost repo back to the users repo.
+        var newCommitSha = await ghostRepo.GetCurrentCommitSha().ConfigureAwait(false);
+        await ghostRepo.CreateBundleFile(bundlePath);
+        Logger.LogInformation("Applying Bundle to local repository {Sha}", newCommitSha);
+        await userRepo.FetchBundle(bundlePath);
+        await userRepo.Reset(newCommitSha);
     }
 
     private static AbsolutePath PatchFileLookup(CommitType commitType)
