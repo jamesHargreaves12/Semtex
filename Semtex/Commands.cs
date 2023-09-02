@@ -268,6 +268,7 @@ public sealed class Commands
 
         var semanticFilepath = PatchFileLookup(CommitType.Behavioural);
         var unsemanticFilepath = PatchFileLookup(CommitType.Readability);
+
         if (semanticFilepath.Exists())
             File.Delete(semanticFilepath.Path);
 
@@ -275,20 +276,19 @@ public sealed class Commands
             File.Delete(unsemanticFilepath.Path);
 
         var applyBuilder = new StringBuilder();
-        // TODO Make sure I delete these files every time.
 
         if (semanticChangesBuilder.Length > 0)
         {
             await File.WriteAllTextAsync(semanticFilepath.Path, semanticChangesBuilder.ToString()).ConfigureAwait(false);
             Logger.LogInformation("Changes that DO effect runtime behaviour at: {semanticChanges}", semanticFilepath.Path);
-            applyBuilder.AppendLine($"git apply {semanticFilepath.Path}");
+            applyBuilder.AppendLine($"semtex commit Behavioural {semanticFilepath.Path}");
         }
 
         if (unsemanticChangesBuilder.Length > 0)
         {
             await File.WriteAllTextAsync(unsemanticFilepath.Path, unsemanticChangesBuilder.ToString()).ConfigureAwait(false);
             Logger.LogInformation("Changes that do NOT effect runtime behaviour at: {UnsemanticChanges}", unsemanticFilepath.Path);
-            applyBuilder.AppendLine($"git apply {unsemanticFilepath.Path}");
+            applyBuilder.AppendLine($"semtex commit Readability {unsemanticFilepath.Path}");
         }
 
 
