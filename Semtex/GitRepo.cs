@@ -666,20 +666,6 @@ internal class GitRepo
         await gitStashCmd.ExecuteAsync();
     }
 
-    public async Task Push()
-    {
-        var gitPushCmd = Cli.Wrap("git")
-            .WithArguments(new[]
-            {
-                "push",
-            })
-            .WithWorkingDirectory(RootFolder.Path)
-            .WithStandardOutputPipe(StdOutPipe)
-            .WithStandardErrorPipe(StdErrPipe);
-        Logger.LogDebug("Executing {Cmd}", gitPushCmd);
-        await gitPushCmd.ExecuteAsync();
-    }
-
     public async Task CreateBundleFile(AbsolutePath bundlePath)
     {
         var gitBundleCmd = Cli.Wrap("git")
