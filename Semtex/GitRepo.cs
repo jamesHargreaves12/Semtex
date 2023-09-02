@@ -426,7 +426,24 @@ internal class GitRepo
         Logger.LogDebug("Finished diff");
     }
     
-    public async Task ApplyPathToStaging(AbsolutePath patchFilepath)
+    public async Task ApplyPatchToStaging(AbsolutePath patchFilepath)
+    {
+        var gitDiffCommand = Cli.Wrap("git")
+            .WithArguments(new[]
+            {
+                "apply",
+                "--cached",
+                patchFilepath.Path
+            })
+            .WithWorkingDirectory(RootFolder.Path)
+            .WithStandardOutputPipe(StdOutPipe)
+            .WithStandardErrorPipe(StdErrPipe);
+        Logger.LogDebug("Executing {GitDiffCommand}", gitDiffCommand);
+        await gitDiffCommand.ExecuteAsync();
+        Logger.LogDebug("Finished diff");
+    }
+    
+    public async Task ApplyPatchToWorkingDir(AbsolutePath patchFilepath)
     {
         var gitDiffCommand = Cli.Wrap("git")
             .WithArguments(new[]
@@ -443,7 +460,7 @@ internal class GitRepo
         Logger.LogDebug("Finished diff");
     }
 
-    public async Task AddAllAndCommit()
+    public async Task AddAllAndCommit(string message)
     {
         var gitAddCommand = Cli.Wrap("git")
             .WithArguments(new[]
@@ -457,7 +474,7 @@ internal class GitRepo
         Logger.LogDebug("Executing {GitAddCommand}", gitAddCommand);
         await gitAddCommand.ExecuteAsync();
         Logger.LogDebug("Finished diff");
-        await Commit("All local changes");
+        await Commit(message);
 
     }
     public async Task Commit(string message)
@@ -645,6 +662,70 @@ internal class GitRepo
             .WithWorkingDirectory(RootFolder.Path)
             .WithStandardOutputPipe(StdOutPipe)
             .WithStandardErrorPipe(StdErrPipe);
+        Logger.LogDebug("Executing {Cmd}", gitStashCmd);
         await gitStashCmd.ExecuteAsync();
+    }
+
+    public async Task Push()
+    {
+        var gitPushCmd = Cli.Wrap("git")
+            .WithArguments(new[]
+            {
+                "push",
+            })
+            .WithWorkingDirectory(RootFolder.Path)
+            .WithStandardOutputPipe(StdOutPipe)
+            .WithStandardErrorPipe(StdErrPipe);
+        Logger.LogDebug("Executing {Cmd}", gitPushCmd);
+        await gitPushCmd.ExecuteAsync();
+    }
+
+    public async Task CreateBundleFile(AbsolutePath bundlePath)
+    {
+        var gitBundleCmd = Cli.Wrap("git")
+            .WithArguments(new[]
+            {
+                "bundle",
+                "create",
+                bundlePath.Path,
+                "HEAD~1",
+                "HEAD"
+            })
+            .WithWorkingDirectory(RootFolder.Path)
+            .WithStandardOutputPipe(StdOutPipe)
+            .WithStandardErrorPipe(StdErrPipe);
+        Logger.LogDebug("Executing {Cmd}", gitBundleCmd);
+        await gitBundleCmd.ExecuteAsync();
+
+    }
+
+    internal async Task FetchBundle(AbsolutePath bundlePath)
+    {
+        var gitFetchCommand = Cli.Wrap("git")
+            .WithArguments(new[]
+            {
+                "fetch",
+                bundlePath.Path
+            })
+            .WithWorkingDirectory(RootFolder.Path)
+            .WithStandardOutputPipe(StdOutPipe)
+            .WithStandardErrorPipe(StdErrPipe);
+        Logger.LogDebug("Executing {Cmd}", gitFetchCommand);
+        await gitFetchCommand.ExecuteAsync();
+    }
+
+    public async Task Reset(string newCommitSha)
+    {
+        var gitResetCmd = Cli.Wrap("git")
+            .WithArguments(new[]
+            {
+                "reset",
+                newCommitSha
+            })
+            .WithWorkingDirectory(RootFolder.Path)
+            .WithStandardOutputPipe(StdOutPipe)
+            .WithStandardErrorPipe(StdErrPipe);
+        Logger.LogDebug("Executing {Cmd}", gitResetCmd);
+        await gitResetCmd.ExecuteAsync();
     }
 }

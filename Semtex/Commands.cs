@@ -259,14 +259,14 @@ public sealed class Commands
         if (semanticChangesBuilder.Length > 0)
         {
             await File.WriteAllTextAsync(semanticFilepath.Path, semanticChangesBuilder.ToString()).ConfigureAwait(false);
-            Logger.LogInformation("Changes that DO effect runtime behaviour at: {semanticChanges}", semanticFilepath);
+            Logger.LogInformation("Changes that DO effect runtime behaviour at: {semanticChanges}", semanticFilepath.Path);
             applyBuilder.AppendLine($"git apply {semanticFilepath.Path}");
         }
 
         if (unsemanticChangesBuilder.Length > 0)
         {
             await File.WriteAllTextAsync(unsemanticFilepath.Path, unsemanticChangesBuilder.ToString()).ConfigureAwait(false);
-            Logger.LogInformation("Changes that do NOT effect runtime behaviour at: {UnsemanticChanges}", unsemanticFilepath);
+            Logger.LogInformation("Changes that do NOT effect runtime behaviour at: {UnsemanticChanges}", unsemanticFilepath.Path);
             applyBuilder.AppendLine($"git apply {unsemanticFilepath.Path}");
         }
 
@@ -318,7 +318,7 @@ public sealed class Commands
         // Now transfer the commit from the ghost repo back to the users repo.
         var newCommitSha = await ghostRepo.GetCurrentCommitSha().ConfigureAwait(false);
         await ghostRepo.CreateBundleFile(bundlePath);
-        Logger.LogInformation("Applying Bundle to local repository {Sha}", newCommitSha);
+        Logger.LogInformation("Applying Bundle to local repository, HEAD will be moved to {Sha}", newCommitSha);
         await userRepo.FetchBundle(bundlePath);
         await userRepo.Reset(newCommitSha);
     }
