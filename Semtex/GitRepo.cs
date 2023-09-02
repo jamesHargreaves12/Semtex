@@ -714,4 +714,20 @@ internal class GitRepo
         Logger.LogDebug("Executing {Cmd}", gitResetCmd);
         await gitResetCmd.ExecuteAsync();
     }
+    public async Task<bool> IsAvailableOnOrigin(string sha)
+    {
+        var gitResetCmd = Cli.Wrap("git")
+            .WithArguments(new[]
+            {
+                "branch",
+                "-r",
+                "--contains", sha
+            })
+            .WithWorkingDirectory(RootFolder.Path)
+            .WithStandardOutputPipe(StdOutPipe)
+            .WithStandardErrorPipe(StdErrPipe);
+        Logger.LogDebug("Executing {Cmd}", gitResetCmd);
+        var result = await gitResetCmd.ExecuteBufferedAsync();
+        return result.StandardOutput.Trim().Length > 0;
+    }
 }
