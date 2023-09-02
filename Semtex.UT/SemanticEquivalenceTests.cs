@@ -233,6 +233,7 @@ public class SemanticEquivalenceTests
         "UnneededCase",
         "UnreachableCode",
         "UnusedPrivateMethods",
+        "UnusedReturn",
         "UnusedUsing",
         "UnusedVariable",
         "UseConditionalAccess",

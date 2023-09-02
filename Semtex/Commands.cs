@@ -133,23 +133,45 @@ public sealed class Commands
         await File.WriteAllTextAsync(filepath, JsonSerializer.Serialize(relativeMapping)).ConfigureAwait(false);
     }
 
-    internal static async Task Split(string repoPath, string baseCommit, IncludeUncommittedChanges includeUncommitted,
-        string? projectMap, bool failFast)
+    internal static async Task Split(string repoPath, string baseCommit, IncludeUncommittedChanges includeUncommitted, string? projectMap, bool failFast)
     {
-        // TODO Check if empty
-        var (gitRepo, localRepoHead) = await CreateGitRepoWithLocalChangesCommitted(new AbsolutePath(repoPath), includeUncommitted).ConfigureAwait(false);
+        // Get a patch from the local version of the repo and grab the commit.
+        // Setup a repo in the scratch space at the same base commit.
+        // apply the patch.
+        var userRepo = await GitRepo.SetupFromExistingFolder(new AbsolutePath(repoPath)).ConfigureAwait(false);
+        var userRepoBaseCommit = await userRepo.GetCurrentCommitSha().ConfigureAwait(false);
+
+        var ghostRepo = await GitRepo.CreateGitRepoFromUrl(userRepo.RemoteUrl).ConfigureAwait(false);
+        await ghostRepo.Checkout(userRepoBaseCommit).ConfigureAwait(false);
+
+        if (includeUncommitted != IncludeUncommittedChanges.None)
+        {
+            var patchFilepath = ScratchSpacePath.Join($"tmp_{Guid.NewGuid()}.patch");
+
+            var hasLocalChanges = await userRepo.CreatePatchFileOfLocalChanges(patchFilepath, includeUncommitted).ConfigureAwait(false);
+
+            if (!hasLocalChanges && baseCommit == "HEAD")
+            {
+                Logger.LogInformation("No changes found. Exiting");
+                return;
+            }
+
+            await ghostRepo.ApplyPatch(patchFilepath).ConfigureAwait(false);
+            await ghostRepo.AddAllAndCommit("All local changes").ConfigureAwait(false);
+        }
+
         // Check that git push has been run TODO
         if (baseCommit == "HEAD")
         {
-            baseCommit = localRepoHead;
+            baseCommit = userRepoBaseCommit;
         }
 
         var projectMapPath = projectMap is null ? null : new AbsolutePath(projectMap);
 
         // Generate a patch so that we are only comparing a single commit.
-        var patchText = await gitRepo.Diff(baseCommit, "HEAD").ConfigureAwait(false);
+        var patchText = await ghostRepo.Diff(baseCommit, "HEAD").ConfigureAwait(false);
 
-        await SplitPatch(gitRepo, baseCommit, patchText, projectMapPath, failFast).ConfigureAwait(false);
+        await SplitPatch(ghostRepo, baseCommit, patchText, projectMapPath, failFast).ConfigureAwait(false);
     }
 
     internal static async Task SplitRemote(string repoUrl, string target, string baseCommit, string? projectMap,
@@ -273,33 +295,6 @@ public sealed class Commands
         Logger.LogInformation("To apply:\n\n{ApplyBuilder}", applyBuilder.ToString());
     }
 
-
-    private static async Task<(GitRepo ghostRepo, string baseCommit)> CreateGitRepoWithLocalChangesCommitted(AbsolutePath path, IncludeUncommittedChanges includeUncommittedChanges)
-    {
-        // Get a patch from the local version of the repo and grab the commit.
-        // Setup a repo in the scratch space at the same base commit.
-        // apply the patch.
-        // Check the patch commit for semantic equality.
-        var localChangesRepo = await GitRepo.SetupFromExistingFolder(path).ConfigureAwait(false);
-        var baseCommit = await localChangesRepo.GetCurrentCommitSha().ConfigureAwait(false);
-
-        var ghostRepo = await GitRepo.CreateGitRepoFromUrl(localChangesRepo.RemoteUrl).ConfigureAwait(false);
-        var currentBaseCommit = await localChangesRepo.GetCurrentCommitSha().ConfigureAwait(false);
-        await ghostRepo.Checkout(currentBaseCommit).ConfigureAwait(false);
-
-        if (includeUncommittedChanges == IncludeUncommittedChanges.None) return (ghostRepo,baseCommit);
-
-        var patchFilepath = ScratchSpacePath.Join($"tmp_{Guid.NewGuid()}.patch");
-
-        var hasLocalChanges = await localChangesRepo.CreatePatchFileOfLocalChanges(patchFilepath, includeUncommittedChanges).ConfigureAwait(false);
-
-        if (!hasLocalChanges) return (ghostRepo, baseCommit);
-
-        await ghostRepo.ApplyPatch(patchFilepath).ConfigureAwait(false);
-        await ghostRepo.AddAllAndCommit("All local changes").ConfigureAwait(false);
-
-        return (ghostRepo,baseCommit);
-    }
 
     public static async Task Commit(AbsolutePath repoPath, CommitType commitType, string message)
     {

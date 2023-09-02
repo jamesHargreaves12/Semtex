@@ -57,7 +57,6 @@ generated_code = false # The fix all provider will not fix all on code which has
         else
         {
             Logger.LogDebug("Adding a dynamically generated analyzer config to the project");
-            var analyzerConfigFolder = Directory.GetParent(typeof(AnalyzerConfigOverwrite).Assembly.Location)!.ToString();
             configText = START_OF_CONFIG_FILE;
 
             analyzerConfigPath = new AbsolutePath(Path.Join(Path.GetDirectoryName(project.FilePath), ".analyzerconfig"));
