@@ -180,12 +180,12 @@ internal sealed class SolutionUtils
             if (e.Diagnostic.Message.EndsWith(
                     "was not recognized. It may be misspelled. If not, then the TargetFrameworkIdentifier and/or TargetFrameworkVersion properties must be specified explicitly."))
             {
-                Logger.LogWarning(
+                Logger.LogDebug(
                     "Miss-match framework error received. If this is due to multitargeting then it can be safely ignored");
                 return;
             }
 
-            Logger.LogError($"{nameof(OnWorkspaceFailed)}[{e.Diagnostic.Kind}] {e.Diagnostic.Message}");
+            Logger.LogDebug($"{nameof(OnWorkspaceFailed)}[{e.Diagnostic.Kind}] {e.Diagnostic.Message}");
         }
 
         // This call will update the MSBUILD_EXE_PATH and MSBuildSDKsPath Env Vars.

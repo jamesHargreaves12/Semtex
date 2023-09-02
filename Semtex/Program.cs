@@ -11,11 +11,13 @@ var returnCode = 0;
 // This should be a tmp dir by default.
 var homeDir = Environment.GetEnvironmentVariable("HOME");
 #if DEBUG
-    var outputPath = $"{homeDir}/dev/Semtex/Semtex/Out/Logs";
+    var outputPath = $"{homeDir}/dev/Semtex/Semtex/Out";
+    var logPath = $"{outputPath}/Logs";
     var shouldLogToFile = true;
 #else
     var shouldLogToFile = false;
-    var outputPath = ""; 
+    var outputPath = "";
+    var logPath = $"";
 #endif
 
 Command GetCheckCommand(){
@@ -98,7 +100,7 @@ Command GetSplitCommand()
 
     splitCommand.SetHandler(async (repoPath, baseValue, includeUncommited, projectMap, verbosity) =>
     {
-        SemtexLog.InitializeLogging(verbosity, shouldLogToFile, outputPath);
+        SemtexLog.InitializeLogging(verbosity, shouldLogToFile, logPath);
         await Commands.Split(repoPath, baseValue, includeUncommited, projectMap).ConfigureAwait(false);
     }, repoArg, baseArg,includeUncommittedOption,projectMapOption,verbosityOption);
     return splitCommand;
