@@ -281,18 +281,45 @@ public sealed class Commands
         {
             await File.WriteAllTextAsync(semanticFilepath.Path, semanticChangesBuilder.ToString()).ConfigureAwait(false);
             Logger.LogInformation("Changes that DO effect runtime behaviour at: {semanticChanges}", semanticFilepath.Path);
-            applyBuilder.AppendLine($"semtex commit Behavioural {semanticFilepath.Path}");
+            applyBuilder.AppendLine(@"To apply:");
         }
 
         if (unsemanticChangesBuilder.Length > 0)
         {
             await File.WriteAllTextAsync(unsemanticFilepath.Path, unsemanticChangesBuilder.ToString()).ConfigureAwait(false);
             Logger.LogInformation("Changes that do NOT effect runtime behaviour at: {UnsemanticChanges}", unsemanticFilepath.Path);
-            applyBuilder.AppendLine($"semtex commit Readability {unsemanticFilepath.Path}");
+            applyBuilder.AppendLine(@"To directly apply this as a commit use: semtex commit Behavioural ""<Commit message>""");
+
         }
 
+        const string behaviouralCommand = @"semtex commit Behavioural ""<Commit message>""";
+        const string readabilityCommand = @"semtex commit Readability ""<Commit message>""";
 
-        Logger.LogInformation("To apply:\n\n{ApplyBuilder}", applyBuilder.ToString());
+        switch (semanticChangesBuilder.Length, unsemanticChangesBuilder.Length)
+        {
+            case (>0,>0):
+                Logger.LogInformation("To apply these changes as new (and separate) commits use the following commands:");
+                Logger.LogInformation("");
+                Logger.LogInformation(behaviouralCommand);
+                Logger.LogInformation(readabilityCommand);
+                Logger.LogInformation("");
+                Logger.LogInformation("If you wish to checkout the change set before commiting, stash your current changes and run: git apply <path>.patch");
+                break;
+            case (>0,0):
+                Logger.LogInformation("To apply this change as a new commit use the following command:");
+                Logger.LogInformation("");
+                Logger.LogInformation(behaviouralCommand);
+                Logger.LogInformation("");
+                Logger.LogInformation("If you wish to checkout the change set before commiting, stash your current changes and run: git apply <path>.patch");
+                break;
+            case (0,>0):
+                Logger.LogInformation("To apply this change as a new commit use the following command:");
+                Logger.LogInformation("");
+                Logger.LogInformation(readabilityCommand);
+                Logger.LogInformation("");
+                Logger.LogInformation("If you wish to checkout the change set before commiting, stash your current changes and run: git apply <path>.patch");
+                break;
+        }
     }
 
 

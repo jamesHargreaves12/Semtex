@@ -15,7 +15,7 @@ var outputPath = $"{homeDir}/dev/Semtex/Semtex/Out";
 var logPath = $"{outputPath}/Logs";
 const bool shouldLogToFile = true;
 #else
-const shouldLogToFile = false;
+const bool shouldLogToFile = false;
 var outputPath = "";
 var logPath = $"";
 #endif

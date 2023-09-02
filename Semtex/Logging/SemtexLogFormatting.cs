@@ -19,7 +19,7 @@ public static class SemtexLogFormatting
         string message)
     {
         if (logLevel == LogLevel.Information)
-            return $"{DateTime.Now.ToString(timestampFormat)} {message}";
+            return $"{message}";
 
         return $"{DateTime.Now.ToString(timestampFormat)} [{GetLogLevelString(logLevel)}] {message}";
     }
