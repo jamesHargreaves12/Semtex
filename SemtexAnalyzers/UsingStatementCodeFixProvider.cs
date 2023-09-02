@@ -9,6 +9,8 @@ namespace SemtexAnalyzers;
 
 public class UsingStatementCodeFixProvider: CodeFixProvider
 {
+    public override ImmutableArray<string> FixableDiagnosticIds => ImmutableArray.Create(new[] { DiagnosticDescriptors.UsingStatementId });
+
     public override async Task RegisterCodeFixesAsync(CodeFixContext context)
     {
         var diagnostic = context.Diagnostics[0];
@@ -65,5 +67,8 @@ public class UsingStatementCodeFixProvider: CodeFixProvider
 
     }
 
-    public override ImmutableArray<string> FixableDiagnosticIds => ImmutableArray.Create(new[] { DiagnosticDescriptors.UsingStatementId });
+    public override FixAllProvider? GetFixAllProvider()
+    {
+        return base.GetFixAllProvider();
+    }
 }

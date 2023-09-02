@@ -331,7 +331,7 @@ public class SemanticEquivalenceTests
 
     static SemanticEquivalenceTests()
     {
-        SemtexLog.InitializeLogging(LogLevel.Debug, false, "");
+        SemtexLog.InitializeLogging(LogLevel.Debug, false, "", false);
 
         // Using the fact that stuff is all immutable in Roslyn we can pay a one off setup cost for this workspace and utils.
         // This also improves the caching of compiles between multiple tests for 91 tests this results in a approx 50% reduction in test time.
@@ -340,11 +340,10 @@ public class SemanticEquivalenceTests
     
     private static DocumentInfo GetMainMethod(string folder, ProjectId projectId)
     {
-        var text = @"
-[assembly: global::System.Runtime.Versioning.TargetFrameworkAttribute("".NETCoreApp,Version=v7.0"", FrameworkDisplayName = "".NET 7.0"")]
-public static class NoOpProgram{public static void Main(){}}// Needed to avoid CS5001
-
-";
+        const string text = """
+                            [assembly: global::System.Runtime.Versioning.TargetFrameworkAttribute(".NETCoreApp,Version=v7.0", FrameworkDisplayName = ".NET 7.0")]
+                            public static class NoOpProgram{public static void Main(){}}// Needed to avoid CS5001
+                            """;
         var source = SourceText.From(text);
         var id = DocumentId.CreateNewId(projectId);
         var loader = TextLoader.From(TextAndVersion.Create(source, VersionStamp.Create()));

@@ -15,7 +15,7 @@ public class LocalVariableRenameRewriter: CSharpSyntaxRewriter
     public LocalVariableRenameRewriter(List<(ISymbol, string)> renames, SemanticModel semanticModel)
     {
         _semanticModel = semanticModel;
-        _mapping = renames.ToDictionary(x => x.Item1, x => x.Item2);
+        _mapping = renames.ToDictionary(x => x.Item1, x => x.Item2, SymbolEqualityComparer.Default);
         leftNames = renames.Select(x => x.Item1.Name).ToHashSet();
     }
     

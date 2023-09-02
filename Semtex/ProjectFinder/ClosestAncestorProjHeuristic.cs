@@ -31,13 +31,13 @@ public sealed class ClosestAncestorProjHeuristic : IProjFinder
                 }
                 else
                 {
-                    Logger.LogWarning("Skipping due to the project filter");
+                    Logger.LogDebug("Skipping due to the project filter");
                     unableToFindProj.Add(filepath);
                 }
             }
             catch (UnableToFindProjectException)
             {
-                Logger.LogError("Unable to find project for {Filepath}", filepath.Path);
+                Logger.LogWarning("Unable to find project for {Filepath}", filepath.Path);
                 unableToFindProj.Add(filepath);
             }
         }

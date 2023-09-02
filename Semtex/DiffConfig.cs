@@ -30,17 +30,12 @@ public record DiffConfig
 
     internal AbsolutePath GetTargetFilepath(AbsolutePath sourceFilepath)
     {
-        AbsolutePath targetFilepath;
         if (RenamedFilepaths.Any(x => x.Source == sourceFilepath))
         {
-            targetFilepath = RenamedFilepaths.First(x => x.Source == sourceFilepath).Target;
-        }
-        else
-        {
-            targetFilepath = sourceFilepath;
+            return RenamedFilepaths.First(x => x.Source == sourceFilepath).Target;
         }
 
-        return targetFilepath;
+        return sourceFilepath;
     }
 
 }

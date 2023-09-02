@@ -9,6 +9,7 @@ namespace SemtexAnalyzers;
 
 public class ConstantValueCodeFixProvider: CodeFixProvider
 {
+    public override ImmutableArray<string> FixableDiagnosticIds => ImmutableArray.Create(new[] { DiagnosticDescriptors.ConstantValueId });
     private static SyntaxNode GetNewNodeFromConstantValue(object constantValue)
     {
         return constantValue switch
@@ -51,5 +52,8 @@ public class ConstantValueCodeFixProvider: CodeFixProvider
         context.RegisterCodeFix(codeAction, diagnostic);
     }
 
-    public override ImmutableArray<string> FixableDiagnosticIds => ImmutableArray.Create(new[] { DiagnosticDescriptors.ConstantValueId });
+    public override FixAllProvider? GetFixAllProvider()
+    {
+        return base.GetFixAllProvider();
+    }
 }

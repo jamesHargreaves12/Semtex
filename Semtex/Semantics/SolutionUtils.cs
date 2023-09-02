@@ -289,7 +289,7 @@ internal sealed class SolutionUtils
             Logger.LogDebug("Finished");
             return ExtractFilePaths(cmdResult.StandardOutput);
         }
-        catch (Exception e)
+        catch (Exception)
         {
             Logger.LogDebug("Dotnet restore failed for {Path}", path.Path);
             // Not much that we can do here so lets just return anyway.

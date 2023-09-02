@@ -24,7 +24,7 @@ public sealed class Commands
     false;
 #endif
 
-    public static async Task<bool> Run(string repoPathOrUrl, string target, string source, AbsolutePath? analyzerConfigPath, string? relativeProjFilter, AbsolutePath? explicitProjectFileMap)
+    internal static async Task<bool> Run(string repoPathOrUrl, string target, string source, AbsolutePath? analyzerConfigPath, string? relativeProjFilter, AbsolutePath? explicitProjectFileMap)
     {
         GitRepo gitRepo;
         if (Path.Exists(repoPathOrUrl))
@@ -37,7 +37,7 @@ public sealed class Commands
             gitRepo = await GitRepo.CreateGitRepoFromUrl(repoPathOrUrl).ConfigureAwait(false);
         }
 
-        await gitRepo.AssertClean();
+        await gitRepo.AssertClean().ConfigureAwait(false);
 
         await gitRepo.CheckoutAndPull(target).ConfigureAwait(false);
 
@@ -68,7 +68,7 @@ public sealed class Commands
         return results.All(r => r.SemanticallyEquivalent);
     }
     
-    public static async Task<bool> RunAllAncestors(string repoPathOrUrl, string target, AbsolutePath? analyzerConfigPath,
+    internal static async Task<bool> RunAllAncestors(string repoPathOrUrl, string target, AbsolutePath? analyzerConfigPath,
         string? relativeProjFilter, AbsolutePath? projectMappingFilepath, AbsolutePath outputPath)
     {
         GitRepo gitRepo;
@@ -81,7 +81,7 @@ public sealed class Commands
         {
             gitRepo = await GitRepo.CreateGitRepoFromUrl(repoPathOrUrl).ConfigureAwait(false);
         }
-        await gitRepo.AssertClean();
+        await gitRepo.AssertClean().ConfigureAwait(false);
 
         await gitRepo.CheckoutAndPull(target).ConfigureAwait(false);
         var projFilter = relativeProjFilter == null ? null : gitRepo.RootFolder.Join(relativeProjFilter);
@@ -124,23 +124,7 @@ public sealed class Commands
     }
 
 
-    public static async Task<bool> RunModified(AbsolutePath path, AbsolutePath? analyzerConfigPath, bool staged,
-        AbsolutePath? projFilter,
-        AbsolutePath? explicitProjectFileMap)
-    {
-        var gitRepo = await CreateGitRepoWithLocalChangesCommitted(path, staged ? IncludeUncommittedChanges.Staged : IncludeUncommittedChanges.Unstaged);
-        var commitSha = await gitRepo.GetCurrentCommitSha().ConfigureAwait(false);
-        
-        var result = await CheckSemanticEquivalence.CheckSemanticallyEquivalent(gitRepo, commitSha, analyzerConfigPath, projFilter, explicitProjectFileMap, DefaultFailFast)
-            .ConfigureAwait(false);
-        var prettySummary = await DisplayResults.GetPrettySummaryOfResultsAsync(result, gitRepo, "A commit with local changes").ConfigureAwait(false);
-        Logger.LogDebug("\n\n{PrettySummary}",prettySummary);
-
-        return result.SemanticallyEquivalent;
-    }
-
-
-    public static async Task ComputeProjectMapping(AbsolutePath slnPath, string filepath)
+    internal static async Task ComputeProjectMapping(AbsolutePath slnPath, string filepath)
     {
         var gitRepoLocation = new AbsolutePath(Path.GetDirectoryName(slnPath.Path)!);
         var localRepo = await GitRepo.SetupFromExistingFolder(gitRepoLocation).ConfigureAwait(false);
@@ -155,39 +139,39 @@ public sealed class Commands
         await File.WriteAllTextAsync(filepath, JsonSerializer.Serialize(relativeMapping)).ConfigureAwait(false);
     }
 
-    public static async Task Split(string repoPath, string baseCommit, IncludeUncommittedChanges includeUncommitted, string? projectMap)
+    internal static async Task Split(string repoPath, string baseCommit, IncludeUncommittedChanges includeUncommitted, string? projectMap)
     {
-        var gitRepo = await CreateGitRepoWithLocalChangesCommitted(new AbsolutePath(repoPath), includeUncommitted);
+        var gitRepo = await CreateGitRepoWithLocalChangesCommitted(new AbsolutePath(repoPath), includeUncommitted).ConfigureAwait(false);
         
         var projectMapPath = projectMap is null ? null : new AbsolutePath(projectMap);
         
         // Generate a patch so that we are only comparing a single commit.
-        var patchText = await gitRepo.Diff(baseCommit, "HEAD");
+        var patchText = await gitRepo.Diff(baseCommit, "HEAD").ConfigureAwait(false);
         
-        await SplitPatch(gitRepo, baseCommit, patchText, projectMapPath);
+        await SplitPatch(gitRepo, baseCommit, patchText, projectMapPath).ConfigureAwait(false);
     }
     
-    public static async Task SplitRemote(string repoUrl, string target, string baseCommit, string? projectMap)
+    internal static async Task SplitRemote(string repoUrl, string target, string baseCommit, string? projectMap)
     {
-        var gitRepo = await GitRepo.CreateGitRepoFromUrl(repoUrl);
+        var gitRepo = await GitRepo.CreateGitRepoFromUrl(repoUrl).ConfigureAwait(false);
 
 
-        baseCommit = await gitRepo.GetMergeBase(target, baseCommit);
+        baseCommit = await gitRepo.GetMergeBase(target, baseCommit).ConfigureAwait(false);
         
         // Generate a patch so that we are only comparing a single commit.
-        var patchText = await gitRepo.Diff(baseCommit,target);
+        var patchText = await gitRepo.Diff(baseCommit,target).ConfigureAwait(false);
         var projectMapPath = projectMap is null ? null : new AbsolutePath(projectMap);
 
-        await SplitPatch(gitRepo, baseCommit, patchText, projectMapPath);
+        await SplitPatch(gitRepo, baseCommit, patchText, projectMapPath).ConfigureAwait(false);
     }
 
-    private static async Task SplitPatch(GitRepo gitRepo, string baseCommit, string patchText, AbsolutePath projectMapPath)
+    private static async Task SplitPatch(GitRepo gitRepo, string baseCommit, string patchText, AbsolutePath? projectMapPath)
     {
         
         var patchFilepath = Path.Join(ScratchSpacePath, $"test-{Guid.NewGuid()}.patch");
         await File.WriteAllTextAsync(patchFilepath, patchText).ConfigureAwait(false);
 
-        await gitRepo.Checkout(baseCommit);
+        await gitRepo.Checkout(baseCommit).ConfigureAwait(false);
 
         await gitRepo.ApplyPatch(new AbsolutePath(patchFilepath)).ConfigureAwait(false);
         await gitRepo.AddAllAndCommit().ConfigureAwait(false);
@@ -203,7 +187,6 @@ public sealed class Commands
             .CheckSemanticallyEquivalent(gitRepo, commit, null, null, projectMappingFilepath: projectMapPath, DefaultFailFast)
             .ConfigureAwait(false);
         // Create a patch of the difference between target and source and then apply that.
-        var semanticallyEquivalentStatuses = new[] {Status.SemanticallyEquivalent, Status.OnlyRename, Status.SafeFile }; // Need to Consider SomeMethodsEquivalent
         var unsemanticChangesBuilder = new StringBuilder();
         var semanticChangesBuilder = new StringBuilder();
         
@@ -211,37 +194,48 @@ public sealed class Commands
         {
             var srcSha = $"{commit}~1";
             var fullDiff = await gitRepo.GetFileDiff(srcSha, commit, file.Filepath).ConfigureAwait(false);
-            // Probably just make this a switch statemenmt
-            if(semanticallyEquivalentStatuses.Contains(file.Status))
+            // Probably just make this a switch statement
+            switch (file.Status)
             {
-                unsemanticChangesBuilder.Append(fullDiff);
-            }
-            else if (file.Status == Status.SubsetOfDiffEquivalent)
-            {
-                var srcFilepath = gitRepo.RootFolder.Join(file.Filepath);
-                var targetFilepath = result.DiffConfig.GetTargetFilepath(srcFilepath);
-                var lineChanges = await gitRepo.GetLineChanges(srcSha, commit, srcFilepath).ConfigureAwait(false);
-                var lineChangesWithContex = await gitRepo.GetLineChangesWithContex(srcSha, commit, srcFilepath).ConfigureAwait(false);
-                var sourceText = await gitRepo.GetFileTextAtCommit(srcSha, srcFilepath).ConfigureAwait(false);
-                var targetText = await gitRepo.GetFileTextAtCommit(commit, targetFilepath).ConfigureAwait(false);
-                var (semanticDiff,unsemanticDiff) = DiffToMethods.SplitDiffByChanged(sourceText, targetText, file.SubsetOfMethodsThatAreNotEquivalent!, lineChanges, lineChangesWithContex);
-                var header = string.Join("\n", fullDiff.Split("\n").Take(4));
+                case Status.SemanticallyEquivalent: 
+                case Status.OnlyRename:
+                case Status.SafeFile:
+                    unsemanticChangesBuilder.Append(fullDiff);
+                    break;
+                case Status.SubsetOfDiffEquivalent:
+                    var srcFilepath = gitRepo.RootFolder.Join(file.Filepath);
+                    var targetFilepath = result.DiffConfig.GetTargetFilepath(srcFilepath);
+                    var lineChanges = await gitRepo.GetLineChanges(srcSha, commit, srcFilepath).ConfigureAwait(false);
+                    var lineChangesWithContext = await gitRepo.GetLineChangesWithContex(srcSha, commit, srcFilepath).ConfigureAwait(false);
+                    var sourceText = await gitRepo.GetFileTextAtCommit(srcSha, srcFilepath).ConfigureAwait(false);
+                    var targetText = await gitRepo.GetFileTextAtCommit(commit, targetFilepath).ConfigureAwait(false);
+                    var (semanticDiff,unsemanticDiff) = DiffToMethods.SplitDiffByChanged(sourceText, targetText, file.SubsetOfMethodsThatAreNotEquivalent!, lineChanges, lineChangesWithContext);
+                    var header = string.Join("\n", fullDiff.Split("\n").Take(4));
                 
-                if (semanticDiff.Any())
-                {
-                    semanticChangesBuilder.AppendLine(header);
-                    semanticChangesBuilder.Append(semanticDiff);
-                }
+                    if (semanticDiff.Any())
+                    {
+                        semanticChangesBuilder.AppendLine(header);
+                        semanticChangesBuilder.Append(semanticDiff);
+                    }
                 
-                if (unsemanticDiff.Any())
-                {
-                    unsemanticChangesBuilder.AppendLine(header);
-                    unsemanticChangesBuilder.Append(unsemanticDiff);
-                }
-            }
-            else
-            {
-                semanticChangesBuilder.Append(fullDiff);
+                    if (unsemanticDiff.Any())
+                    {
+                        unsemanticChangesBuilder.AppendLine(header);
+                        unsemanticChangesBuilder.Append(unsemanticDiff);
+                    }
+                    break;
+                case Status.ContainsSemanticChanges:
+                case Status.NotCSharp:
+                case Status.HasConditionalPreprocessor:
+                case Status.ProjectDidNotCompile:
+                case Status.Added:
+                case Status.Removed:
+                case Status.UnableToFindProj:
+                case Status.ProjectDidNotRestore:
+                case Status.UnexpectedError:
+                default:
+                    semanticChangesBuilder.Append(fullDiff);
+                    break;
             }
         }
         
@@ -260,14 +254,14 @@ public sealed class Commands
 
         if (semanticChangesBuilder.Length > 0)
         {
-            await File.WriteAllTextAsync(semanticFilepath, semanticChangesBuilder.ToString());
+            await File.WriteAllTextAsync(semanticFilepath, semanticChangesBuilder.ToString()).ConfigureAwait(false);
             Logger.LogInformation("Changes that DO effect runtime behaviour at: {semanticChanges}", semanticFilepath);
             applyBuilder.AppendLine($"git apply {semanticFilepath}");
         }
 
         if (unsemanticChangesBuilder.Length > 0)
         {       
-            await File.WriteAllTextAsync(unsemanticFilepath, unsemanticChangesBuilder.ToString());
+            await File.WriteAllTextAsync(unsemanticFilepath, unsemanticChangesBuilder.ToString()).ConfigureAwait(false);
             Logger.LogInformation("Changes that do NOT effect runtime behaviour at: {UnsemanticChanges}", unsemanticFilepath);
             applyBuilder.AppendLine($"git apply {unsemanticFilepath}");
         }

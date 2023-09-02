@@ -207,7 +207,7 @@ public sealed class CheckSemanticEquivalence
             }
             catch (CantFindDocumentException e)
             {
-                Logger.LogWarning("Unable to find unique document in solution for Document at {path}", e.Path.Path);
+                Logger.LogDebug("Unable to find unique document in solution for Document at {path}", e.Path.Path);
                 continue; 
             }
         }
@@ -232,7 +232,7 @@ public sealed class CheckSemanticEquivalence
 
         var matchedTarget = new HashSet<string>();
         var matchedSource = new HashSet<string>();
-        var mapping = new Dictionary<ISymbol, string>();
+        var mapping = new Dictionary<ISymbol, string>(SymbolEqualityComparer.Default);
         while (queue.TryDequeue(out var pair, out var _))
         {
             var (tgt, src) = pair;
@@ -533,11 +533,11 @@ public sealed class CheckSemanticEquivalence
             case [var x]:
                 return x;
             case []:
-                Logger.LogWarning("Document not found in source projects {Path}", filepath.Path);
+                Logger.LogDebug("Document not found in source projects {Path}", filepath.Path);
                 throw new CantFindDocumentException(filepath);
             default:
                 // This indicates that the same document is in multiple projects. Something that is not worth supporting.
-                Logger.LogWarning("Document in multiple projects, reporting unable to find project {Path}",
+                Logger.LogDebug("Document in multiple projects, reporting unable to find project {Path}",
                     filepath.Path);
                 throw new CantFindDocumentException(filepath);
         }

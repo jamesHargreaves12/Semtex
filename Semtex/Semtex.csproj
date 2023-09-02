@@ -15,7 +15,6 @@
         <PackageReference Include="Microsoft.CodeAnalysis.CSharp.Workspaces" Version="4.5.0" />
         <PackageReference Include="Microsoft.CodeAnalysis.Workspaces.MSBuild" Version="4.5.0" />
         <PackageReference Include="Microsoft.Build.Locator" Version="1.4.1" />
-        <PackageReference Include="Microsoft.CodeQuality.Analyzers" Version="3.3.2" />
         <PackageReference Include="Microsoft.Extensions.Logging" Version="7.0.0" />
         <PackageReference Include="Microsoft.Extensions.Logging.Console" Version="7.0.0" />
         <PackageReference Include="OneOf" Version="3.0.255" />

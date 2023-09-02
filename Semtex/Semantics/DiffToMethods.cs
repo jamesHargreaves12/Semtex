@@ -63,7 +63,7 @@ public sealed class DiffToMethods
             startI); //count is inclusive of first line, 0 indicates insert
         var end = fileLines[endI].EndIncludingLineBreak;
         var span = new TextSpan(start, end - start);
-        var node = root!.FindNode(span);
+        var node = root.FindNode(span);
         while (true)
         {
             switch (node)
@@ -78,8 +78,10 @@ public sealed class DiffToMethods
                 case ClassDeclarationSyntax or CompilationUnitSyntax or NamespaceDeclarationSyntax:
                     methodIdentifier = null;
                     return false;
+                case null:
+                    methodIdentifier = null;
+                    return false;
             }
-
             node = node.Parent;
         }
     }
@@ -105,10 +107,10 @@ public sealed class DiffToMethods
             switch (lineChangesWithContext.Count)
             {
                 case 0:
-                    Logger.LogWarning("--unified=0 diff {Src} not contained in normal diff hunk", srcDiff);
+                    Logger.LogDebug("--unified=0 diff {Src} not contained in normal diff hunk", srcDiff);
                     return (string.Join("\n", diffWithContext.Select(x => x.text)), "");
                 case > 1:
-                    Logger.LogWarning("--unified=0 diff {Src} contained in {Count} normal diff hunks", srcDiff,
+                    Logger.LogDebug("--unified=0 diff {Src} contained in {Count} normal diff hunks", srcDiff,
                         lineChangesWithContext.Count);
                     return (string.Join("\n", diffWithContext.Select(x => x.text)), "");
             }
@@ -117,7 +119,7 @@ public sealed class DiffToMethods
 
             if (!withContext.right.Contains(targetDiff))
             {
-                Logger.LogWarning(
+                Logger.LogDebug(
                     "targetDiff not contained in same hunk as srcDiff: \n{SrcDiff} in {Left}\n{TargetDiff} not in {Right}",
                     srcDiff, withContext.left, targetDiff, withContext.right);
                 return (string.Join("\n", diffWithContext.Select(x => x.text)), "");

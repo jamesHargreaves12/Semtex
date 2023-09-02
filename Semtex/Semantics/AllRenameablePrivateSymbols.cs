@@ -14,7 +14,7 @@ public class AllRenameablePrivateSymbols : CSharpSyntaxWalker
         _semanticModel = semanticModel;
     }
 
-    public HashSet<ISymbol> PrivateSymbols { get; } = new();
+    public HashSet<ISymbol> PrivateSymbols { get; } = new(SymbolEqualityComparer.Default);
 
     public override void VisitClassDeclaration(ClassDeclarationSyntax node)
     {

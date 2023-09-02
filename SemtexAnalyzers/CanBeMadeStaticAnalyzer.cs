@@ -99,7 +99,7 @@ public class CanBeMadeStaticAnalyzer: DiagnosticAnalyzer
                     return false;
                 
                 var invokedMethod = semanticModel.GetSymbolInfo(identifier).Symbol as IMethodSymbol;
-                return invokedMethod != null && invokedMethod.Equals(symbol);
+                return invokedMethod != null && invokedMethod.Equals(symbol, SymbolEqualityComparer.Default);
             });
     }
 

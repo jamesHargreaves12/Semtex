@@ -151,18 +151,15 @@ public sealed class SafeAnalyzers
 
     private static int GetPriority(string descriptorId)
     {
-        switch (descriptorId)
+        return descriptorId switch
         {
-            case "RCS1220": // need to be applied before RCS1208
-                return 1;
-            case "CS8019": // apply this last as theres a good chance there will be more unused usings.
-                return -1;
-            default:
-                return 0;
-        }
+            "RCS1220" => 1, // need to be applied before RCS1208
+            "CS8019" => -1, // apply this last as theres a good chance there will be more unused usings.
+            _ => 0
+        };
     }
 
-    private static HashSet<string> DiagnosticToApplyEvenIfNotInChangeMap = new HashSet<string>()
+    private static readonly HashSet<string> DiagnosticToApplyEvenIfNotInChangeMap = new HashSet<string>()
     {
         "RCS1213", // Unused Member
     };
@@ -210,6 +207,7 @@ public sealed class SafeAnalyzers
                 if (document is null)
                 {
                     Logger.LogWarning("Unable to find document in solution, skipping");
+                    currentDocumentIds.Remove(documentId);
                     continue; // The .cs file is not actually compiled by the project this can happen if the file is a test case for something that acts on .cs files
                 }
 
@@ -217,7 +215,7 @@ public sealed class SafeAnalyzers
                 var groupedDiagnostics = relevantDiagnostics
                     .Where(d => document.FilePath == d.Location.GetLineSpan().Path)
                     .Where(d=> !changedMethodsMap.ContainsKey(documentId) 
-                               || IsDiagnosticsInChangedMethod(root, d, changedMethodsMap[documentId]) 
+                               || IsDiagnosticsInChangedMethod(root!, d, changedMethodsMap[documentId]) 
                                || DiagnosticToApplyEvenIfNotInChangeMap.Contains(d.Descriptor.Id))
                     .GroupBy(d => d.Descriptor.Id)
                     .OrderByDescending(g => (GetPriority(g.Key), g.Count()))
@@ -273,6 +271,8 @@ public sealed class SafeAnalyzers
                 }
                 case ClassDeclarationSyntax or CompilationUnitSyntax or NamespaceDeclarationSyntax:
                     return true;
+                case null:
+                    return true;
                 default:
                     node = node.Parent;
                     break;
@@ -314,10 +314,10 @@ public sealed class SafeAnalyzers
             .ToList();
         if (analyzerErrors.Any())
         {
-            Logger.LogError("Some analyzer's failed to be computed");
+            Logger.LogDebug("Some analyzer's failed to be computed");
             foreach (var e in analyzerErrors)
             {
-                Logger.LogError(e);
+                Logger.LogDebug(e);
             }
 
             throw new SemtexCompileException(new AbsolutePath(proj.FilePath!), $"Analyzer execution threw exception {analyzerErrors.First()}");
@@ -333,7 +333,7 @@ public sealed class SafeAnalyzers
 
             var firstIssue = diagnostics.First(d => d.Severity == DiagnosticSeverity.Error);
             var sourceWithIssue = firstIssue.Location.SourceTree;
-            Logger.LogError(sourceWithIssue!.ToString());
+            Logger.LogDebug(sourceWithIssue!.ToString());
             throw new SemtexCompileException(new AbsolutePath(proj.FilePath!),$"Compile Failed {firstIssue}");
         }
 
@@ -351,7 +351,7 @@ public sealed class SafeAnalyzers
     }
 
 
-    static async Task<Solution> MakeCodeFixForDiagnostic(Document curDoc, Diagnostic diagnostic,
+    private static async Task<Solution> MakeCodeFixForDiagnostic(Document curDoc, Diagnostic diagnostic,
         CodeFixProvider fixProvider)
     {
         List<CodeAction> actions = new();
@@ -359,7 +359,7 @@ public sealed class SafeAnalyzers
         var context = new CodeFixContext(
             curDoc,
             diagnostic,
-            (a, d) => actions.Add(a),
+            (a, _) => actions.Add(a),
             default
         );
 
@@ -367,8 +367,7 @@ public sealed class SafeAnalyzers
         // should we throw if actions is the empty list?
         var action = actions.First();
 
-        var operations =
-            await action!.GetOperationsAsync(CancellationToken.None).ConfigureAwait(false);
+        var operations = await action.GetOperationsAsync(CancellationToken.None).ConfigureAwait(false);
 
         return operations
             .OfType<ApplyChangesOperation>()
@@ -379,7 +378,7 @@ public sealed class SafeAnalyzers
     }
 
 
-    private static List<string> CannotFixAllDiagnosticIds = new List<string>()
+    private static readonly List<string> CannotFixAllDiagnosticIds = new List<string>()
     {
         "RCS1056", // Since fixing the first might change the fix you need to apply for the second its just safest to ignore this for now.
         "RCS1220", // Adds variables and is not smart enough to ensure they are distinct, TODO fix the code fix provider.
@@ -410,7 +409,7 @@ public sealed class SafeAnalyzers
         var context = new CodeFixContext(
             document,
             nonOverlappingDiagnostic.First(),
-            (a, d) => codeActions.Add(a),
+            (a, _) => codeActions.Add(a),
             default
         );
         await fixProvider.RegisterCodeFixesAsync(context).ConfigureAwait(false);
@@ -419,8 +418,7 @@ public sealed class SafeAnalyzers
 
         if (!codeActions.Any())
         {
-            Logger.LogWarning(
-                $"The code fix for diagnostic with Id {diagnosticDescriptorId} did not raise any CodeActions");
+            Logger.LogDebug("The code fix for diagnostic with Id {Id} did not raise any CodeActions", diagnosticDescriptorId);
             return document.Project.Solution;
         }
 
@@ -470,7 +468,7 @@ public sealed class SafeAnalyzers
             throw;
         }
 
-        Logger.LogWarning("Unable to FixAll falling back to just fixing the first");
+        Logger.LogDebug("Unable to FixAll falling back to just fixing the first");
 
         return await MakeCodeFixForDiagnostic(document, nonOverlappingDiagnostic.First(d => d.Descriptor.Id == diagnosticDescriptorId),
             fixProvider).ConfigureAwait(false);

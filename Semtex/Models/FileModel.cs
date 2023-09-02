@@ -1,6 +1,5 @@
 
 using System.Text.Json.Serialization;
-using Semtex.Semantics;
 
 namespace Semtex.Models;
 

@@ -10,6 +10,8 @@ namespace SemtexAnalyzers;
 
 public class LogTemplateParamsCodeFixProvider: CodeFixProvider
 {
+    public override ImmutableArray<string> FixableDiagnosticIds => ImmutableArray.Create(new[] { DiagnosticDescriptors.LogTemplateParamsId });
+    
     public override async Task RegisterCodeFixesAsync(CodeFixContext context)
     {
         var diagnostic = context.Diagnostics[0];
@@ -41,5 +43,8 @@ public class LogTemplateParamsCodeFixProvider: CodeFixProvider
          context.RegisterCodeFix(codeAction, diagnostic);
     }
 
-    public override ImmutableArray<string> FixableDiagnosticIds => ImmutableArray.Create(new[] { DiagnosticDescriptors.LogTemplateParamsId });
+    public override FixAllProvider? GetFixAllProvider()
+    {
+        return base.GetFixAllProvider();
+    }
 }

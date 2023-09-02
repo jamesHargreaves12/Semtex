@@ -21,7 +21,7 @@ internal class RenameSymbolRewriter: CSharpSyntaxRewriter
             _oldSymbolNames.Add(s.Key.Name);
         }
 
-        _oldSymbols = renameMapping.Keys.ToHashSet();
+        _oldSymbols = renameMapping.Keys.ToHashSet(SymbolEqualityComparer.Default);
         
     }
     
@@ -34,7 +34,7 @@ internal class RenameSymbolRewriter: CSharpSyntaxRewriter
         if (currentSymbol == null)
             return base.VisitIdentifierName(node);
 
-        var symbol = _oldSymbols.SingleOrDefault(s => currentSymbol.Equals(s));
+        var symbol = _oldSymbols.SingleOrDefault(s => currentSymbol.Equals(s,SymbolEqualityComparer.Default));
         if (symbol is null)
             return base.VisitIdentifierName(node);
         
@@ -50,7 +50,7 @@ internal class RenameSymbolRewriter: CSharpSyntaxRewriter
         if (currentSymbol == null)
             return base.VisitPropertyDeclaration(node);
 
-        var symbol = _oldSymbols.SingleOrDefault(s => currentSymbol.Equals(s));
+        var symbol = _oldSymbols.SingleOrDefault(s => currentSymbol.Equals(s,SymbolEqualityComparer.Default));
         if (symbol is null)
             return base.VisitPropertyDeclaration(node);
         
@@ -66,7 +66,7 @@ internal class RenameSymbolRewriter: CSharpSyntaxRewriter
         if (currentSymbol == null)
             return base.VisitStructDeclaration(node);
 
-        var symbol = _oldSymbols.SingleOrDefault(s => currentSymbol.Equals(s));
+        var symbol = _oldSymbols.SingleOrDefault(s => currentSymbol.Equals(s,SymbolEqualityComparer.Default));
         if (symbol is null)
             return base.VisitStructDeclaration(node);
         
@@ -82,7 +82,7 @@ internal class RenameSymbolRewriter: CSharpSyntaxRewriter
         if (currentSymbol == null)
             return base.VisitRecordDeclaration(node);
 
-        var symbol = _oldSymbols.SingleOrDefault(s => currentSymbol.Equals(s));
+        var symbol = _oldSymbols.SingleOrDefault(s => currentSymbol.Equals(s,SymbolEqualityComparer.Default));
         if (symbol is null)
             return base.VisitRecordDeclaration(node);
         
@@ -99,7 +99,7 @@ internal class RenameSymbolRewriter: CSharpSyntaxRewriter
         if (currentSymbol == null)
             return base.VisitVariableDeclarator(node);
 
-        var symbol = _oldSymbols.SingleOrDefault(s => currentSymbol.Equals(s));
+        var symbol = _oldSymbols.SingleOrDefault(s => currentSymbol.Equals(s,SymbolEqualityComparer.Default));
         if (symbol is null)
             return base.VisitVariableDeclarator(node);
         
@@ -115,7 +115,7 @@ internal class RenameSymbolRewriter: CSharpSyntaxRewriter
         if (currentSymbol == null)
             return base.VisitMethodDeclaration(node);
 
-        var symbol = _oldSymbols.SingleOrDefault(s => currentSymbol.Equals(s));
+        var symbol = _oldSymbols.SingleOrDefault(s => currentSymbol.Equals(s,SymbolEqualityComparer.Default));
         if (symbol is null)
             return base.VisitMethodDeclaration(node);
         
