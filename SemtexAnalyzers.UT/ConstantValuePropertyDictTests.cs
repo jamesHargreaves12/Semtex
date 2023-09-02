@@ -14,7 +14,7 @@ public class ConstantValuePropertyDictTests
         var val = ConstantValuePropertyDict.GetValueFromPropDict(propDict!);
         val.Should().Be(s);
     }
-    
+
     [Test]
     public void Test_IntInIntOut()
     {
@@ -24,7 +24,7 @@ public class ConstantValuePropertyDictTests
         var val = ConstantValuePropertyDict.GetValueFromPropDict(propDict!);
         val.Should().Be(i);
     }
-    
+
     [Test]
     public void Test_FloatInFloatOut()
     {
@@ -34,12 +34,12 @@ public class ConstantValuePropertyDictTests
         var val = ConstantValuePropertyDict.GetValueFromPropDict(propDict!);
         val.Should().Be(f);
     }
-    
+
     [Test]
     public void Test_DoubleInDoubleOut()
     {
         const int d = 3;
-        var propDict = ConstantValuePropertyDict.GetPropertiesDict(d);  
+        var propDict = ConstantValuePropertyDict.GetPropertiesDict(d);
         propDict.Should().NotBeNull();
         var val = ConstantValuePropertyDict.GetValueFromPropDict(propDict!);
         val.Should().Be(d);
@@ -48,7 +48,7 @@ public class ConstantValuePropertyDictTests
     public void Test_UnknownTypeShouldReturnNullPropDict()
     {
         object o = new();
-        var propDict = ConstantValuePropertyDict.GetPropertiesDict(o);  
+        var propDict = ConstantValuePropertyDict.GetPropertiesDict(o);
         propDict.Should().BeNull();
     }
 }

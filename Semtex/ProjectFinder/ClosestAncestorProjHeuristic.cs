@@ -12,7 +12,7 @@ public sealed class ClosestAncestorProjHeuristic : IProjFinder
     public (Dictionary<AbsolutePath, HashSet<AbsolutePath>>, HashSet<AbsolutePath> unableToFindProj) GetProjectToFileMapping(HashSet<AbsolutePath> filepaths, AbsolutePath? projFilter)
     {
 
-        if(projFilter is not null)
+        if (projFilter is not null)
         {
             Logger.LogDebug("Project filter limiting project to only {FilePath}", projFilter.Path);
         }
@@ -48,7 +48,7 @@ public sealed class ClosestAncestorProjHeuristic : IProjFinder
                 group => group.Key,
                 group => group.Select(x => x.Path).ToHashSet()
             );
-        return (projToFiles,unableToFindProj);
+        return (projToFiles, unableToFindProj);
     }
 
     private static AbsolutePath GetProjByClosestAncestorHeuristic(AbsolutePath filepath)

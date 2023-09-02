@@ -1,7 +1,7 @@
 using System.Collections.Immutable;
 using System.Globalization;
 
-namespace SemtexAnalyzers; 
+namespace SemtexAnalyzers;
 
 // Yeah this is another case of encapsulate ugliness from the rest of the code base. Code Coverage of this file should be pm 100%
 public static class ConstantValuePropertyDict
@@ -52,5 +52,5 @@ public static class ConstantValuePropertyDict
         throw new NotImplementedException();
     }
 
- 
+
 }

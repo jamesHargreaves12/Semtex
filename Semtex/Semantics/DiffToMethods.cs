@@ -45,7 +45,7 @@ public sealed class DiffToMethods
 
                 changedMethods.Add(methodIdentifier!.Value);
             }
-            
+
             if (!changeOutsideMethod)
             {
                 result[filepath] = changedMethods;
@@ -126,8 +126,8 @@ public sealed class DiffToMethods
             }
 
             var srcDiffInMethod = TryGetMethodIdentifier(srcDiff, srcFileLines, srcRoot, out var srcMethodIdentifier);
-            var tgtDiffInMethod = TryGetMethodIdentifier(targetDiff, targetFileLines, targetRoot, out var targetMethodIdentifier); 
-            
+            var tgtDiffInMethod = TryGetMethodIdentifier(targetDiff, targetFileLines, targetRoot, out var targetMethodIdentifier);
+
             if (!srcDiffInMethod && !tgtDiffInMethod)
             {
                 continue; // If they are both at class level and we have limited semantic changes to a set of methods then this change must not be semantic

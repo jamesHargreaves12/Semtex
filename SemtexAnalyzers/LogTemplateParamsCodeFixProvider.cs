@@ -8,28 +8,28 @@ using Microsoft.CodeAnalysis.CSharp.Syntax;
 
 namespace SemtexAnalyzers;
 
-public class LogTemplateParamsCodeFixProvider: CodeFixProvider
+public class LogTemplateParamsCodeFixProvider : CodeFixProvider
 {
     public override ImmutableArray<string> FixableDiagnosticIds => ImmutableArray.Create(new[] { DiagnosticDescriptors.LogTemplateParamsId });
-    
+
     public override async Task RegisterCodeFixesAsync(CodeFixContext context)
     {
         var diagnostic = context.Diagnostics[0];
 
-        var root =  await context.Document.GetSyntaxRootAsync().ConfigureAwait(false);
+        var root = await context.Document.GetSyntaxRootAsync().ConfigureAwait(false);
 
         var node = root!.FindNode(diagnostic.Location.SourceSpan, getInnermostNodeForTie: true);
-        
+
         if (node is not LiteralExpressionSyntax literalExpression)
             return;
-        
+
         var srcText = (string)literalExpression.Token.Value!;
         var newText = Regex.Replace(srcText, @"\{[^}]+\}", "{X}");
-        
-        if(srcText == newText)
-            return;    
-    
-        
+
+        if (srcText == newText)
+            return;
+
+
         var codeAction = CodeAction.Create(
             nameof(LogTemplateParamsCodeFixProvider),
              ct =>
@@ -40,11 +40,11 @@ public class LogTemplateParamsCodeFixProvider: CodeFixProvider
              },
              diagnostic.Id
          );
-         context.RegisterCodeFix(codeAction, diagnostic);
+        context.RegisterCodeFix(codeAction, diagnostic);
     }
 
     public override FixAllProvider? GetFixAllProvider()
     {
-        return base.GetFixAllProvider();
+        return WellKnownFixAllProviders.BatchFixer;
     }
 }

@@ -3,7 +3,7 @@ using Microsoft.CodeAnalysis.CSharp;
 
 namespace Semtex.Rewriters;
 
-public class RemoveTriviaRewriter : CSharpSyntaxRewriter 
+public class RemoveTriviaRewriter : CSharpSyntaxRewriter
 {
     public override SyntaxNode? Visit(SyntaxNode? node)
     {

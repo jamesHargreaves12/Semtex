@@ -30,7 +30,7 @@ internal static class SemtexLog
                 {
                     options.TimestampFormat = timestampFormat;
                 });
-            if(shouldLogToFile)
+            if (shouldLogToFile)
                 builder.AddProvider(new SemtexLoggingProvider(logPath, timestampFormat));
         });
     }

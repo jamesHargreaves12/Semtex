@@ -7,7 +7,7 @@ using Microsoft.CodeAnalysis.Diagnostics;
 namespace SemtexAnalyzers;
 
 [DiagnosticAnalyzer(LanguageNames.CSharp)]
-public class UsingStatementAnalyzer: DiagnosticAnalyzer
+public class UsingStatementAnalyzer : DiagnosticAnalyzer
 {
     public override void Initialize(AnalysisContext context)
     {
@@ -19,9 +19,9 @@ public class UsingStatementAnalyzer: DiagnosticAnalyzer
 
     private void AnalyzeNode(SyntaxNodeAnalysisContext context)
     {
-        if(context.Compilation is not CSharpCompilation { LanguageVersion: >= LanguageVersion.CSharp8 })
+        if (context.Compilation is not CSharpCompilation { LanguageVersion: >= LanguageVersion.CSharp8 })
             return;
-        
+
         var usingStatement = (UsingStatementSyntax)context.Node;
 
         var parentBlock = usingStatement.Parent as BlockSyntax;
@@ -29,9 +29,9 @@ public class UsingStatementAnalyzer: DiagnosticAnalyzer
             return;
 
         var lastStatement = parentBlock.Statements.LastOrDefault();
-        if(lastStatement != usingStatement)
+        if (lastStatement != usingStatement)
             return;
-        
+
         if (usingStatement.Declaration is null)
         {
             return;
@@ -40,21 +40,21 @@ public class UsingStatementAnalyzer: DiagnosticAnalyzer
         var statements = usingStatement.Statement;
         while (statements is not BlockSyntax)
         {
-            if (statements is not UsingStatementSyntax childUsingStatement || childUsingStatement.Declaration is not VariableDeclarationSyntax )
+            if (statements is not UsingStatementSyntax childUsingStatement || childUsingStatement.Declaration is not VariableDeclarationSyntax)
             {
                 return;
             }
             statements = childUsingStatement.Statement;
-        
+
         }
 
-        if(DoDeclaredVariablesOverlapWithOuterScope(usingStatement, context.SemanticModel))
+        if (DoDeclaredVariablesOverlapWithOuterScope(usingStatement, context.SemanticModel))
             return;
 
         var diagnostic = Diagnostic.Create(DiagnosticDescriptors.UsingStatementDescriptor, usingStatement.GetLocation());
         context.ReportDiagnostic(diagnostic);
     }
-    
+
     // https://github.com/JosefPihrt/Roslynator/blob/914b232d7a7916ae8bd36f1bd472f5e708c7fc33/src/Common/CSharp/Analysis/ReduceIfNesting/IfLocalVariableAnalysis.cs#L12
     private static bool DoDeclaredVariablesOverlapWithOuterScope(
         StatementSyntax usingStatement,
@@ -63,7 +63,7 @@ public class UsingStatementAnalyzer: DiagnosticAnalyzer
     {
         ImmutableArray<ISymbol> variablesDeclared = semanticModel.AnalyzeDataFlow(usingStatement)!
             .VariablesDeclared;
-    
+
         if (variablesDeclared.IsEmpty)
             return false;
         var parentStatements = usingStatement.Parent switch
@@ -76,7 +76,7 @@ public class UsingStatementAnalyzer: DiagnosticAnalyzer
         {
             if (statement == usingStatement)
                 continue;
-    
+
             foreach (ISymbol parentVariable in semanticModel.AnalyzeDataFlow(statement)!.VariablesDeclared)
             {
                 foreach (ISymbol variable in variablesDeclared)
@@ -86,12 +86,13 @@ public class UsingStatementAnalyzer: DiagnosticAnalyzer
                 }
             }
         }
-    
+
         return false;
     }
 
 
-    public override ImmutableArray<DiagnosticDescriptor> SupportedDiagnostics {
+    public override ImmutableArray<DiagnosticDescriptor> SupportedDiagnostics
+    {
         get
         {
             return ImmutableArray.Create(new[]

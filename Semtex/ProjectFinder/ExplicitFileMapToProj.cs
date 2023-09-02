@@ -3,7 +3,7 @@ using Semtex.Models;
 
 namespace Semtex.ProjectFinder;
 
-public class ExplicitFileMapToProj: IProjFinder
+public class ExplicitFileMapToProj : IProjFinder
 {
     private readonly AbsolutePath _rootFolder;
     private readonly Dictionary<string, List<string>> _fileMap;

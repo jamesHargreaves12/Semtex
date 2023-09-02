@@ -20,7 +20,7 @@ public class AllRenameablePrivateSymbols : CSharpSyntaxWalker
     {
         if (node.Modifiers.All(m =>
                 !m.IsKind(SyntaxKind.PublicKeyword)
-                && !m.IsKind(SyntaxKind.ProtectedKeyword) 
+                && !m.IsKind(SyntaxKind.ProtectedKeyword)
                 && !m.IsKind(SyntaxKind.InternalKeyword))
             && (node.Parent is ClassDeclarationSyntax cds && cds.Modifiers.All(m => !m.IsKind(SyntaxKind.PartialKeyword))
                 || node.Parent is StructDeclarationSyntax sds && sds.Modifiers.All(m => !m.IsKind(SyntaxKind.PartialKeyword))
@@ -28,7 +28,7 @@ public class AllRenameablePrivateSymbols : CSharpSyntaxWalker
             ))
         {
             var symbol = _semanticModel.GetDeclaredSymbol(node);
-            if(symbol is not null)
+            if (symbol is not null)
                 PrivateSymbols.Add(symbol);
         }
 
@@ -39,16 +39,16 @@ public class AllRenameablePrivateSymbols : CSharpSyntaxWalker
     {
         if (node.Modifiers.All(m =>
                 !m.IsKind(SyntaxKind.PublicKeyword)
-                && !m.IsKind(SyntaxKind.ProtectedKeyword) 
+                && !m.IsKind(SyntaxKind.ProtectedKeyword)
                 && !m.IsKind(SyntaxKind.InternalKeyword))
             && (node.Parent is ClassDeclarationSyntax cds && cds.Modifiers.All(m => !m.IsKind(SyntaxKind.PartialKeyword))
                 || node.Parent is StructDeclarationSyntax sds && sds.Modifiers.All(m => !m.IsKind(SyntaxKind.PartialKeyword))
-                || node.Parent is RecordDeclarationSyntax rds && rds.Modifiers.All(m => !m.IsKind(SyntaxKind.PartialKeyword))) 
+                || node.Parent is RecordDeclarationSyntax rds && rds.Modifiers.All(m => !m.IsKind(SyntaxKind.PartialKeyword)))
             && node.Declaration.Variables is [var declaration])
         {
-            
+
             var symbol = _semanticModel.GetDeclaredSymbol(declaration);
-            if(symbol is not null)
+            if (symbol is not null)
                 PrivateSymbols.Add(symbol);
         }
 
@@ -57,11 +57,11 @@ public class AllRenameablePrivateSymbols : CSharpSyntaxWalker
 
     public override void VisitStructDeclaration(StructDeclarationSyntax node)
     {
-        if (node.Modifiers.Any(m => m.IsKind(SyntaxKind.PrivateKeyword)) 
-            && node.FirstAncestor(SyntaxKind.ClassDeclaration) is ClassDeclarationSyntax cds && cds.Modifiers.All(m=>!m.IsKind(SyntaxKind.PartialKeyword)))
+        if (node.Modifiers.Any(m => m.IsKind(SyntaxKind.PrivateKeyword))
+            && node.FirstAncestor(SyntaxKind.ClassDeclaration) is ClassDeclarationSyntax cds && cds.Modifiers.All(m => !m.IsKind(SyntaxKind.PartialKeyword)))
         {
             var symbol = _semanticModel.GetDeclaredSymbol(node);
-            if(symbol is not null)
+            if (symbol is not null)
                 PrivateSymbols.Add(symbol);
         }
 
@@ -72,7 +72,7 @@ public class AllRenameablePrivateSymbols : CSharpSyntaxWalker
     {
         if (node.Modifiers.All(m =>
                 !m.IsKind(SyntaxKind.PublicKeyword)
-                && !m.IsKind(SyntaxKind.ProtectedKeyword) 
+                && !m.IsKind(SyntaxKind.ProtectedKeyword)
                 && !m.IsKind(SyntaxKind.InternalKeyword))
             && (node.Parent is ClassDeclarationSyntax cds && cds.Modifiers.All(m => !m.IsKind(SyntaxKind.PartialKeyword))
                 || node.Parent is StructDeclarationSyntax sds && sds.Modifiers.All(m => !m.IsKind(SyntaxKind.PartialKeyword))
@@ -89,7 +89,7 @@ public class AllRenameablePrivateSymbols : CSharpSyntaxWalker
     {
         if (node.Modifiers.All(m =>
                 !m.IsKind(SyntaxKind.PublicKeyword)
-                && !m.IsKind(SyntaxKind.ProtectedKeyword) 
+                && !m.IsKind(SyntaxKind.ProtectedKeyword)
                 && !m.IsKind(SyntaxKind.InternalKeyword))
             && (node.Parent is ClassDeclarationSyntax cds && cds.Modifiers.All(m => !m.IsKind(SyntaxKind.PartialKeyword))
                 || node.Parent is StructDeclarationSyntax sds && sds.Modifiers.All(m => !m.IsKind(SyntaxKind.PartialKeyword))
@@ -108,7 +108,7 @@ public class AllRenameablePrivateSymbols : CSharpSyntaxWalker
     {
         if (node.Modifiers.All(m =>
                 !m.IsKind(SyntaxKind.PublicKeyword)
-                && !m.IsKind(SyntaxKind.ProtectedKeyword) 
+                && !m.IsKind(SyntaxKind.ProtectedKeyword)
                 && !m.IsKind(SyntaxKind.InternalKeyword))
             && (node.Parent is ClassDeclarationSyntax cds && cds.Modifiers.All(m => !m.IsKind(SyntaxKind.PartialKeyword))
                 || node.Parent is StructDeclarationSyntax sds && sds.Modifiers.All(m => !m.IsKind(SyntaxKind.PartialKeyword))

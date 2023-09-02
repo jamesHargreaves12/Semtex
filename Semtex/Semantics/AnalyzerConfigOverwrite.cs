@@ -11,7 +11,7 @@ namespace Semtex.Semantics;
 public sealed class AnalyzerConfigOverwrite
 {
     private static readonly ILogger<AnalyzerConfigOverwrite> Logger = SemtexLog.LoggerFactory.CreateLogger<AnalyzerConfigOverwrite>();
-    
+
     /// <summary>
     /// By default we want to control which analyzers are applied. To achieve this we strip out any existing
     /// AnalyzerConfig documents in the project and replace it with a new one that is controlled by us.
@@ -27,9 +27,9 @@ public sealed class AnalyzerConfigOverwrite
         // Strip out all existing config docs.
         var whitelistConfigDocumentName = $"{project.Name}.GeneratedMSBuildEditorConfig.editorconfig";
         var configDocuments = project.AnalyzerConfigDocuments
-            .Where(x=>x.Name != whitelistConfigDocumentName)
+            .Where(x => x.Name != whitelistConfigDocumentName)
             .ToList();
-        
+
         Logger.LogDebug(
             $"Stripping out Existing config documents {string.Join(",", configDocuments.Select(c => c.FilePath))}");
         var newSln = sln.RemoveAnalyzerConfigDocuments(configDocuments.Select(d => d.Id).ToImmutableArray());
@@ -46,7 +46,7 @@ public sealed class AnalyzerConfigOverwrite
             var analyzerConfigFolder = Directory.GetParent(typeof(AnalyzerConfigOverwrite).Assembly.Location)!.ToString();
             configText = await File.ReadAllTextAsync(Path.Join(analyzerConfigFolder, ".analyzerconfig")).ConfigureAwait(false);
 
-            analyzerConfigPath = new AbsolutePath(Path.Join(Path.GetDirectoryName(project.FilePath), ".analyzerconfig")); 
+            analyzerConfigPath = new AbsolutePath(Path.Join(Path.GetDirectoryName(project.FilePath), ".analyzerconfig"));
             configText += GetAnalyzerConfigOnlyForFilesThatChanged(changedDocumentIds.Select(project.GetDocument));
         }
 
@@ -64,9 +64,9 @@ public sealed class AnalyzerConfigOverwrite
         result.AppendLine();
         foreach (var document in documents)
         {
-            if(document?.FilePath is null)
+            if (document?.FilePath is null)
                 continue;
-            
+
             result.AppendLine($"[{document.FilePath}]");
             result.Append((string?)warningLines);
             result.AppendLine();

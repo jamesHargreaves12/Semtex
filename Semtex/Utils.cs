@@ -30,10 +30,10 @@ internal sealed class Utils
             }
         }
     }
-    
+
     internal static bool IsRepoUrl(string s)
     {
-        return s.EndsWith(".git"); 
+        return s.EndsWith(".git");
     }
 
 }

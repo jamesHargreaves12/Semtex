@@ -4,7 +4,7 @@ using Microsoft.CodeAnalysis.CSharp.Syntax;
 
 namespace Semtex.Rewriters;
 
-public class ConsistentOrderRewriter: CSharpSyntaxRewriter
+public class ConsistentOrderRewriter : CSharpSyntaxRewriter
 {
     private static (int, string, string) Order(MemberDeclarationSyntax member)
     {

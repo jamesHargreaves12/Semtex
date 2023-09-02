@@ -28,6 +28,6 @@ public sealed class SemtexConsoleFormatter : ConsoleFormatter, IDisposable
 
         textWriter.WriteLine(text);
     }
-    
+
     public void Dispose() => _optionsReloadToken?.Dispose();
 }

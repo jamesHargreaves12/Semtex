@@ -7,7 +7,7 @@ using Microsoft.CodeAnalysis.CSharp.Syntax;
 
 namespace SemtexAnalyzers;
 
-public class ConstantValueCodeFixProvider: CodeFixProvider
+public class ConstantValueCodeFixProvider : CodeFixProvider
 {
     public override ImmutableArray<string> FixableDiagnosticIds => ImmutableArray.Create(new[] { DiagnosticDescriptors.ConstantValueId });
     private static SyntaxNode GetNewNodeFromConstantValue(object constantValue)
@@ -17,7 +17,7 @@ public class ConstantValueCodeFixProvider: CodeFixProvider
             string s => SyntaxFactory.LiteralExpression(SyntaxKind.StringLiteralExpression, SyntaxFactory.Literal(s)),
             int i and >= 0 => SyntaxFactory.LiteralExpression(SyntaxKind.NumericLiteralExpression, SyntaxFactory.Literal(i)),
             // This is slightly awkward but the casting to an enum can't be done from a negative literal - https://learn.microsoft.com/en-us/dotnet/csharp/misc/cs0075.
-            int i and < 0 => SyntaxFactory.ParenthesizedExpression(SyntaxFactory.LiteralExpression(SyntaxKind.NumericLiteralExpression, SyntaxFactory.Literal(i))), 
+            int i and < 0 => SyntaxFactory.ParenthesizedExpression(SyntaxFactory.LiteralExpression(SyntaxKind.NumericLiteralExpression, SyntaxFactory.Literal(i))),
             float f => SyntaxFactory.LiteralExpression(SyntaxKind.NumericLiteralExpression, SyntaxFactory.Literal(f)),
             double d => SyntaxFactory.LiteralExpression(SyntaxKind.NumericLiteralExpression, SyntaxFactory.Literal(d)),
             _ => throw new NotImplementedException()
@@ -29,19 +29,20 @@ public class ConstantValueCodeFixProvider: CodeFixProvider
         var diagnostic = context.Diagnostics[0];
         // var constantValue = diagnostic.
         var properties = diagnostic.Properties;
-        var root =  await context.Document.GetSyntaxRootAsync().ConfigureAwait(false);
+        var root = await context.Document.GetSyntaxRootAsync().ConfigureAwait(false);
 
         var node = root!.FindNode(diagnostic.Location.SourceSpan, getInnermostNodeForTie: true);
         // if constant is X.Name and "Name" is constant then we should replace X.Name
-        if (node.Parent is MemberAccessExpressionSyntax memberAccess && memberAccess.Name == node 
-            || node.Parent is QualifiedNameSyntax qualifiedNameSyntax && qualifiedNameSyntax.Right == node )
+        if (node.Parent is MemberAccessExpressionSyntax memberAccess && memberAccess.Name == node
+            || node.Parent is QualifiedNameSyntax qualifiedNameSyntax && qualifiedNameSyntax.Right == node)
         {
             node = node.Parent;
         }
 
         var codeAction = CodeAction.Create(
             nameof(ConstantValueCodeFixProvider),
-            ct => {
+            ct =>
+            {
                 var value = ConstantValuePropertyDict.GetValueFromPropDict(properties);
                 var newNode = GetNewNodeFromConstantValue(value);
                 var newRoot = root.ReplaceNode(node, newNode);
@@ -54,6 +55,6 @@ public class ConstantValueCodeFixProvider: CodeFixProvider
 
     public override FixAllProvider? GetFixAllProvider()
     {
-        return base.GetFixAllProvider();
+        return WellKnownFixAllProviders.BatchFixer;
     }
 }

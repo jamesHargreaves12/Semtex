@@ -17,7 +17,7 @@ public static class DiagnosticDescriptors
         "category",
         DiagnosticSeverity.Warning,
         isEnabledByDefault: true);
-    
+
     public static DiagnosticDescriptor LogTemplateParamsDiagnosticDescriptors = new(
         LogTemplateParamsId,
         nameof(LogTemplateParamsDiagnosticDescriptors),

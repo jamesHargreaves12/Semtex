@@ -7,14 +7,14 @@ using Microsoft.CodeAnalysis.CSharp.Syntax;
 
 namespace SemtexAnalyzers;
 
-public class UsingStatementCodeFixProvider: CodeFixProvider
+public class UsingStatementCodeFixProvider : CodeFixProvider
 {
     public override ImmutableArray<string> FixableDiagnosticIds => ImmutableArray.Create(new[] { DiagnosticDescriptors.UsingStatementId });
 
     public override async Task RegisterCodeFixesAsync(CodeFixContext context)
     {
         var diagnostic = context.Diagnostics[0];
-        var root =  await context.Document.GetSyntaxRootAsync().ConfigureAwait(false);
+        var root = await context.Document.GetSyntaxRootAsync().ConfigureAwait(false);
 
         var node = root!.FindNode(diagnostic.Location.SourceSpan, getInnermostNodeForTie: true);
 
@@ -45,7 +45,7 @@ public class UsingStatementCodeFixProvider: CodeFixProvider
                         block = blockSyntax;
                         break;
                     }
-                    if (usingStatement.Statement is not UsingStatementSyntax childUsingStatement || childUsingStatement.Declaration is not VariableDeclarationSyntax childUsingVariableDeclaration )
+                    if (usingStatement.Statement is not UsingStatementSyntax childUsingStatement || childUsingStatement.Declaration is not VariableDeclarationSyntax childUsingVariableDeclaration)
                     {
                         throw new InvalidOperationException();
                     }
@@ -60,15 +60,15 @@ public class UsingStatementCodeFixProvider: CodeFixProvider
                 var newRoot = root.ReplaceNode(parentBlock, newParentBlock);
                 return Task.FromResult(context.Document.WithSyntaxRoot(newRoot));
             },
-            
+
             diagnostic.Id
-        );    
+        );
         context.RegisterCodeFix(codeAction, diagnostic);
 
     }
 
     public override FixAllProvider? GetFixAllProvider()
     {
-        return base.GetFixAllProvider();
+        return WellKnownFixAllProviders.BatchFixer;
     }
 }

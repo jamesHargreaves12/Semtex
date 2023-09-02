@@ -8,7 +8,7 @@ public record UnsimplifiedFilesSummary
         HashSet<AbsolutePath> filepathsWithIfPreprocessor,
         HashSet<AbsolutePath> filepathsInProjThatFailedToCompile,
         HashSet<AbsolutePath> filepathsWhichUnableToFindProjFor,
-        HashSet<AbsolutePath> filepathsInProjThatFailedToRestore, 
+        HashSet<AbsolutePath> filepathsInProjThatFailedToRestore,
         HashSet<AbsolutePath> filepathsWithUnexpectedErrors
     )
     {
@@ -38,10 +38,10 @@ public record UnsimplifiedFilesSummary
 
     public bool IsUnsimplified(AbsolutePath p)
     {
-        return FilepathsWithIfPreprocessor.Contains(p) 
-               || FilepathsInProjThatFailedToCompile.Contains(p) 
-               || FilepathsWhichUnableToFindProjFor.Contains(p) 
-               || FilepathsInProjThatFailedToRestore.Contains(p) 
+        return FilepathsWithIfPreprocessor.Contains(p)
+               || FilepathsInProjThatFailedToCompile.Contains(p)
+               || FilepathsWhichUnableToFindProjFor.Contains(p)
+               || FilepathsInProjThatFailedToRestore.Contains(p)
                || FilepathsWithUnexpectedErrors.Contains(p);
     }
 }

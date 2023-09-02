@@ -4,7 +4,7 @@ using Microsoft.CodeAnalysis.CSharp.Syntax;
 
 namespace Semtex.Rewriters;
 
-internal class RenameSymbolRewriter: CSharpSyntaxRewriter
+internal class RenameSymbolRewriter : CSharpSyntaxRewriter
 {
     private readonly SemanticModel _semanticModel;
     private readonly Dictionary<ISymbol, string> _renameMapping;
@@ -22,9 +22,9 @@ internal class RenameSymbolRewriter: CSharpSyntaxRewriter
         }
 
         _oldSymbols = renameMapping.Keys.ToHashSet(SymbolEqualityComparer.Default);
-        
+
     }
-    
+
     public override SyntaxNode? VisitIdentifierName(IdentifierNameSyntax node)
     {
         if (!_oldSymbolNames.Contains(node.Identifier.Text))
@@ -34,10 +34,10 @@ internal class RenameSymbolRewriter: CSharpSyntaxRewriter
         if (currentSymbol == null)
             return base.VisitIdentifierName(node);
 
-        var symbol = _oldSymbols.SingleOrDefault(s => currentSymbol.Equals(s,SymbolEqualityComparer.Default));
+        var symbol = _oldSymbols.SingleOrDefault(s => currentSymbol.Equals(s, SymbolEqualityComparer.Default));
         if (symbol is null)
             return base.VisitIdentifierName(node);
-        
+
         return node.WithIdentifier(SyntaxFactory.Identifier(_renameMapping[symbol]));
     }
 
@@ -50,10 +50,10 @@ internal class RenameSymbolRewriter: CSharpSyntaxRewriter
         if (currentSymbol == null)
             return base.VisitPropertyDeclaration(node);
 
-        var symbol = _oldSymbols.SingleOrDefault(s => currentSymbol.Equals(s,SymbolEqualityComparer.Default));
+        var symbol = _oldSymbols.SingleOrDefault(s => currentSymbol.Equals(s, SymbolEqualityComparer.Default));
         if (symbol is null)
             return base.VisitPropertyDeclaration(node);
-        
+
         return node.WithIdentifier(SyntaxFactory.Identifier(_renameMapping[symbol]));
     }
 
@@ -66,13 +66,13 @@ internal class RenameSymbolRewriter: CSharpSyntaxRewriter
         if (currentSymbol == null)
             return base.VisitStructDeclaration(node);
 
-        var symbol = _oldSymbols.SingleOrDefault(s => currentSymbol.Equals(s,SymbolEqualityComparer.Default));
+        var symbol = _oldSymbols.SingleOrDefault(s => currentSymbol.Equals(s, SymbolEqualityComparer.Default));
         if (symbol is null)
             return base.VisitStructDeclaration(node);
-        
+
         return node.WithIdentifier(SyntaxFactory.Identifier(_renameMapping[symbol]));
     }
-    
+
     public override SyntaxNode? VisitRecordDeclaration(RecordDeclarationSyntax node)
     {
         if (!_oldSymbolNames.Contains(node.Identifier.Text))
@@ -82,10 +82,10 @@ internal class RenameSymbolRewriter: CSharpSyntaxRewriter
         if (currentSymbol == null)
             return base.VisitRecordDeclaration(node);
 
-        var symbol = _oldSymbols.SingleOrDefault(s => currentSymbol.Equals(s,SymbolEqualityComparer.Default));
+        var symbol = _oldSymbols.SingleOrDefault(s => currentSymbol.Equals(s, SymbolEqualityComparer.Default));
         if (symbol is null)
             return base.VisitRecordDeclaration(node);
-        
+
         return node.WithIdentifier(SyntaxFactory.Identifier(_renameMapping[symbol]));
     }
 
@@ -99,10 +99,10 @@ internal class RenameSymbolRewriter: CSharpSyntaxRewriter
         if (currentSymbol == null)
             return base.VisitVariableDeclarator(node);
 
-        var symbol = _oldSymbols.SingleOrDefault(s => currentSymbol.Equals(s,SymbolEqualityComparer.Default));
+        var symbol = _oldSymbols.SingleOrDefault(s => currentSymbol.Equals(s, SymbolEqualityComparer.Default));
         if (symbol is null)
             return base.VisitVariableDeclarator(node);
-        
+
         return node.WithIdentifier(SyntaxFactory.Identifier(_renameMapping[symbol]));
     }
 
@@ -115,10 +115,10 @@ internal class RenameSymbolRewriter: CSharpSyntaxRewriter
         if (currentSymbol == null)
             return base.VisitMethodDeclaration(node);
 
-        var symbol = _oldSymbols.SingleOrDefault(s => currentSymbol.Equals(s,SymbolEqualityComparer.Default));
+        var symbol = _oldSymbols.SingleOrDefault(s => currentSymbol.Equals(s, SymbolEqualityComparer.Default));
         if (symbol is null)
             return base.VisitMethodDeclaration(node);
-        
+
         return node.WithIdentifier(SyntaxFactory.Identifier(_renameMapping[symbol]));
     }
 }

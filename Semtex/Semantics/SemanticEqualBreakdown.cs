@@ -55,7 +55,7 @@ public sealed class SemanticEqualBreakdown
         {
             Logger.LogDebug("Resulting diffs = " + string.Join(",", res.AsT0.MethodIdentifiers));
         }
-        
+
         return res;
     }
 
@@ -68,12 +68,12 @@ public sealed class SemanticEqualBreakdown
             (BaseNamespaceDeclarationSyntax l, BaseNamespaceDeclarationSyntax r) => await GetSemanticallyUnequalNamespace(l, r, leftSemanticModel, rightSemanticModel, leftDocument, rightDocument).ConfigureAwait(false),
             (ClassDeclarationSyntax l, ClassDeclarationSyntax r) => await GetSemanticallyUnequalClassDeclaration(l, r, leftSemanticModel, rightSemanticModel, leftDocument, rightDocument).ConfigureAwait(false),
             (MethodDeclarationSyntax l, MethodDeclarationSyntax r) => await GetSemanticallyUnequalMethodDeclaration(l, r, leftSemanticModel, rightSemanticModel, leftDocument, rightDocument).ConfigureAwait(false),
-            _ => StringEqual(left, right) 
+            _ => StringEqual(left, right)
                 ? OneOf<DifferencesLimitedToFunctions, CouldntLimitToFunctions>.FromT0(new DifferencesLimitedToFunctions())
                 : OneOf<DifferencesLimitedToFunctions, CouldntLimitToFunctions>.FromT1(new CouldntLimitToFunctions())
         };
     }
-    
+
     private static bool SemanticallyEqualSyntaxList<T>(SyntaxList<T> left, SyntaxList<T> right) where T : SyntaxNode
     {
         if (left.Count != right.Count)
@@ -91,14 +91,14 @@ public sealed class SemanticEqualBreakdown
     {
         if (left.Count != right.Count)
             return false;
-        foreach (var (l,r) in left.Zip(right))
+        foreach (var (l, r) in left.Zip(right))
         {
             if (l.ToString() != r.ToString())
                 return false;
         }
         return true;
     }
-    
+
     private static bool SemanticallyEqualBaseList(BaseListSyntax? left, BaseListSyntax? right)
     {
         // If both null return true if one is null return false
@@ -117,10 +117,10 @@ public sealed class SemanticEqualBreakdown
 
     private static async Task<OneOf<DifferencesLimitedToFunctions, CouldntLimitToFunctions>> GetSemanticallyUnequalCompilationUnit(CompilationUnitSyntax left, CompilationUnitSyntax right, SemanticModel leftSemanticModel, SemanticModel rightSemanticModel, Document leftDocument, Document rightDocument)
     {
-        if(!SemanticallyEqualSyntaxList(left.Externs, right.Externs)
+        if (!SemanticallyEqualSyntaxList(left.Externs, right.Externs)
            || !SemanticallyEqualSyntaxList(left.AttributeLists, right.AttributeLists))
             return new CouldntLimitToFunctions();
-        
+
         var memberResult = await SemanticallyEqualMembers(left.Members, right.Members, leftSemanticModel, rightSemanticModel, leftDocument, rightDocument).ConfigureAwait(false);
         if (memberResult.IsT1 || SemanticallyEqualUsings(left.Usings, right.Usings))
             return memberResult;
@@ -141,7 +141,7 @@ public sealed class SemanticEqualBreakdown
 
         return OneOf<DifferencesLimitedToFunctions, CouldntLimitToFunctions>.FromT1(new CouldntLimitToFunctions());
     }
-    
+
     private static async Task<OneOf<DifferencesLimitedToFunctions, CouldntLimitToFunctions>> GetSemanticallyUnequalClassDeclaration(ClassDeclarationSyntax left, ClassDeclarationSyntax right, SemanticModel leftSemanticModel, SemanticModel rightSemanticModel, Document leftDocument, Document rightDocument)
     {
         if (SemanticallyEqualSyntaxList(left.AttributeLists, right.AttributeLists) &&
@@ -155,7 +155,7 @@ public sealed class SemanticEqualBreakdown
         return OneOf<DifferencesLimitedToFunctions, CouldntLimitToFunctions>.FromT1(new CouldntLimitToFunctions());
     }
 
-    private static async Task<OneOf<DifferencesLimitedToFunctions, CouldntLimitToFunctions>> GetSemanticallyUnequalMethodDeclaration(MethodDeclarationSyntax left, MethodDeclarationSyntax right, SemanticModel leftSemanticModel, SemanticModel rightSemanticModel,Document leftDocument, Document rightDocument)
+    private static async Task<OneOf<DifferencesLimitedToFunctions, CouldntLimitToFunctions>> GetSemanticallyUnequalMethodDeclaration(MethodDeclarationSyntax left, MethodDeclarationSyntax right, SemanticModel leftSemanticModel, SemanticModel rightSemanticModel, Document leftDocument, Document rightDocument)
     {
         var leftId = SemanticSimplifier.GetMethodIdentifier(left);
         var rightId = SemanticSimplifier.GetMethodIdentifier(right);
@@ -173,18 +173,18 @@ public sealed class SemanticEqualBreakdown
             !StringEqual(left.ReturnType, right.ReturnType) ||
             !NullableStringEqual(left.TypeParameterList, right.TypeParameterList) // Not checkint arity as it is covered by TypeParameterList
            )
-            return new DifferencesLimitedToFunctions(new List<MethodIdentifier> {SemanticSimplifier.GetMethodIdentifier(left)});
+            return new DifferencesLimitedToFunctions(new List<MethodIdentifier> { SemanticSimplifier.GetMethodIdentifier(left) });
 
         switch (left.Body, right.Body)
         {
-            case (null,null):
+            case (null, null):
                 return new DifferencesLimitedToFunctions();
-            case (null, {}):
-                return new DifferencesLimitedToFunctions(new List<MethodIdentifier> {SemanticSimplifier.GetMethodIdentifier(left)});
-            case ({},null):
-                return new DifferencesLimitedToFunctions(new List<MethodIdentifier> {SemanticSimplifier.GetMethodIdentifier(left)});
+            case (null, { }):
+                return new DifferencesLimitedToFunctions(new List<MethodIdentifier> { SemanticSimplifier.GetMethodIdentifier(left) });
+            case ({ }, null):
+                return new DifferencesLimitedToFunctions(new List<MethodIdentifier> { SemanticSimplifier.GetMethodIdentifier(left) });
         }
-        
+
         // Calculating Renames is more expensive so lets only do it for methods that are not equal before renaming:
         if (LocalStatementsEquality.SemanticallyEqualLocalStatements(left.Body.Statements, right.Body.Statements,
                 leftSemanticModel, rightSemanticModel, new List<(ISymbol left, string right)>()))
@@ -202,11 +202,11 @@ public sealed class SemanticEqualBreakdown
             return new DifferencesLimitedToFunctions();
         }
 
-        return new DifferencesLimitedToFunctions(new List<MethodIdentifier> {SemanticSimplifier.GetMethodIdentifier(left)});
+        return new DifferencesLimitedToFunctions(new List<MethodIdentifier> { SemanticSimplifier.GetMethodIdentifier(left) });
     }
-    
+
     private static bool SemanticallyEqualUsings(SyntaxList<UsingDirectiveSyntax> left, SyntaxList<UsingDirectiveSyntax> right)
-    {        
+    {
         // Allow reordering of using directives.
         var leftUsings = left.Select(u => u.NormalizeWhitespace().ToString()).ToHashSet();
         return leftUsings.SetEquals(right.Select(u => u.NormalizeWhitespace().ToString()));
@@ -218,7 +218,7 @@ public sealed class SemanticEqualBreakdown
             return OneOf<DifferencesLimitedToFunctions, CouldntLimitToFunctions>.FromT1(new CouldntLimitToFunctions());
 
         var accumulator = new List<MethodIdentifier>();
-        foreach (var (lMem,rMem) in left.Zip(right))
+        foreach (var (lMem, rMem) in left.Zip(right))
         {
 
             var memberResult = await GetSemanticallyUnequal(lMem, rMem, leftSemanticModel, rightSemanticModel, leftDocument, rightDocument)

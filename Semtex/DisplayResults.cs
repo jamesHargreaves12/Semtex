@@ -5,7 +5,7 @@ namespace Semtex;
 
 public static class DisplayResults
 {
-    internal static async Task<string> GetPrettySummaryOfResultsAsync(CommitModel result, GitRepo gitRepo, string? commitDisplayTitle=default)
+    internal static async Task<string> GetPrettySummaryOfResultsAsync(CommitModel result, GitRepo gitRepo, string? commitDisplayTitle = default)
     {
         var resultSummary = new StringBuilder();
         var commitDisplayName = commitDisplayTitle ?? await gitRepo.GetCommitOnelineDisplay(result.CommitHash).ConfigureAwait(false);
@@ -54,7 +54,7 @@ public static class DisplayResults
             "Files that have some changes which effect execution and some that don't"
         );
 
-        var notEquiv = result.FileModels   
+        var notEquiv = result.FileModels
             .Where(f => f.Status == Status.ContainsSemanticChanges)
             .ToList();
         AddSectionIfNotEmpty(
@@ -63,7 +63,7 @@ public static class DisplayResults
             "❌",
             "Contained semantic changes:"
         );
-        
+
         var added = result.FileModels
             .Where(f => f.Status == Status.Added)
             .ToList();
@@ -84,7 +84,7 @@ public static class DisplayResults
             "Removed:"
         );
 
-        
+
         var notCs = result.FileModels
             .Where(f => f.Status == Status.NotCSharp)
             .ToList();
@@ -94,7 +94,7 @@ public static class DisplayResults
             "❌",
             "Not C# so were not checked:"
         );
-        
+
         var notCompile = result.FileModels
             .Where(f => f.Status == Status.ProjectDidNotCompile)
             .ToList();
@@ -104,7 +104,7 @@ public static class DisplayResults
             "❌",
             "Projects failed to compile:"
         );
-        
+
         var notRestore = result.FileModels
             .Where(f => f.Status == Status.ProjectDidNotRestore)
             .ToList();
@@ -114,7 +114,7 @@ public static class DisplayResults
             "❌",
             "Projects failed to restore:"
         );
-        
+
         var hasConditionalPreprocessor = result.FileModels
             .Where(f => f.Status == Status.HasConditionalPreprocessor)
             .ToList();
@@ -124,7 +124,7 @@ public static class DisplayResults
             "❌",
             "Contained conditional preprocessors so were not checked:"
         );
-        
+
         var unableToFindProj = result.FileModels
             .Where(f => f.Status == Status.UnableToFindProj)
             .ToList();

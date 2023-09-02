@@ -14,7 +14,7 @@ public class ComputeDocumentToProjMapping
 
             foreach (var doc in proj.Documents)
             {
-                if(doc.FilePath is null) continue;
+                if (doc.FilePath is null) continue;
 
                 var docFilePath = new AbsolutePath(doc.FilePath);
                 var projFilePath = new AbsolutePath(proj.FilePath);

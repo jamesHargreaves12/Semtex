@@ -17,7 +17,7 @@ public static class RoslynCsCodeFixProviders
     public static CodeFixProvider GetRoslynCodeFixProvider(string typeFullName)
     {
         var t = CsharpCodeFixProviderAssembly.GetType(typeFullName);
-        return (CodeFixProvider)t!.GetConstructor(new Type[]{})!.Invoke(null);
+        return (CodeFixProvider)t!.GetConstructor(new Type[] { })!.Invoke(null);
     }
 
     private static string GetEquivalenceKeyForCSharpRemoveUnnecessaryImportsCodeFixProvider(CodeFixProvider codeFixProvider)
@@ -26,16 +26,16 @@ public static class RoslynCsCodeFixProviders
         return (string)codeFixProvider
             .GetType()
             .GetMethod("GetTitle", BindingFlags.NonPublic | BindingFlags.Instance)!
-            .Invoke(codeFixProvider, new object?[]{})!;
+            .Invoke(codeFixProvider, new object?[] { })!;
     }
 
     public static Dictionary<string, CodeFixProvider> SupportedCodeFixes =
         new()
         {
-            ["CS8019"]= GetRoslynCodeFixProvider("Microsoft.CodeAnalysis.CSharp.RemoveUnnecessaryImports.CSharpRemoveUnnecessaryImportsCodeFixProvider"),
+            ["CS8019"] = GetRoslynCodeFixProvider("Microsoft.CodeAnalysis.CSharp.RemoveUnnecessaryImports.CSharpRemoveUnnecessaryImportsCodeFixProvider"),
             // TODO I checked out this guy and its really not doing anything smart. I should just reimplementl it.
-            ["CS0219"]= GetRoslynCodeFixProvider("Microsoft.CodeAnalysis.CSharp.RemoveUnusedVariable.CSharpRemoveUnusedVariableCodeFixProvider"),
-            ["CS0168"]= GetRoslynCodeFixProvider("Microsoft.CodeAnalysis.CSharp.RemoveUnusedVariable.CSharpRemoveUnusedVariableCodeFixProvider"),
+            ["CS0219"] = GetRoslynCodeFixProvider("Microsoft.CodeAnalysis.CSharp.RemoveUnusedVariable.CSharpRemoveUnusedVariableCodeFixProvider"),
+            ["CS0168"] = GetRoslynCodeFixProvider("Microsoft.CodeAnalysis.CSharp.RemoveUnusedVariable.CSharpRemoveUnusedVariableCodeFixProvider"),
         };
 
     public static Dictionary<string, string?> SupportedCodeFixesEquivalentKeys =

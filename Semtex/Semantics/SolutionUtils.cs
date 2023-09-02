@@ -35,8 +35,8 @@ internal sealed class SolutionUtils
         await workspace.OpenSolutionAsync(slnPath.Path).ConfigureAwait(false);
         return workspace.CurrentSolution;
     }
-    
-    
+
+
     internal static async Task<(Solution sln, List<AbsolutePath> failedToRestore, HashSet<AbsolutePath> failedToCompile)> LoadSolution(List<AbsolutePath> projectPaths)
     {
         var stopwatch = Stopwatch.StartNew();
@@ -44,7 +44,7 @@ internal sealed class SolutionUtils
         Logger.LogDebug(SemtexLog.GetPerformanceStr(nameof(LoadSolutionImpl), stopwatch.ElapsedMilliseconds));
         var toSimplify = projectPaths.Where(p => !failedToRestore.Contains(p)).ToHashSet();
         sln = FilterSolutionToHighestTargetVersionOfProjects(sln, toSimplify);
-        
+
         stopwatch.Restart();
         HashSet<AbsolutePath> failedToCompile;
         try
@@ -53,16 +53,16 @@ internal sealed class SolutionUtils
         }
         catch (Exception e)
         {
-            Logger.LogDebug("Failure in CheckProjectsCompile: {E}",e);
+            Logger.LogDebug("Failure in CheckProjectsCompile: {E}", e);
             failedToCompile = projectPaths.ToHashSet();
         }
 
         Logger.LogDebug(SemtexLog.GetPerformanceStr(nameof(CheckProjectsCompile), stopwatch.ElapsedMilliseconds));
-        
+
         stopwatch.Restart();
         if (failedToCompile.Any())
         {
-            Logger.LogDebug("The following projects failed initial compile: {ProjPaths}", string.Join("\n",failedToCompile.Select(p=> p.Path)));
+            Logger.LogDebug("The following projects failed initial compile: {ProjPaths}", string.Join("\n", failedToCompile.Select(p => p.Path)));
             Logger.LogDebug("Will attempt to restore project and then try again");
             foreach (var path in failedToCompile)
             {
@@ -74,25 +74,25 @@ internal sealed class SolutionUtils
 
             failedToRestore.AddRange(failedToRestore2);
             failedToCompile = await CheckProjectsCompile(sln, projectPaths).ConfigureAwait(false);
-            
+
             if (failedToRestore.Any())
             {
                 Logger.LogWarning(
                     "The following projects failed to restore and so the files will not be checked: {ProjPaths}",
-                    string.Join("\n", failedToRestore.Select(p=> p.Path)));
+                    string.Join("\n", failedToRestore.Select(p => p.Path)));
             }
 
             if (failedToCompile.Any())
             {
                 Logger.LogWarning(
                     "The following projects failed compile and so the files will not be checked: {ProjPaths}",
-                    string.Join("\n", failedToCompile.Select(p=> p.Path)));
+                    string.Join("\n", failedToCompile.Select(p => p.Path)));
             }
             else
             {
                 Logger.LogDebug("All projects now compiling");
             }
-            Logger.LogDebug(SemtexLog.GetPerformanceStr(nameof(LoadSolution)+"-Reload", stopwatch.ElapsedMilliseconds));
+            Logger.LogDebug(SemtexLog.GetPerformanceStr(nameof(LoadSolution) + "-Reload", stopwatch.ElapsedMilliseconds));
         }
 
         toSimplify = projectPaths.Where(p => !failedToCompile.Contains(p) && !failedToRestore.Contains(p)).ToHashSet();
@@ -102,7 +102,7 @@ internal sealed class SolutionUtils
         return (sln, failedToRestore, failedToCompile);
     }
 
-    private static async Task<(Solution sln, List<AbsolutePath>failedToRestore)> LoadSolutionImpl(List<AbsolutePath> projectPaths)
+    private static async Task<(Solution sln, List<AbsolutePath> failedToRestore)> LoadSolutionImpl(List<AbsolutePath> projectPaths)
     {
         var failedToRestore = await RunDotnetRestoreOnAllProjects(projectPaths).ConfigureAwait(false);
 
@@ -169,9 +169,9 @@ internal sealed class SolutionUtils
             if (workspace.CurrentSolution.Projects.Any(p => p.FilePath == projPath.Path))
             {
                 continue;
-            }          
+            }
             Logger.LogDebug("Loading {projectPath}", projPath.Path);
-            
+
             await workspace.OpenProjectAsync(projPath.Path).ConfigureAwait(false);
         }
 
@@ -179,7 +179,7 @@ internal sealed class SolutionUtils
         Logger.LogDebug(SemtexLog.GetPerformanceStr("Load projects took:", sw.ElapsedMilliseconds));
         return sln;
     }
-    
+
     private static MSBuildWorkspace GetMsBuildWorkspace()
     {
         void OnWorkspaceFailed(object? sender, WorkspaceDiagnosticEventArgs e)
@@ -207,7 +207,7 @@ internal sealed class SolutionUtils
             frameworkVersion = MSBuildLocator.QueryVisualStudioInstances().FirstOrDefault();
         }
 
-        var properties = frameworkVersion is not null? new Dictionary<string, string>
+        var properties = frameworkVersion is not null ? new Dictionary<string, string>
         {
         } : new Dictionary<string, string>();
 
@@ -249,7 +249,7 @@ internal sealed class SolutionUtils
                     continue;
                 }
 
-                Logger.LogDebug("Restored {RestoredFilesFirst} and {OtherProjCount} other projects",restoredFiles[0].Path, restoredFiles.Count-1);
+                Logger.LogDebug("Restored {RestoredFilesFirst} and {OtherProjCount} other projects", restoredFiles[0].Path, restoredFiles.Count - 1);
                 AlreadyRunDotNetRestoreOnProj.UnionWith(restoredFiles);
 
             }
@@ -311,7 +311,7 @@ internal sealed class SolutionUtils
         return filePaths;
     }
 
-    
+
     public static Solution FilterSolutionToHighestTargetVersionOfProjects(Solution slnStart, HashSet<AbsolutePath> projectPathsToSimplify)
     {
         // Take the highest version of every project that is supported.
@@ -323,9 +323,9 @@ internal sealed class SolutionUtils
             .Select(proj => (proj, Path: new AbsolutePath(proj.FilePath!)))
             .Where(p => projectPathsToSimplify.Contains(p.Path))
             .GroupBy(p => p.Path)
-            .Select(g => GetHighestTargetVersion(g.Select(pair => pair.proj).ToList())).Select(p=>p.Id).ToHashSet();
+            .Select(g => GetHighestTargetVersion(g.Select(pair => pair.proj).ToList())).Select(p => p.Id).ToHashSet();
 
-        
+
         var stack = new Stack<ProjectId>();
         foreach (var pId in projectsToKeep)
         {
@@ -337,7 +337,7 @@ internal sealed class SolutionUtils
             var projId = stack.Pop();
             foreach (var projRef in slnStart.GetProject(projId)!.ProjectReferences)
             {
-                if (projectsToKeep.Contains(projRef.ProjectId))continue;
+                if (projectsToKeep.Contains(projRef.ProjectId)) continue;
                 projectsToKeep.Add(projRef.ProjectId);
                 stack.Push(projRef.ProjectId);
             }
@@ -347,17 +347,17 @@ internal sealed class SolutionUtils
         var sb = new StringBuilder();
         foreach (var p in slnStart.Projects)
         {
-            if(projectsToKeep.Contains(p.Id))continue;
+            if (projectsToKeep.Contains(p.Id)) continue;
             sln = sln.RemoveProject(p.Id);
             sb.Append(p.Name + ",");
         }
 
-        if(sb.Length > 0)
-            Logger.LogDebug("Removed unneeded projects from the sln: {Projs}",sb.ToString());
+        if (sb.Length > 0)
+            Logger.LogDebug("Removed unneeded projects from the sln: {Projs}", sb.ToString());
         // Removing 
         return sln;
     }
-    
+
     private static readonly string[] FrameworkPreferenceOrder = new[] {
         "net11",
         "net20",
@@ -408,7 +408,7 @@ internal sealed class SolutionUtils
         var result = monikerPairs.MaxBy(pair =>
                 (Array.IndexOf(FrameworkPreferenceOrder, pair.Item1.Split("-")[0]), // index in the framework list above ignoring environment specific modifiers
                     pair.Item1.Contains("-") ? 0 : 1) // non environment specific should be higher.
-        ).proj; 
+        ).proj;
         Logger.LogDebug("Multiple versions of project, chose {Name}", result.Name);
         return result;
     }

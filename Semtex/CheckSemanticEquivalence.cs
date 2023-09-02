@@ -19,7 +19,7 @@ public sealed class CheckSemanticEquivalence
     {
         var stopWatch = Stopwatch.StartNew();
         var source = $"{target}~1";
-        Logger.LogInformation("Processing git config...");
+        Logger.LogInformation("Processing git metadata...");
         // Use git diff to give us the set of files to consider.
         var diffConfig = await GetDiffConfig(gitRepo, target, source).ConfigureAwait(false);
         var fileModels = await CheckSemanticallyEquivalentInternal(gitRepo, diffConfig, source, target, analyzerConfigPath, projFilter, projectMappingFilepath, failFast).ConfigureAwait(false);
@@ -29,13 +29,13 @@ public sealed class CheckSemanticEquivalence
         };
 
     }
-    
+
     internal static async Task<List<FileModel>> CheckSemanticallyEquivalentInternal(GitRepo gitRepo, DiffConfig diffConfig, string source, string target,
         AbsolutePath? analyzerConfigPath, AbsolutePath? projFilter, AbsolutePath? projectMappingFilepath, bool failFast)
     {
         if (diffConfig.SourceCsFilepaths.Count == 0)
         {
-            Logger.LogDebug("Skipping commit {Target} as it has no c# diffs",target);
+            Logger.LogDebug("Skipping commit {Target} as it has no c# diffs", target);
             return await GetFileModels(gitRepo, diffConfig, SimplifiedSolutionSummary.Empty(), SimplifiedSolutionSummary.Empty(), new Dictionary<AbsolutePath, HashSet<MethodIdentifier>>())
                 .ConfigureAwait(false);
         }
@@ -56,7 +56,7 @@ public sealed class CheckSemanticEquivalence
             {
                 var lineChanges = await gitRepo.GetLineChanges(source, target, sourceFilepath).ConfigureAwait(false);
                 sourceLineChangeMapping[sourceFilepath] = lineChanges.Select(l => l.Item1).ToList();
-                
+
                 var targetFilepath = diffConfig.GetTargetFilepath(sourceFilepath);
                 targetLineChangeMapping[targetFilepath] = lineChanges.Select(l => l.Item2).ToList();
             }
@@ -64,7 +64,7 @@ public sealed class CheckSemanticEquivalence
             await gitRepo.Checkout(target).ConfigureAwait(false);
             var targetChangedMethods =
                     await DiffToMethods.GetChangesFilter(targetFilesToSimplify, targetLineChangeMapping).ConfigureAwait(false);
-            
+
             await gitRepo.Checkout(source).ConfigureAwait(false);
             var sourceChangedMethods =
                 await DiffToMethods.GetChangesFilter(sourceFilesToSimplify, sourceLineChangeMapping).ConfigureAwait(false);
@@ -80,14 +80,14 @@ public sealed class CheckSemanticEquivalence
                 targetChangedMethodsMap[targetKey] = toCheck;
             }
 
-            Logger.LogDebug("We have a method filter for {Percentage}% of methods ({ChangedCount} files)",(int)(sourceChangedMethodsMap.Count/(float)sourceFilesToSimplify.Count), sourceChangedMethodsMap.Count);
+            Logger.LogDebug("We have a method filter for {Percentage}% of methods ({ChangedCount} files)", (int)(sourceChangedMethodsMap.Count / (float)sourceFilesToSimplify.Count), sourceChangedMethodsMap.Count);
 
             // Setup the solutions
             Logger.LogInformation("Setting up LHS Solution...");
             await gitRepo.Checkout(target).ConfigureAwait(false);
             var targetProjFinder = GetProjFinder(gitRepo.RootFolder, projectMappingFilepath);
             var (targetSolution, targetUnsimplified, targetProjectIds) = await GetSolution(targetFilesToSimplify, projFilter, targetProjFinder).ConfigureAwait(false);
-            
+
             Logger.LogInformation("Setting up RHS Solution...");
             await gitRepo.Checkout(source).ConfigureAwait(false);
             var sourceProjFinder = GetProjFinder(gitRepo.RootFolder, projectMappingFilepath);
@@ -102,13 +102,13 @@ public sealed class CheckSemanticEquivalence
 
             sourceFilesToSimplify = sourceFilesToSimplify.Where(fp => !srcUnsimplified.IsUnsimplified(fp)).ToHashSet();
             targetFilesToSimplify = targetFilesToSimplify.Where(fp => !targetUnsimplified.IsUnsimplified(fp)).ToHashSet();
-            
+
             Logger.LogInformation("Simplifying LHS...");
             // Simplify the solutions by apply rewriters and Analyzers/Code Fixes
             var simplifiedSrcSln = await SemanticSimplifier
                 .GetSolutionWithFilesSimplified(srcSolution, sourceProjectIds, sourceFilesToSimplify, analyzerConfigPath, sourceChangedMethodsMap)
                 .ConfigureAwait(false);
-            
+
             Logger.LogInformation("Simplifying RHS...");
             var simplifiedTargetSln = await SemanticSimplifier
                 .GetSolutionWithFilesSimplified(targetSolution, targetProjectIds, targetFilesToSimplify, analyzerConfigPath, targetChangedMethodsMap)
@@ -117,23 +117,23 @@ public sealed class CheckSemanticEquivalence
             // Co simplify here - some changes like renaming make much more sense to do once we have both left and right. Aim is to keep this set of operation small though.
             var filePathsToSimplify = diffConfig.SourceCsFilepaths
                 .Select(p => (p, diffConfig.GetTargetFilepath(p)))
-                .Where(pair=> 
+                .Where(pair =>
                     !srcUnsimplified.IsUnsimplified(pair.Item1)
                     && !targetUnsimplified.IsUnsimplified(pair.Item2)
                 );
-            
+
             (simplifiedSrcSln, simplifiedTargetSln) = await CoSimplifySolutions(simplifiedSrcSln, simplifiedTargetSln, sourceProjectIds, targetProjectIds, filePathsToSimplify).ConfigureAwait(false);
 
             var simplifiedSrcSolutionSummary = new SimplifiedSolutionSummary(simplifiedSrcSln, sourceProjectIds, srcUnsimplified);
             var simplifiedTargetSolutionSummary = new SimplifiedSolutionSummary(simplifiedTargetSln, targetProjectIds, targetUnsimplified);
-            
+
             Logger.LogInformation("Calculating Equivalence...");
             var result = await GetFileModels(gitRepo, diffConfig, simplifiedSrcSolutionSummary, simplifiedTargetSolutionSummary, sourceChangedMethods).ConfigureAwait(false);
             // I am not sure why the GC is not smart enough to do this itself. But these lines prevent a linear increase in memory usage that just kills the process after a while.
             // Could it be the caching within Roslyn is holding references to some nodes which are then causing the reference to the wholue workspace to be held.  
             simplifiedSrcSln.Workspace.Dispose();
             simplifiedTargetSln.Workspace.Dispose();
-            
+
             return result;
         }
         catch (SemtexCompileException e)
@@ -166,20 +166,20 @@ public sealed class CheckSemanticEquivalence
                 gitRepo,
                 diffConfig,
                 new SimplifiedSolutionSummary(null, new HashSet<ProjectId>(), srcUnexpectErrorSummary),
-                new SimplifiedSolutionSummary(null, new HashSet<ProjectId>(),tgtUnexpectedErrorSummary),
+                new SimplifiedSolutionSummary(null, new HashSet<ProjectId>(), tgtUnexpectedErrorSummary),
                 new Dictionary<AbsolutePath, HashSet<MethodIdentifier>>()
             ).ConfigureAwait(false);
         }
-        
+
     }
-    
+
     internal static async Task<(Solution srcSln, Solution targetSln)> CoSimplifySolutions(Solution srcSln, Solution targetSln, HashSet<ProjectId> sourceProjectIds, HashSet<ProjectId> targetProjectIds, IEnumerable<(AbsolutePath, AbsolutePath)> filepaths)
     {
-        foreach (var (sourceFilepath,targetFilepath) in filepaths)
+        foreach (var (sourceFilepath, targetFilepath) in filepaths)
         {
             try
             {
-                var sourceDoc = GetDocumentFromProjects(srcSln.Projects.Where(p=>sourceProjectIds.Contains(p.Id)), sourceFilepath);
+                var sourceDoc = GetDocumentFromProjects(srcSln.Projects.Where(p => sourceProjectIds.Contains(p.Id)), sourceFilepath);
                 var sourceRootNode = (await sourceDoc.GetSyntaxRootAsync().ConfigureAwait(false))!;
                 var srcCompilation = await sourceDoc.Project.GetCompilationAsync().ConfigureAwait(false);
                 var srcSemanticModel = srcCompilation!.GetSemanticModel(sourceRootNode.SyntaxTree);
@@ -187,7 +187,7 @@ public sealed class CheckSemanticEquivalence
                 sourceRenamablePrivateSymbolsWalker.Visit(sourceRootNode);
                 var srcRenamableSymbols = sourceRenamablePrivateSymbolsWalker.PrivateSymbols;
 
-                var targetDoc = GetDocumentFromProjects(targetSln.Projects.Where(p=>targetProjectIds.Contains(p.Id)), targetFilepath);
+                var targetDoc = GetDocumentFromProjects(targetSln.Projects.Where(p => targetProjectIds.Contains(p.Id)), targetFilepath);
                 var targetRootNode = (await targetDoc.GetSyntaxRootAsync().ConfigureAwait(false))!;
                 var targetCompilation = await targetDoc.Project.GetCompilationAsync().ConfigureAwait(false);
                 var targetSemanticModel = targetCompilation!.GetSemanticModel(targetRootNode.SyntaxTree);
@@ -208,25 +208,25 @@ public sealed class CheckSemanticEquivalence
             catch (CantFindDocumentException e)
             {
                 Logger.LogDebug("Unable to find unique document in solution for Document at {path}", e.Path.Path);
-                continue; 
+                continue;
             }
         }
 
-        return (srcSln,targetSln);
+        return (srcSln, targetSln);
     }
-    
+
     private static Dictionary<ISymbol, string> GetRenameMapping(HashSet<ISymbol> tgtPrivateVariables, HashSet<ISymbol> srcPrivateVariables)
-    { 
+    {
         // Could also use type of private variable and declaring type here but I think the assumption that renames will likely be closer than other renames is probably a good enough proxy.
         // O(N^2) complexity on the number of unmatched variables is fine - for almost all cases we expect the N to be small.
-        var unmatchedTgtVariables = tgtPrivateVariables.Select(s => s.Name).ToHashSet().Except(srcPrivateVariables.Select(s=>s.Name));
-        var unmatchedSrcVariables = srcPrivateVariables.Select(s => s.Name).ToHashSet().Except(tgtPrivateVariables.Select(s=>s.Name)).ToList();
-        var queue = new PriorityQueue<(string,string), int>();
+        var unmatchedTgtVariables = tgtPrivateVariables.Select(s => s.Name).ToHashSet().Except(srcPrivateVariables.Select(s => s.Name));
+        var unmatchedSrcVariables = srcPrivateVariables.Select(s => s.Name).ToHashSet().Except(tgtPrivateVariables.Select(s => s.Name)).ToList();
+        var queue = new PriorityQueue<(string, string), int>();
         foreach (var unmatchedTgtVariable in unmatchedTgtVariables)
         {
             foreach (var unmatchedSrcVariable in unmatchedSrcVariables)
             {
-                queue.Enqueue((unmatchedTgtVariable,unmatchedSrcVariable),LevenshteinDistance.Calculate(unmatchedTgtVariable,unmatchedSrcVariable));
+                queue.Enqueue((unmatchedTgtVariable, unmatchedSrcVariable), LevenshteinDistance.Calculate(unmatchedTgtVariable, unmatchedSrcVariable));
             }
         }
 
@@ -256,8 +256,8 @@ public sealed class CheckSemanticEquivalence
 
     private static async Task<DiffConfig> GetDiffConfig(GitRepo gitRepo, string target, string source)
     {
-       var( modifiedFilepaths, addedFilepaths, removedFilepaths, renamedFilepaths) =
-            await gitRepo.DiffFiles(source, target).ConfigureAwait(false);
+        var (modifiedFilepaths, addedFilepaths, removedFilepaths, renamedFilepaths) =
+             await gitRepo.DiffFiles(source, target).ConfigureAwait(false);
 
         var allSourceFilePaths = modifiedFilepaths
             .Concat(renamedFilepaths.Select(pair => pair.Source))
@@ -283,12 +283,12 @@ public sealed class CheckSemanticEquivalence
         if (explicitFilePath is null) return new ClosestAncestorProjHeuristic();
         return new ExplicitFileMapToProj(explicitFilePath, rootFolder);
     }
-    
+
 
     private static async Task<(Solution slnStart, UnsimplifiedFilesSummary, HashSet<ProjectId>)> GetSolution(
-            HashSet<AbsolutePath> csFilepaths, 
+            HashSet<AbsolutePath> csFilepaths,
             AbsolutePath? projFilter,
-            IProjFinder projFinder )
+            IProjFinder projFinder)
     {
         var filepathsWithIfPreprocessor = csFilepaths.Where(HasIfPreprocessor).ToHashSet();
         var filepathsToSimplify = csFilepaths.Except(filepathsWithIfPreprocessor).ToHashSet();
@@ -296,10 +296,10 @@ public sealed class CheckSemanticEquivalence
 
         var (slnStart, failedToRestore, failedToCompile) =
             await SolutionUtils.LoadSolution(projectToFilesMap.Keys.ToList()).ConfigureAwait(false);
-        
+
         var filepathsInFailedToRestore = failedToRestore.SelectMany(f => projectToFilesMap[f]).ToHashSet();
         var filepathsInFailedToCompile = failedToCompile.SelectMany(f => projectToFilesMap[f]).ToHashSet();
-        
+
         var projPathsToSimplify =
             projectToFilesMap.Keys.Where(p => projectToFilesMap[p].Count > 0 && !failedToRestore.Contains(p) && !failedToCompile.Contains(p)).ToHashSet();
 
@@ -312,8 +312,8 @@ public sealed class CheckSemanticEquivalence
 
         // Because a single project can appear multiple times in a solution if it has multiple target frameworks then we should only pick one.
         // Even though we do a best effort attempt at removing multiple target versions above this can still occur due to the need to check dependencies.
-        return (slnStart,new UnsimplifiedFilesSummary(filepathsWithIfPreprocessor, filepathsInFailedToCompile, unableToFindProj,
-            filepathsInFailedToRestore, new HashSet<AbsolutePath>()),projectIdsToSimplify);
+        return (slnStart, new UnsimplifiedFilesSummary(filepathsWithIfPreprocessor, filepathsInFailedToCompile, unableToFindProj,
+            filepathsInFailedToRestore, new HashSet<AbsolutePath>()), projectIdsToSimplify);
     }
 
 
@@ -330,7 +330,7 @@ public sealed class CheckSemanticEquivalence
 
         return false;
     }
-    
+
 
     private static readonly HashSet<string> CommonSafeFilenames = new()
     {
@@ -390,10 +390,10 @@ public sealed class CheckSemanticEquivalence
         Dictionary<AbsolutePath, HashSet<MethodIdentifier>> sourceChangedMethods)
     {
         Stopwatch? stopwatch = null;
-        var fileResults = diffConfig.AddedFilepaths.Select(addedFp => 
+        var fileResults = diffConfig.AddedFilepaths.Select(addedFp =>
                 new FileModel(gitRepo.GetRelativePath(addedFp), IsKnownSafe(addedFp, gitRepo) ? Status.SafeFile : Status.Added)
             )
-            .Concat(diffConfig.RemovedFilepaths.Select(removedFp => 
+            .Concat(diffConfig.RemovedFilepaths.Select(removedFp =>
                 new FileModel(gitRepo.GetRelativePath(removedFp), IsKnownSafe(removedFp, gitRepo) ? Status.SafeFile : Status.Removed)))
             .ToList();
         foreach (var sourceFilepath in diffConfig.AllSourceFilePaths)
@@ -421,7 +421,7 @@ public sealed class CheckSemanticEquivalence
                 fileResults.Add(new FileModel(relativePath, Status.OnlyRename));
                 continue;
             }
-            
+
             if (simplifiedTargetSolution.UnsimplifiedFilesSummary.FilepathsWithUnexpectedErrors.Contains(targetFilepath)
                 || simplifiedSrcSolution.UnsimplifiedFilesSummary.FilepathsWithUnexpectedErrors.Contains(sourceFilepath))
             {
@@ -467,9 +467,9 @@ public sealed class CheckSemanticEquivalence
             catch (CantFindDocumentException)
             {
                 fileResults.Add(new FileModel(relativePath, Status.UnableToFindProj));
-                continue; 
+                continue;
             }
-            
+
             (stopwatch ??= new Stopwatch()).Restart();
 
             OneOf<DifferencesLimitedToFunctions, CouldntLimitToFunctions> semanticallyUnequal;
@@ -495,15 +495,15 @@ public sealed class CheckSemanticEquivalence
                 {
                     if (!functions.MethodIdentifiers.Any())
                         return new FileModel(relativePath, Status.SemanticallyEquivalent);
-                    
-                    if (!sourceChangedMethods.ContainsKey(sourceFilepath) || 
+
+                    if (!sourceChangedMethods.ContainsKey(sourceFilepath) ||
                         functions.MethodIdentifiers.ToHashSet().IsProperSubsetOf(sourceChangedMethods[sourceFilepath]))
                     {
                         // We have limited the set of semantic changes to a smaller subset than the diff.
                         return new FileModel(relativePath, Status.SubsetOfDiffEquivalent, functions.MethodIdentifiers.ToHashSet());
                     }
-                    
-                    if(!sourceChangedMethods.ContainsKey(sourceFilepath))
+
+                    if (!sourceChangedMethods.ContainsKey(sourceFilepath))
                         return new FileModel(relativePath, Status.ContainsSemanticChanges);
 
                     var newDiffs = functions.MethodIdentifiers.Where(x => !sourceChangedMethods[sourceFilepath].Contains(x));
@@ -511,9 +511,9 @@ public sealed class CheckSemanticEquivalence
                     if (newDiffs.Count() != 0)
                     {
                         // ReSharper disable once PossibleMultipleEnumeration
-                        Logger.LogDebug("Functions is not a subset of the input methods for file {Filepath}: {NewDiffs}", sourceFilepath, string.Join(",",newDiffs));
+                        Logger.LogDebug("Functions is not a subset of the input methods for file {Filepath}: {NewDiffs}", sourceFilepath, string.Join(",", newDiffs));
                     }
-                    
+
                     return new FileModel(relativePath, Status.ContainsSemanticChanges);
                 },
                 _ => new FileModel(relativePath, Status.ContainsSemanticChanges));
@@ -525,9 +525,9 @@ public sealed class CheckSemanticEquivalence
 
     private static Document GetDocumentFromProjects(IEnumerable<Project>? simplifiedProjects, AbsolutePath filepath)
     {
-        if(simplifiedProjects is null)
+        if (simplifiedProjects is null)
             throw new CantFindDocumentException(filepath);
-        
+
         switch (simplifiedProjects.SelectMany(p => p.Documents).Where(d => d.FilePath == filepath.Path).ToList())
         {
             case [var x]:

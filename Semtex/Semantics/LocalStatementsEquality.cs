@@ -35,7 +35,7 @@ public static class LocalStatementsEquality
         var simpleBlocks = GetSimpleBlockRanges(left, leftSemanticModel)
             .Zip(GetSimpleBlockRanges(right, rightSemanticModel));
         // 2. From description
-        foreach (var (simpleBlockLeft,simpleBlockRight) in simpleBlocks)
+        foreach (var (simpleBlockLeft, simpleBlockRight) in simpleBlocks)
         {
             if (simpleBlockLeft.Count != simpleBlockRight.Count)
                 return false;
@@ -57,14 +57,14 @@ public static class LocalStatementsEquality
 
         return true;
     }
-    
+
     // Implements 1. from the description.
     private static IEnumerable<List<StatementSyntax>> GetSimpleBlockRanges(SyntaxList<StatementSyntax> statements, SemanticModel semanticModel)
     {
         var acc = new List<StatementSyntax>();
-        foreach (var (statement,index) in statements.Select((x,i)=> (x,i)))
+        foreach (var (statement, index) in statements.Select((x, i) => (x, i)))
         {
-            if (IsPureStatement(statement,semanticModel))
+            if (IsPureStatement(statement, semanticModel))
             {
                 acc.Add(statement);
             }
@@ -82,36 +82,36 @@ public static class LocalStatementsEquality
     {
         var rightTexts = simpleBlockRight.Select(s => s.NormalizeWhitespace().ToString()).ToList();
         var leftTexts = simpleBlockLeft.Select(s => s.NormalizeWhitespace().ToString()).ToList();
-        
+
         // 3. From description
         if (leftTexts.Any(s => !rightTexts.Contains(s)) || leftTexts.Count != rightTexts.Count)
             return false;
-        
+
         if (leftTexts.Distinct().Count() < leftTexts.Count)
             return false; // This wouldn't be difficult to support but right now I don't think its worth it.
-        
+
         // 4. From description
-        foreach (var (leftText, leftIndex) in leftTexts.Select((t,i)=>(t,i)))
+        foreach (var (leftText, leftIndex) in leftTexts.Select((t, i) => (t, i)))
         {
             foreach (var needSwapping in GetPairwiseSwapsRequired(leftTexts, rightTexts, leftIndex))
             {
                 var needSwappingIndex = rightTexts.IndexOf(needSwapping);
                 // We can swap two pure statements order if the values written to by the first statement are not read by the second statement and vice versa.
-                if(SwapStatementsChangesSemantics(simpleBlockLeft[leftIndex],simpleBlockRight[needSwappingIndex]))
+                if (SwapStatementsChangesSemantics(simpleBlockLeft[leftIndex], simpleBlockRight[needSwappingIndex]))
                     return false;
             }
         }
 
         return true;
     }
-    
+
     // 5. From description
     private static IEnumerable<string> GetPairwiseSwapsRequired(List<string> leftStatements,
         List<string> rightStatements, int leftIndex)
     {
         var rightIndex = rightStatements.IndexOf(leftStatements[leftIndex]);
         var beforeLeft = leftStatements.Take(leftIndex);
-        var afterRight = rightStatements.Skip(rightIndex+1);
+        var afterRight = rightStatements.Skip(rightIndex + 1);
         return beforeLeft.Intersect(afterRight);
     }
 
@@ -124,9 +124,9 @@ public static class LocalStatementsEquality
 
     }
 
-    
+
     // Implements semantic approximation to pure check (100% Precision, < 100% Recall) 
-    private static bool IsPureStatement(StatementSyntax statement,SemanticModel semanticModel)
+    private static bool IsPureStatement(StatementSyntax statement, SemanticModel semanticModel)
     {
         switch (statement)
         {
@@ -145,11 +145,11 @@ public static class LocalStatementsEquality
 
                 // do we need to think about semantic model here?
                 var variable = localDeclarationStatementSyntax.Declaration.Variables.First();
-                
+
                 if (variable.Initializer == null)
                     return true;
 
-                return IsSimpleExpression(variable.Initializer.Value,semanticModel);
+                return IsSimpleExpression(variable.Initializer.Value, semanticModel);
             case ExpressionStatementSyntax expressionStatementSyntax:
                 if (expressionStatementSyntax.AttributeLists.Any() ||
                     expressionStatementSyntax.ContainsDirectives ||
@@ -182,13 +182,13 @@ public static class LocalStatementsEquality
             case AssignmentExpressionSyntax assignmentExpressionSyntax:
                 return assignmentExpressionSyntax.Left is IdentifierNameSyntax &&
                        IsSimpleExpression(assignmentExpressionSyntax.Right, semanticModel);
-                
+
             default:
                 return false;
         }
     }
 
-    private static (IEnumerable<string> reads,IEnumerable<string>writes) GetReadsAndWrites(StatementSyntax statementSyntax)
+    private static (IEnumerable<string> reads, IEnumerable<string> writes) GetReadsAndWrites(StatementSyntax statementSyntax)
     {
         switch (statementSyntax)
         {
@@ -196,7 +196,7 @@ public static class LocalStatementsEquality
                 var variable = localDeclarationStatementSyntax.Declaration.Variables.First();
                 var writes = new List<string>() { variable.Identifier.Text };
                 if (variable.Initializer == null)
-                    return (new List<string>(),writes);
+                    return (new List<string>(), writes);
 
                 var initializerResults = GetReadsAndWrites(variable.Initializer.Value);
                 return (initializerResults.reads, initializerResults.writes.Concat(writes));
@@ -206,16 +206,16 @@ public static class LocalStatementsEquality
                 throw new InvalidOperationException($"Unexpected Statement with kind {statementSyntax.Kind()}");
         }
     }
-    private static (IEnumerable<string> reads,IEnumerable<string>writes) GetReadsAndWrites(ExpressionSyntax statementSyntax)
+    private static (IEnumerable<string> reads, IEnumerable<string> writes) GetReadsAndWrites(ExpressionSyntax statementSyntax)
     {
         switch (statementSyntax)
         {
             case AssignmentExpressionSyntax expressionStatementSyntax:
                 if (expressionStatementSyntax.Left is not IdentifierNameSyntax leftIdentifierNameSyntax)
                     throw new InvalidOperationException("Only support for assignment to IdentifierNames.");
-                
+
                 var rhs = GetReadsAndWrites(expressionStatementSyntax.Right);
-                return (rhs.reads, rhs.writes.Append( leftIdentifierNameSyntax.Identifier.Text));
+                return (rhs.reads, rhs.writes.Append(leftIdentifierNameSyntax.Identifier.Text));
             case BinaryExpressionSyntax binaryExpression:
                 var leftResults = GetReadsAndWrites(binaryExpression.Left);
                 var rightResults = GetReadsAndWrites(binaryExpression.Right);

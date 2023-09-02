@@ -8,7 +8,7 @@ using Microsoft.CodeAnalysis.Diagnostics;
 namespace SemtexAnalyzers;
 
 [DiagnosticAnalyzer(LanguageNames.CSharp)]
-public class LogTemplateParamsAnalyzer: DiagnosticAnalyzer
+public class LogTemplateParamsAnalyzer : DiagnosticAnalyzer
 {
 
     public override void Initialize(AnalysisContext context)
@@ -34,9 +34,9 @@ public class LogTemplateParamsAnalyzer: DiagnosticAnalyzer
 
         var logMethodClassInterfaces = context.SemanticModel.GetTypeInfo(memberAccessExpression.Expression).Type?.Interfaces;
         if (logMethodClassInterfaces is null)
-            return; 
-        
-        if(logMethodClassInterfaces.Value.Length == 1 &&  logMethodClassInterfaces.Value.First().ToString() == "Microsoft.Extensions.Logging.ILogger<T>")
+            return;
+
+        if (logMethodClassInterfaces.Value.Length == 1 && logMethodClassInterfaces.Value.First().ToString() == "Microsoft.Extensions.Logging.ILogger<T>")
             return;
 
         if (invocationExpression.ArgumentList.Arguments.First().Expression is not LiteralExpressionSyntax
@@ -48,9 +48,9 @@ public class LogTemplateParamsAnalyzer: DiagnosticAnalyzer
 
         var matches = Regex.Matches(text, @"\{[^}]+\}");
 
-        if (matches.Count == 0 || matches.All(x => x.Value == "{X}")) 
+        if (matches.Count == 0 || matches.All(x => x.Value == "{X}"))
             return;
-        
+
         var diagnostic = Diagnostic.Create(
             descriptor: DiagnosticDescriptors.LogTemplateParamsDiagnosticDescriptors,
             location: literalExpression.GetLocation());
@@ -59,7 +59,8 @@ public class LogTemplateParamsAnalyzer: DiagnosticAnalyzer
     }
 
 
-    public override ImmutableArray<DiagnosticDescriptor> SupportedDiagnostics {
+    public override ImmutableArray<DiagnosticDescriptor> SupportedDiagnostics
+    {
         get
         {
             return ImmutableArray.Create(new[]

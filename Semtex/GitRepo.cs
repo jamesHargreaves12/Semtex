@@ -23,7 +23,7 @@ internal class GitRepo
     private static readonly string ScratchSpacePath = Path.Join(Path.GetTempPath(), "Semtex");
 
     public string RemoteUrl { get; }
-    private static readonly Func<string,string> FormatOutputString = s => $"[git] {s}";
+    private static readonly Func<string, string> FormatOutputString = s => $"[git] {s}";
     // This is noisy for little gain. May regret this but right now its a pain.
     private static readonly PipeTarget StdOutPipe = PipeTarget.ToDelegate(s => Logger.LogDebug(FormatOutputString(s)));
     private static readonly PipeTarget StdErrPipe = PipeTarget.ToDelegate(s => Logger.LogDebug(FormatOutputString(s)));
@@ -45,7 +45,7 @@ internal class GitRepo
             .WithWorkingDirectory(path.Path)
             .WithStandardOutputPipe(StdOutPipe)
             .WithStandardErrorPipe(StdErrPipe);
-        Logger.LogDebug("Executing {GitConfigCmd}",gitConfigCmd);
+        Logger.LogDebug("Executing {GitConfigCmd}", gitConfigCmd);
         var cmdResult = await gitConfigCmd.ExecuteBufferedAsync();
         Logger.LogDebug("Finished");
         return new AbsolutePath(cmdResult.StandardOutput.Replace("\n", ""));
@@ -62,7 +62,7 @@ internal class GitRepo
             .WithWorkingDirectory(path.Path)
             .WithStandardOutputPipe(StdOutPipe)
             .WithStandardErrorPipe(StdErrPipe);
-        Logger.LogDebug("Executing {GitConfigCmd}",gitConfigCmd);
+        Logger.LogDebug("Executing {GitConfigCmd}", gitConfigCmd);
         var cmdResult = await gitConfigCmd.ExecuteBufferedAsync();
         Logger.LogDebug("Finished");
         var rootFolder = await GetRootFolder(path).ConfigureAwait(false);
@@ -71,14 +71,14 @@ internal class GitRepo
 
     public async Task AssertClean()
     {
-        var diff = await DiffUncommitted(true).ConfigureAwait(false) 
+        var diff = await DiffUncommitted(true).ConfigureAwait(false)
                    + await DiffUncommitted(false).ConfigureAwait(false);
         if (diff.Any())
         {
             throw new Exception($"Expected {RootFolder} to be clean but it is not");
         }
     }
-    
+
     public async Task<bool> CreatePatchFileOfLocalChanges(AbsolutePath patchFilepath, IncludeUncommittedChanges includeUncommittedChanges)
     {
         var patchText = await DiffUncommitted(includeUncommittedChanges == IncludeUncommittedChanges.Staged).ConfigureAwait(false);
@@ -86,25 +86,25 @@ internal class GitRepo
         {
             return false;
         }
-        
+
         await File.WriteAllTextAsync(patchFilepath.Path, patchText).ConfigureAwait(false);
         return true;
     }
-    
-    
+
+
     public static async Task<GitRepo> CreateGitRepoFromUrl(string repoUrl)
     {
         // Clean / Create the temp directory for the build.
         var repoName = repoUrl.Split("/")[^1].Split(".")[0];
         var rootFolder = new AbsolutePath(Path.Join(ScratchSpacePath, repoName));
 
-        if(Directory.Exists(rootFolder.Path))
+        if (Directory.Exists(rootFolder.Path))
         {
             Logger.LogDebug("Folder {RootFolder} already exists. Checking if it has the correct origin", rootFolder.Path);
             try
             {
                 var existingRepo = await SetupFromExistingFolder(rootFolder).ConfigureAwait(false);
-                if (existingRepo.RemoteUrl.Replace(".git","") == repoUrl.Replace(".git",""))
+                if (existingRepo.RemoteUrl.Replace(".git", "") == repoUrl.Replace(".git", ""))
                 {
                     await existingRepo.Fetch().ConfigureAwait(false);
                     if (await existingRepo.IsClean().ConfigureAwait(false))
@@ -118,7 +118,7 @@ internal class GitRepo
                 // Will just continue and check it out from scratch.
             }
         }
-    
+
         // Should be clever here and just check if it is the same repo and just git clean if so.
         Utils.EnsureDirectoryExistsAndEmpty(rootFolder);
 
@@ -138,7 +138,7 @@ internal class GitRepo
             .WithWorkingDirectory(RootFolder.Path)
             .WithStandardOutputPipe(StdOutPipe)
             .WithStandardErrorPipe(StdErrPipe);
-        Logger.LogDebug("Executing {GitDiffCmd}",gitDiffCmd);
+        Logger.LogDebug("Executing {GitDiffCmd}", gitDiffCmd);
         var cmdResult = await gitDiffCmd.ExecuteBufferedAsync();
         Logger.LogDebug("Finished");
         return !cmdResult.StandardOutput.Any();
@@ -179,7 +179,7 @@ internal class GitRepo
             .WithWorkingDirectory(RootFolder.Path)
             .WithStandardOutputPipe(StdOutPipe)
             .WithStandardErrorPipe(StdErrPipe);
-        Logger.LogDebug("Executing {GitDiffCmd}",gitDiffCmd);
+        Logger.LogDebug("Executing {GitDiffCmd}", gitDiffCmd);
         var cmdResult = await gitDiffCmd.ExecuteBufferedAsync();
         Logger.LogDebug("Finished");
         var diffResults = cmdResult.StandardOutput
@@ -187,11 +187,11 @@ internal class GitRepo
             .Where(c => !string.IsNullOrEmpty(c))
             .Select(c => c.Split("\t"))
             .ToList();
-       var diffResultsLookup = diffResults
-            .ToLookup(c => c[0]); // Renamings have a similarity score as well.
+        var diffResultsLookup = diffResults
+             .ToLookup(c => c[0]); // Renamings have a similarity score as well.
 
-       
-       // Not supporting "C", "T", "U", "X"
+
+        // Not supporting "C", "T", "U", "X"
         var modifiedFilepaths = diffResultsLookup["M"]
             .Select(c => c[1])
             .Select(f => RootFolder.Join(f))
@@ -205,8 +205,8 @@ internal class GitRepo
             .Select(f => RootFolder.Join(f))
             .ToHashSet();
         var renamedFilepaths = diffResults
-            .Where(c=>c[0].StartsWith("R"))
-            .Select(c => (RootFolder.Join(c[1]),  RootFolder.Join(c[2]), int.Parse(c[0][1..])))
+            .Where(c => c[0].StartsWith("R"))
+            .Select(c => (RootFolder.Join(c[1]), RootFolder.Join(c[2]), int.Parse(c[0][1..])))
             .ToHashSet();
         // We should report the similarity because if they are R100 then we should not bother doing processing them.
         // However keeping them in for development is probably good as it means that we can assert nothing funny is going on.
@@ -233,7 +233,7 @@ internal class GitRepo
             .WithWorkingDirectory(RootFolder.Path)
             .WithStandardOutputPipe(StdOutPipe)
             .WithStandardErrorPipe(StdErrPipe);
-        Logger.LogDebug("Executing {GitCheckoutCommand}",gitCheckoutCommand);
+        Logger.LogDebug("Executing {GitCheckoutCommand}", gitCheckoutCommand);
         await gitCheckoutCommand.ExecuteAsync();
         Logger.LogDebug("Finished Checkout");
     }
@@ -279,7 +279,7 @@ internal class GitRepo
             .WithWorkingDirectory(RootFolder.Path)
             .WithStandardOutputPipe(StdOutPipe)
             .WithStandardErrorPipe(StdErrPipe);
-        Logger.LogDebug("Executing {GitLogCmd}",gitLogCmd);
+        Logger.LogDebug("Executing {GitLogCmd}", gitLogCmd);
         var cmdResult = await gitLogCmd.ExecuteBufferedAsync();
         Logger.LogDebug("Finished");
         return cmdResult.StandardOutput
@@ -322,7 +322,7 @@ internal class GitRepo
             .WithWorkingDirectory(RootFolder.Path)
             .WithStandardOutputPipe(StdOutPipe)
             .WithStandardErrorPipe(StdErrPipe);
-        Logger.LogDebug("Executing {GitLogCmd}",gitLogCmd);
+        Logger.LogDebug("Executing {GitLogCmd}", gitLogCmd);
         var cmdResult = await gitLogCmd.ExecuteBufferedAsync();
         Logger.LogDebug("Finished");
         return cmdResult.StandardOutput.Split("\n")[0];
@@ -339,7 +339,7 @@ internal class GitRepo
             .WithWorkingDirectory(RootFolder.Path)
             .WithStandardOutputPipe(StdOutPipe)
             .WithStandardErrorPipe(StdErrPipe);
-        Logger.LogDebug("Executing {GitLogCmd}",gitLogCmd);
+        Logger.LogDebug("Executing {GitLogCmd}", gitLogCmd);
         var cmdResult = await gitLogCmd.ExecuteBufferedAsync();
         Logger.LogDebug("Finished");
         return cmdResult.StandardOutput.Trim();
@@ -354,10 +354,10 @@ internal class GitRepo
             .WithWorkingDirectory(RootFolder.Path)
             .WithStandardOutputPipe(StdOutPipe)
             .WithStandardErrorPipe(StdErrPipe);
-        Logger.LogDebug("Executing {GitLogCmd}",gitLogCmd);
+        Logger.LogDebug("Executing {GitLogCmd}", gitLogCmd);
         var cmdResult = await gitLogCmd.ExecuteBufferedAsync();
         Logger.LogDebug("Finished");
-        return cmdResult.StandardOutput.Replace("\n","");
+        return cmdResult.StandardOutput.Replace("\n", "");
     }
 
     public async Task Pull()
@@ -370,7 +370,7 @@ internal class GitRepo
             .WithWorkingDirectory(RootFolder.Path)
             .WithStandardOutputPipe(StdOutPipe)
             .WithStandardErrorPipe(StdErrPipe);
-        Logger.LogDebug("Executing {GitPullCommand}",gitPullCommand);
+        Logger.LogDebug("Executing {GitPullCommand}", gitPullCommand);
         await gitPullCommand.ExecuteAsync();
         Logger.LogDebug("Finished pull");
     }
@@ -381,7 +381,7 @@ internal class GitRepo
             .WithArguments(new[]
             {
                 "diff",
-                ancestor, 
+                ancestor,
                 target
             })
             .WithWorkingDirectory(RootFolder.Path)
@@ -400,7 +400,7 @@ internal class GitRepo
             {
                 "diff",
                 stagedChanges?"--cached":"",
-            }.Where(x=>x != "").ToArray())
+            }.Where(x => x != "").ToArray())
             .WithWorkingDirectory(RootFolder.Path)
             .WithStandardOutputPipe(StdOutPipe)
             .WithStandardErrorPipe(StdErrPipe);
@@ -409,7 +409,7 @@ internal class GitRepo
         Logger.LogDebug("Finished diff");
         return cmdResult.StandardOutput;
     }
-    
+
     public async Task ApplyPatch(AbsolutePath patchFilepath)
     {
         var gitDiffCommand = Cli.Wrap("git")
@@ -440,7 +440,7 @@ internal class GitRepo
         Logger.LogDebug("Executing {GitAddCommand}", gitAddCommand);
         await gitAddCommand.ExecuteAsync();
         Logger.LogDebug("Finished diff");
-        
+
         var gitCommitCmd = Cli.Wrap("git")
             .WithArguments(new[]
             {
@@ -454,7 +454,7 @@ internal class GitRepo
         await gitCommitCmd.ExecuteAsync();
         Logger.LogDebug("Finished diff");
     }
-    
+
     public async Task<List<(LineDiff, LineDiff)>> GetLineChanges(string sourceSha, string targetSha, AbsolutePath sourceFileName)
     {
         var gitDiffCmd = Cli.Wrap("git")
@@ -466,22 +466,22 @@ internal class GitRepo
                 "--", sourceFileName.Path
             })
             .WithWorkingDirectory(RootFolder.Path)
-            .WithStandardOutputPipe(PipeTarget.ToDelegate(s=>
+            .WithStandardOutputPipe(PipeTarget.ToDelegate(s =>
             {
                 if (s.StartsWith("@@")) Logger.LogDebug(FormatOutputString(s)); // Only show the @@ lines as its to noisey otherwise
             }))
             .WithStandardErrorPipe(StdErrPipe);
-        Logger.LogDebug("Executing {GitDiffCmd}",gitDiffCmd);
+        Logger.LogDebug("Executing {GitDiffCmd}", gitDiffCmd);
         var cmdResult = await gitDiffCmd.ExecuteBufferedAsync();
         var lines = cmdResult.StandardOutput
             .Split("\n");
-        var result = new List<(LineDiff,LineDiff)>();
+        var result = new List<(LineDiff, LineDiff)>();
         var diffLines = lines
             .Select((line, i) => (line, i))
             .Where(pair => pair.line.StartsWith("@@"))
-            .Select(pair => pair.i).ToList(); 
+            .Select(pair => pair.i).ToList();
 
-        foreach (var (start,_) in diffLines.Zip(diffLines.Skip(1).Concat(new[] {lines.Length})))
+        foreach (var (start, _) in diffLines.Zip(diffLines.Skip(1).Concat(new[] { lines.Length })))
         {
             var parts = lines[start].Split(" ");
             var leftParts = parts[1];
@@ -502,33 +502,33 @@ internal class GitRepo
                 "--", sourceFileName.Path
             })
             .WithWorkingDirectory(RootFolder.Path)
-            .WithStandardOutputPipe(PipeTarget.ToDelegate(s=>
+            .WithStandardOutputPipe(PipeTarget.ToDelegate(s =>
             {
                 if (s.StartsWith("@@")) Logger.LogDebug(FormatOutputString(s)); // Only show the @@ lines as its to noisey otherwise
             }))
             .WithStandardErrorPipe(StdErrPipe);
-        Logger.LogDebug("Executing {GitDiffCmd}",gitDiffCmd);
+        Logger.LogDebug("Executing {GitDiffCmd}", gitDiffCmd);
         var cmdResult = await gitDiffCmd.ExecuteBufferedAsync();
         var lines = cmdResult.StandardOutput
             .Split("\n");
-        var result = new List<(LineDiff,LineDiff,string)>();
+        var result = new List<(LineDiff, LineDiff, string)>();
         var diffLines = lines
             .Select((line, i) => (line, i))
             .Where(pair => pair.line.StartsWith("@@"))
-            .Select(pair => pair.i).ToList(); 
+            .Select(pair => pair.i).ToList();
 
-        foreach (var (start,end) in diffLines.Zip(diffLines.Skip(1).Concat(new[] {lines.Length})))
+        foreach (var (start, end) in diffLines.Zip(diffLines.Skip(1).Concat(new[] { lines.Length })))
         {
             var parts = lines[start].Split(" ");
             var leftParts = parts[1];
             var rightPart = parts[2];
-            result.Add((GetLineDiff(leftParts), GetLineDiff(rightPart), string.Join("\n", lines.Skip(start).Take(end-start))));
+            result.Add((GetLineDiff(leftParts), GetLineDiff(rightPart), string.Join("\n", lines.Skip(start).Take(end - start))));
         }
 
         return result;
     }
 
-    
+
     public async Task<string> GetFileDiff(string sourceSha, string targetSha, string relativeFilepath)
     {
         var gitDiffCmd = Cli.Wrap("git")
@@ -541,7 +541,7 @@ internal class GitRepo
             .WithWorkingDirectory(RootFolder.Path)
             .WithStandardOutputPipe(StdOutPipe)
             .WithStandardErrorPipe(StdErrPipe);
-        Logger.LogDebug("Executing {GitDiffCmd}",gitDiffCmd);
+        Logger.LogDebug("Executing {GitDiffCmd}", gitDiffCmd);
         var cmdResult = await gitDiffCmd.ExecuteBufferedAsync();
         Logger.LogDebug("Finished");
         return cmdResult.StandardOutput;
@@ -567,7 +567,7 @@ internal class GitRepo
 
     private static LineDiff GetLineDiff(string gitDescriptionOfDiff)
     {
-        var parts = gitDescriptionOfDiff.Replace("+","").Replace("-","").Split(",");
+        var parts = gitDescriptionOfDiff.Replace("+", "").Replace("-", "").Split(",");
         return parts.Length switch
         {
             1 => new LineDiff(int.Parse(parts[0]), 1),

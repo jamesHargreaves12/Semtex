@@ -21,9 +21,9 @@ internal class ProgressBar<T>
         // Draw the progress bar
         var pct = progress / _total;
         var chars = (int)Math.Floor(pct * BAR_SIZE);
-        if(chars == _prevChars)
+        if (chars == _prevChars)
             return;
-        
+
         var builder = new StringBuilder();
         builder.Append("[");
         for (var i = 0; i < BAR_SIZE; i++)

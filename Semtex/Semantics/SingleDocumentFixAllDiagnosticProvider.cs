@@ -3,7 +3,7 @@ using Microsoft.CodeAnalysis.CodeFixes;
 
 namespace Semtex.Semantics;
 
-internal class SingleDocumentFixAllDiagnosticProvider: FixAllContext.DiagnosticProvider
+internal class SingleDocumentFixAllDiagnosticProvider : FixAllContext.DiagnosticProvider
 {
     private readonly IEnumerable<Diagnostic> _diagnostics;
     private readonly DocumentId _id;
@@ -16,12 +16,12 @@ internal class SingleDocumentFixAllDiagnosticProvider: FixAllContext.DiagnosticP
 
     public override Task<IEnumerable<Diagnostic>> GetDocumentDiagnosticsAsync(Document document, CancellationToken cancellationToken)
     {
-        if (document== null)
+        if (document == null)
             throw new ArgumentNullException(nameof(document));
 
-        if(document.Id != _id)
+        if (document.Id != _id)
             throw new ArgumentException($"{nameof(SingleDocumentFixAllDiagnosticProvider)} is only setup for document with id {_id} this document has Id {document.Id}");
-        
+
         return Task.FromResult(_diagnostics);
     }
 

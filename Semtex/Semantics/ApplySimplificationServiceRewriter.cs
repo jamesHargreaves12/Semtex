@@ -18,7 +18,7 @@ public class ApplySimplificationServiceRewriter : CSharpSyntaxRewriter
     {
         if (_ignoreParentKind.Contains(node.Parent!.Kind()))
             return base.VisitQualifiedName(node);
-        
+
         return node.WithSimplifierAnnotation();
     }
 

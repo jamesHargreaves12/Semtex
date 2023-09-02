@@ -9,7 +9,7 @@ internal class FileLogger : ILogger
     private readonly string _category;
     private readonly string _timestampFormat;
     private static object _lock = new object();
-    
+
     public FileLogger(string path, string category, string timestampFormat)
     {
         _filePath = path;
@@ -31,7 +31,7 @@ internal class FileLogger : ILogger
         if (formatter == null) return;
         var message = formatter(state, exception);
         var logLine = SemtexLogFormatting.FormatLog(logLevel, _timestampFormat, _category, message);
-        
+
         lock (_lock)
         {
             File.AppendAllText(_filePath, logLine + "\n");

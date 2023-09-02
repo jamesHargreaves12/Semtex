@@ -7,7 +7,7 @@ using Microsoft.CodeAnalysis.Diagnostics;
 namespace SemtexAnalyzers;
 
 [DiagnosticAnalyzer(LanguageNames.CSharp)]
-public class ConstantValueAnalyzer: DiagnosticAnalyzer
+public class ConstantValueAnalyzer : DiagnosticAnalyzer
 {
 
     public override void Initialize(AnalysisContext context)
@@ -26,14 +26,14 @@ public class ConstantValueAnalyzer: DiagnosticAnalyzer
     private static void Analyze(SyntaxNodeAnalysisContext syntaxNodeAnalysisContext)
     {
         var expression = syntaxNodeAnalysisContext.Node;
-        
+
         // If the thing that is constant is a member access then we need to replace the whole thing.
         var parent = expression.Parent;
         while (parent is MemberAccessExpressionSyntax memberAccess)
         {
             parent = memberAccess.Parent;
         }
-        
+
         // If in AnonymousType then we shouldn't change it as the name matters.
         if (parent is AnonymousObjectMemberDeclaratorSyntax)
         {
@@ -66,12 +66,13 @@ public class ConstantValueAnalyzer: DiagnosticAnalyzer
             descriptor: DiagnosticDescriptors.ConstantValueDiagnosticDescriptors,
             location: expression.GetLocation(),
             properties: properties);
-        
+
         syntaxNodeAnalysisContext.ReportDiagnostic(diagnostic);
     }
 
 
-    public override ImmutableArray<DiagnosticDescriptor> SupportedDiagnostics {
+    public override ImmutableArray<DiagnosticDescriptor> SupportedDiagnostics
+    {
         get
         {
             return ImmutableArray.Create(new[]

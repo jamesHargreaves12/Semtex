@@ -34,7 +34,7 @@ public sealed class SafeAnalyzers
             }
             .SelectMany(x => x)
             .ToDictionary(pair => pair.Key, pair => pair.Value);
-    
+
     private static readonly ImmutableArray<DiagnosticAnalyzer> Analyzers = new HashSet<DiagnosticAnalyzer>()
     {
         new UnusedMemberAnalyzer(),
@@ -169,17 +169,17 @@ public sealed class SafeAnalyzers
         // Clone the set so that any edits don't effect caller.
         var currentDocumentIds = new HashSet<DocumentId>(documentIds);
         var currentSolution = await AnalyzerConfigOverwrite.ReplaceAnyAnalyzerConfigDocuments(sln, projId, currentDocumentIds, analyzerConfigPath).ConfigureAwait(false);
-        
+
         Logger.LogDebug("Starting Applying Diagnostic Fixes");
-        
+
         // We tried to fix it but it didn't change the solution so we pull it from the set of diagnostics that will be considered for this file.
-        var diagnosticsThatDidntMakeFix = new HashSet<(string filename,string diagnosticId)>();
+        var diagnosticsThatDidntMakeFix = new HashSet<(string filename, string diagnosticId)>();
         var analyzerOptions = new AnalyzerOptions(
             additionalFiles: EmptyAdditionalFiles,
             optionsProvider: currentSolution.GetProject(projId)!.AnalyzerOptions.AnalyzerConfigOptionsProvider
         );
 
-        foreach (var _ in Enumerable.Range(0,1000)) // If we hit 1000 we have almost certainly hit an inf loop
+        foreach (var _ in Enumerable.Range(0, 1000)) // If we hit 1000 we have almost certainly hit an inf loop
         {
             progress.Report(1 - (double)currentDocumentIds.Count / documentIds.Count);
             var project = currentSolution.GetProject(projId)!;
@@ -189,9 +189,9 @@ public sealed class SafeAnalyzers
 
             relevantDiagnostics = relevantDiagnostics
                 .Where(d => CodeFixProviders.ContainsKey(d.Descriptor.Id))
-                .Where(d=> !diagnosticsThatDidntMakeFix.Contains((d.Location.GetLineSpan().Path,d.Id)))
+                .Where(d => !diagnosticsThatDidntMakeFix.Contains((d.Location.GetLineSpan().Path, d.Id)))
                 .ToList();
-            
+
             if (!relevantDiagnostics.Any())
             {
                 break;
@@ -203,7 +203,7 @@ public sealed class SafeAnalyzers
             {
                 var document = currentSolution
                     .GetDocument(documentId);
-                
+
                 if (document is null)
                 {
                     Logger.LogWarning("Unable to find document in solution, skipping");
@@ -214,8 +214,8 @@ public sealed class SafeAnalyzers
                 var root = await document.GetSyntaxRootAsync().ConfigureAwait(false);
                 var groupedDiagnostics = relevantDiagnostics
                     .Where(d => document.FilePath == d.Location.GetLineSpan().Path)
-                    .Where(d=> !changedMethodsMap.ContainsKey(documentId) 
-                               || IsDiagnosticsInChangedMethod(root!, d, changedMethodsMap[documentId]) 
+                    .Where(d => !changedMethodsMap.ContainsKey(documentId)
+                               || IsDiagnosticsInChangedMethod(root!, d, changedMethodsMap[documentId])
                                || DiagnosticToApplyEvenIfNotInChangeMap.Contains(d.Descriptor.Id))
                     .GroupBy(d => d.Descriptor.Id)
                     .OrderByDescending(g => (GetPriority(g.Key), g.Count()))
@@ -265,10 +265,10 @@ public sealed class SafeAnalyzers
             {
                 // need other cases here e.g. getters
                 case MethodDeclarationSyntax methodDeclarationSyntax:
-                {
-                    var methodIdentifier = SemanticSimplifier.GetMethodIdentifier(methodDeclarationSyntax);
-                    return changedMethods.Contains(methodIdentifier);
-                }
+                    {
+                        var methodIdentifier = SemanticSimplifier.GetMethodIdentifier(methodDeclarationSyntax);
+                        return changedMethods.Contains(methodIdentifier);
+                    }
                 case ClassDeclarationSyntax or CompilationUnitSyntax or NamespaceDeclarationSyntax:
                     return true;
                 case null:
@@ -285,14 +285,14 @@ public sealed class SafeAnalyzers
     {
         var compilation = await proj.GetCompilationAsync().ConfigureAwait(false);
         var stopwatch = Stopwatch.StartNew();
-        
+
         var compilationWithAnalyzers = compilation!
             .WithAnalyzers(
                 Analyzers,
                 options: analyzerOptions);
 
         // These diagnostics come from the inbuilt analyzers.
-        var diagnostics  = new List<Diagnostic>(compilation!.GetDiagnostics()); 
+        var diagnostics = new List<Diagnostic>(compilation!.GetDiagnostics());
 
         // These diagnostics come from the manually added Analyzers.
         var stopwatch2 = Stopwatch.StartNew();
@@ -306,8 +306,8 @@ public sealed class SafeAnalyzers
         }
 
         Logger.LogDebug(SemtexLog.GetPerformanceStr("CompilationAndDiagnostics", stopwatch.ElapsedMilliseconds));
-        Logger.LogDebug("{Percent}% from custom analyzers)", (int)(stopwatch2.ElapsedMilliseconds/(float)stopwatch.ElapsedMilliseconds*100));
-        
+        Logger.LogDebug("{Percent}% from custom analyzers)", (int)(stopwatch2.ElapsedMilliseconds / (float)stopwatch.ElapsedMilliseconds * 100));
+
         var analyzerErrors = diagnostics
             .Where(d => d.Descriptor.Id == "AD0001")
             .Select(d => d.GetMessage())
@@ -334,7 +334,7 @@ public sealed class SafeAnalyzers
             var firstIssue = diagnostics.First(d => d.Severity == DiagnosticSeverity.Error);
             var sourceWithIssue = firstIssue.Location.SourceTree;
             Logger.LogDebug(sourceWithIssue!.ToString());
-            throw new SemtexCompileException(new AbsolutePath(proj.FilePath!),$"Compile Failed {firstIssue}");
+            throw new SemtexCompileException(new AbsolutePath(proj.FilePath!), $"Compile Failed {firstIssue}");
         }
 
         var documentPaths = enumerable.Select(d => d.FilePath!).ToHashSet();
@@ -435,13 +435,13 @@ public sealed class SafeAnalyzers
             new[] { diagnosticDescriptorId },
             new SingleDocumentFixAllDiagnosticProvider(nonOverlappingDiagnostic, document.Id),
             default);
-        
+
 
         try
         {
             sw.Restart();
             var fixAll = await fixAllProvider.GetFixAsync(fixAllContext).ConfigureAwait(false);
-            
+
             if (sw.ElapsedMilliseconds > 500)
                 Logger.LogDebug(SemtexLog.GetPerformanceStr(nameof(fixAllProvider.GetFixAsync), sw.ElapsedMilliseconds));
 
@@ -450,7 +450,7 @@ public sealed class SafeAnalyzers
                 sw.Restart();
                 var operations =
                     await fixAll.GetOperationsAsync(CancellationToken.None).ConfigureAwait(false);
-                
+
                 if (sw.ElapsedMilliseconds > 500)
                     Logger.LogDebug(SemtexLog.GetPerformanceStr(nameof(fixAll.GetOperationsAsync), sw.ElapsedMilliseconds));
 
