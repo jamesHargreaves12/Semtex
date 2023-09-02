@@ -109,7 +109,7 @@ Command GetCheckCommand()
     checkCommand.SetHandler(async (repo, target, source, allAncestors, projFilter, explicitProjectMap, verbosity) =>
     {
         SemtexLog.InitializeLogging(verbosity, shouldLogToFile, outputPath, verbosity == LogLevel.Information);
-        AbsolutePath? analyzerConfigPathTyped =  null; // For now this is not supported
+        AbsolutePath? analyzerConfigPathTyped = null; // For now this is not supported
         var explicitProjectMapTyped = explicitProjectMap == null ? null : new AbsolutePath(explicitProjectMap);
 
         bool passedCheck;
@@ -137,7 +137,7 @@ Command GetComputeProjectMappingCommand()
 {
     var projMappingCommand = new Command("compute-project-file-map", "This command is a prerequisite if your codebase does not follow the standard hierarchical project layout. It generates a file that maps each C# file to its respective project.");
     var slnPathArg = new Argument<string>("sln-path", "Path to local solution file. Accepts both absolute and relative paths.");
-    var outPathArg = new Argument<string>("output-file-path","Defines the path where the mapping will be saved.");
+    var outPathArg = new Argument<string>("output-file-path", "Defines the path where the mapping will be saved.");
     var verbosityOption = new Option<LogLevel>("--verbosity", () => LogLevel.Information, "Set the logging verbosity level.");
     projMappingCommand.AddArgument(slnPathArg);
     projMappingCommand.AddArgument(outPathArg);
@@ -161,7 +161,7 @@ Command CommitCommand()
     commitCommand.AddArgument(messageArg);
     commitCommand.AddOption(repoOption);
     commitCommand.AddOption(verbosityOption);
-    commitCommand.SetHandler(async (repo, type, message,verbosity) =>
+    commitCommand.SetHandler(async (repo, type, message, verbosity) =>
     {
         SemtexLog.InitializeLogging(verbosity, shouldLogToFile, outputPath, verbosity == LogLevel.Information);
         await Commands.Commit(new AbsolutePath(repo), type, message);
