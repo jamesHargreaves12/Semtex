@@ -12,10 +12,12 @@ public class Right: Wrapper
     {
         X = 3;
         CanBeStatic(w);
+        CannotBeStatic(w);
     }
 
-    private static void CanBeStatic(Wrapper w)
+    private static void CanBeStatic(Wrapper? w)
     {
+        Console.WriteLine($"Something {F} {w?.X}");
         Console.WriteLine($"Something {F} {w.X}");
     }
     private void CannotBeStatic(Wrapper w)
