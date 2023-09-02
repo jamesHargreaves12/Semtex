@@ -53,7 +53,7 @@ internal sealed class SolutionUtils
         }
         catch (Exception e)
         {
-            Logger.LogWarning("Failure in CheckProjectsCompile: {E}",e);
+            Logger.LogDebug("Failure in CheckProjectsCompile: {E}",e);
             failedToCompile = projectPaths.ToHashSet();
         }
 
@@ -62,7 +62,7 @@ internal sealed class SolutionUtils
         stopwatch.Restart();
         if (failedToCompile.Any())
         {
-            Logger.LogWarning("The following projects failed initial compile: {ProjPaths}", string.Join("\n",failedToCompile.Select(p=> p.Path)));
+            Logger.LogDebug("The following projects failed initial compile: {ProjPaths}", string.Join("\n",failedToCompile.Select(p=> p.Path)));
             Logger.LogDebug("Will attempt to restore project and then try again");
             foreach (var path in failedToCompile)
             {
@@ -74,10 +74,18 @@ internal sealed class SolutionUtils
 
             failedToRestore.AddRange(failedToRestore2);
             failedToCompile = await CheckProjectsCompile(sln, projectPaths).ConfigureAwait(false);
+            
+            if (failedToRestore.Any())
+            {
+                Logger.LogWarning(
+                    "The following projects failed to restore and so the files will not be checked: {ProjPaths}",
+                    string.Join("\n", failedToRestore.Select(p=> p.Path)));
+            }
+
             if (failedToCompile.Any())
             {
                 Logger.LogWarning(
-                    "The following projects are still failing to compile and so the files will not be checked: {ProjPaths}",
+                    "The following projects failed compile and so the files will not be checked: {ProjPaths}",
                     string.Join("\n", failedToCompile.Select(p=> p.Path)));
             }
             else
