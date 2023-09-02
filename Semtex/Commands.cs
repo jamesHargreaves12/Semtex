@@ -140,13 +140,14 @@ public sealed class Commands
         // apply the patch.
         var userRepo = await GitRepo.SetupFromExistingFolder(new AbsolutePath(repoPath)).ConfigureAwait(false);
         var userRepoBaseCommit = await userRepo.GetCurrentCommitSha().ConfigureAwait(false);
-        if (!await userRepo.IsAvailableOnOrigin(userRepoBaseCommit))
+        var ghostRepo = await GitRepo.CreateGitRepoFromUrl(userRepo.RemoteUrl).ConfigureAwait(false);
+
+        if (!await ghostRepo.IsAvailable(userRepoBaseCommit))
         {
-            Logger.LogError("Unable to find commit on remote repository. Please ensure you have run `git push` and try again. Exiting");
+            Logger.LogError("Unable to find current commit on remote repository. Please ensure you have run `git push` and try again. Exiting");
             return;
         }
 
-        var ghostRepo = await GitRepo.CreateGitRepoFromUrl(userRepo.RemoteUrl).ConfigureAwait(false);
         await ghostRepo.Checkout(userRepoBaseCommit).ConfigureAwait(false);
 
         if (includeUncommitted != IncludeUncommittedChanges.None)
