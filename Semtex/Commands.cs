@@ -11,7 +11,7 @@ namespace Semtex;
 
 public sealed class Commands
 {
-    private static readonly string ScratchSpacePath = Path.Join(Path.GetTempPath(), "Semtex");
+    private static readonly AbsolutePath ScratchSpacePath = new AbsolutePath(Path.Join(Path.GetTempPath(), "Semtex"));
 
     private static readonly ILogger<Commands> Logger = SemtexLog.LoggerFactory.CreateLogger<Commands>();
     // If true then any errors that we unhandled errors within the solution logic will be unhandled. If false then the
@@ -141,7 +141,12 @@ public sealed class Commands
 
     internal static async Task Split(string repoPath, string baseCommit, IncludeUncommittedChanges includeUncommitted, string? projectMap)
     {
-        var gitRepo = await CreateGitRepoWithLocalChangesCommitted(new AbsolutePath(repoPath), includeUncommitted).ConfigureAwait(false);
+        var (gitRepo, localRepoHead) = await CreateGitRepoWithLocalChangesCommitted(new AbsolutePath(repoPath), includeUncommitted).ConfigureAwait(false);
+        // Check that git push has been run TODO
+        if (baseCommit == "HEAD")
+        {
+            baseCommit = localRepoHead;
+        }
 
         var projectMapPath = projectMap is null ? null : new AbsolutePath(projectMap);
 
@@ -167,12 +172,12 @@ public sealed class Commands
 
     private static async Task SplitPatch(GitRepo gitRepo, string baseCommit, string patchText, AbsolutePath? projectMapPath)
     {
-        var patchFilepath = Path.Join(ScratchSpacePath, $"test-{Guid.NewGuid()}.patch");
-        await File.WriteAllTextAsync(patchFilepath, patchText).ConfigureAwait(false);
+        var patchFilepath = ScratchSpacePath.Join($"test-{Guid.NewGuid()}.patch");
+        await File.WriteAllTextAsync(patchFilepath.Path, patchText).ConfigureAwait(false);
 
         await gitRepo.Checkout(baseCommit).ConfigureAwait(false);
 
-        await gitRepo.ApplyPatch(new AbsolutePath(patchFilepath)).ConfigureAwait(false);
+        await gitRepo.ApplyPatch(patchFilepath).ConfigureAwait(false);
         await gitRepo.AddAllAndCommit().ConfigureAwait(false);
 
         var commitWithPatch = await gitRepo.GetCurrentCommitSha().ConfigureAwait(false);
@@ -241,28 +246,28 @@ public sealed class Commands
         var resultStr = await DisplayResults.GetPrettySummaryOfResultsAsync(result, gitRepo, "changes").ConfigureAwait(false);
         Logger.LogInformation(resultStr);
 
-        var semanticFilepath = Path.Join(ScratchSpacePath, "change_behaviour.patch");
-        var unsemanticFilepath = Path.Join(ScratchSpacePath, "improve_readability.patch");
-        if (Path.Exists(semanticFilepath))
-            File.Delete(semanticFilepath);
+        var semanticFilepath = PatchFileLookup(CommitType.Behavioural);
+        var unsemanticFilepath = PatchFileLookup(CommitType.Readability);
+        if (semanticFilepath.Exists())
+            File.Delete(semanticFilepath.Path);
 
-        if (Path.Exists(unsemanticFilepath))
-            File.Delete(unsemanticFilepath);
+        if (unsemanticFilepath.Exists())
+            File.Delete(unsemanticFilepath.Path);
 
         var applyBuilder = new StringBuilder();
 
         if (semanticChangesBuilder.Length > 0)
         {
-            await File.WriteAllTextAsync(semanticFilepath, semanticChangesBuilder.ToString()).ConfigureAwait(false);
+            await File.WriteAllTextAsync(semanticFilepath.Path, semanticChangesBuilder.ToString()).ConfigureAwait(false);
             Logger.LogInformation("Changes that DO effect runtime behaviour at: {semanticChanges}", semanticFilepath);
-            applyBuilder.AppendLine($"git apply {semanticFilepath}");
+            applyBuilder.AppendLine($"git apply {semanticFilepath.Path}");
         }
 
         if (unsemanticChangesBuilder.Length > 0)
         {
-            await File.WriteAllTextAsync(unsemanticFilepath, unsemanticChangesBuilder.ToString()).ConfigureAwait(false);
+            await File.WriteAllTextAsync(unsemanticFilepath.Path, unsemanticChangesBuilder.ToString()).ConfigureAwait(false);
             Logger.LogInformation("Changes that do NOT effect runtime behaviour at: {UnsemanticChanges}", unsemanticFilepath);
-            applyBuilder.AppendLine($"git apply {unsemanticFilepath}");
+            applyBuilder.AppendLine($"git apply {unsemanticFilepath.Path}");
         }
 
 
@@ -270,30 +275,62 @@ public sealed class Commands
     }
 
 
-    private static async Task<GitRepo> CreateGitRepoWithLocalChangesCommitted(AbsolutePath path, IncludeUncommittedChanges includeUncommittedChanges)
+    private static async Task<(GitRepo ghostRepo, string baseCommit)> CreateGitRepoWithLocalChangesCommitted(AbsolutePath path, IncludeUncommittedChanges includeUncommittedChanges)
     {
         // Get a patch from the local version of the repo and grab the commit.
         // Setup a repo in the scratch space at the same base commit.
         // apply the patch.
         // Check the patch commit for semantic equality.
         var localChangesRepo = await GitRepo.SetupFromExistingFolder(path).ConfigureAwait(false);
+        var baseCommit = await localChangesRepo.GetCurrentCommitSha().ConfigureAwait(false);
+
         var ghostRepo = await GitRepo.CreateGitRepoFromUrl(localChangesRepo.RemoteUrl).ConfigureAwait(false);
         var currentBaseCommit = await localChangesRepo.GetCurrentCommitSha().ConfigureAwait(false);
         await ghostRepo.Checkout(currentBaseCommit).ConfigureAwait(false);
 
-        if (includeUncommittedChanges == IncludeUncommittedChanges.None) return ghostRepo;
+        if (includeUncommittedChanges == IncludeUncommittedChanges.None) return (ghostRepo,baseCommit);
 
-        var patchFilepath = new AbsolutePath(Path.Join(ScratchSpacePath, $"tmp_{new Guid()}.patch"));
+        var patchFilepath = ScratchSpacePath.Join($"tmp_{Guid.NewGuid()}.patch");
 
         var hasLocalChanges = await localChangesRepo.CreatePatchFileOfLocalChanges(patchFilepath, includeUncommittedChanges).ConfigureAwait(false);
 
-        if (!hasLocalChanges) return ghostRepo;
+        if (!hasLocalChanges) return (ghostRepo, baseCommit);
 
         await ghostRepo.ApplyPatch(patchFilepath).ConfigureAwait(false);
         await ghostRepo.AddAllAndCommit().ConfigureAwait(false);
 
-        return ghostRepo;
+        return (ghostRepo,baseCommit);
     }
 
+    public static async Task Commit(AbsolutePath repoPath, CommitType commitType, string message)
+    { 
+        var gitRepo = await GitRepo.SetupFromExistingFolder(repoPath);
+        var patchPath = PatchFileLookup(commitType);
+        var stashStatePath = ScratchSpacePath.Join($"full-{Guid.NewGuid()}.patch");
+        // If the user has any currently stashed files we cache a patch and then stash them. The reason to do both is that
+        // if something happens we can point them to the stashed files however it is not trivial to apply the stash only to
+        // the staging and so we apply the changes to staging by reapplying the stash file.
+        var hasStagedFiles = await gitRepo.CreatePatchFileOfLocalChanges(stashStatePath, IncludeUncommittedChanges.Staged);
+        if (hasStagedFiles)
+        {
+            await gitRepo.StashStaged().ConfigureAwait(false);
+        }
+        await gitRepo.ApplyPathToStaging(patchPath);
+        await gitRepo.Commit(message);
+        if (hasStagedFiles)
+        {
+            await gitRepo.ApplyPathToStaging(stashStatePath);
+            await gitRepo.StashPop();
+        }
+    }
 
+    private static AbsolutePath PatchFileLookup(CommitType commitType)
+    {
+        return commitType switch
+        {
+            CommitType.Behavioural => ScratchSpacePath.Join("change_behaviour.patch"),
+            CommitType.Readability => ScratchSpacePath.Join("improve_readability.patch"),
+            _ => throw new ArgumentOutOfRangeException(nameof(commitType), commitType, null)
+        };
+    }
 }

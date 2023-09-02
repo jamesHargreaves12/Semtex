@@ -12,6 +12,20 @@ public sealed class AnalyzerConfigOverwrite
 {
     private static readonly ILogger<AnalyzerConfigOverwrite> Logger = SemtexLog.LoggerFactory.CreateLogger<AnalyzerConfigOverwrite>();
 
+    private const string START_OF_CONFIG_FILE = """
+is_global = true #https://learn.microsoft.com/en-us/dotnet/fundamentals/code-analysis/configuration-files
+roslynator_array_creation_type_style = explicit
+roslynator_body_style = block
+roslynator_object_creation_parentheses_style = include
+roslynator_empty_string_style = literal
+roslynator_enum_has_flag_style = operator
+roslynator_object_creation_type_style = explicit
+roslynator_use_var_instead_of_implicit_object_creation = true
+roslynator_infinite_loop_style = while
+roslynator_enum_flag_value_style = decimal_number
+generated_code = false # The fix all provider will not fix all on code which has generated code commnet. We will only call fix all if the file is checked into git and so we want to ignore this check.
+""";
+
     /// <summary>
     /// By default we want to control which analyzers are applied. To achieve this we strip out any existing
     /// AnalyzerConfig documents in the project and replace it with a new one that is controlled by us.
@@ -44,7 +58,7 @@ public sealed class AnalyzerConfigOverwrite
         {
             Logger.LogDebug("Adding a dynamically generated analyzer config to the project");
             var analyzerConfigFolder = Directory.GetParent(typeof(AnalyzerConfigOverwrite).Assembly.Location)!.ToString();
-            configText = await File.ReadAllTextAsync(Path.Join(analyzerConfigFolder, ".analyzerconfig")).ConfigureAwait(false);
+            configText = START_OF_CONFIG_FILE;
 
             analyzerConfigPath = new AbsolutePath(Path.Join(Path.GetDirectoryName(project.FilePath), ".analyzerconfig"));
             configText += GetAnalyzerConfigOnlyForFilesThatChanged(changedDocumentIds.Select(project.GetDocument));

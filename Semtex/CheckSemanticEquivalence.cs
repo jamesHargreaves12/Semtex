@@ -250,7 +250,7 @@ public sealed class CheckSemanticEquivalence
     {
         var projectFilter = projectPath is null ? "" : $"--project-filter \"{gitRepo.GetRelativePath(projectPath)}";
         var commandline =
-            $"check {gitRepo.RemoteUrl} {target} --source {source} {projectFilter}\"";
+            $"check {gitRepo.RemoteUrl} {target} --base {source} {projectFilter} --verbosity Debug\"";
         return commandline;
     }
 

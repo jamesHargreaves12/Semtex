@@ -86,7 +86,7 @@ internal class GitRepo
         {
             return false;
         }
-
+        Logger.LogDebug("Creating patch of current changes at {Path}", patchFilepath.Path);
         await File.WriteAllTextAsync(patchFilepath.Path, patchText).ConfigureAwait(false);
         return true;
     }
@@ -425,6 +425,23 @@ internal class GitRepo
         await gitDiffCommand.ExecuteAsync();
         Logger.LogDebug("Finished diff");
     }
+    
+    public async Task ApplyPathToStaging(AbsolutePath patchFilepath)
+    {
+        var gitDiffCommand = Cli.Wrap("git")
+            .WithArguments(new[]
+            {
+                "apply",
+                "--cached",
+                patchFilepath.Path
+            })
+            .WithWorkingDirectory(RootFolder.Path)
+            .WithStandardOutputPipe(StdOutPipe)
+            .WithStandardErrorPipe(StdErrPipe);
+        Logger.LogDebug("Executing {GitDiffCommand}", gitDiffCommand);
+        await gitDiffCommand.ExecuteAsync();
+        Logger.LogDebug("Finished diff");
+    }
 
     public async Task AddAllAndCommit()
     {
@@ -440,12 +457,16 @@ internal class GitRepo
         Logger.LogDebug("Executing {GitAddCommand}", gitAddCommand);
         await gitAddCommand.ExecuteAsync();
         Logger.LogDebug("Finished diff");
+        await Commit("All local changes");
 
+    }
+    public async Task Commit(string message)
+    {
         var gitCommitCmd = Cli.Wrap("git")
             .WithArguments(new[]
             {
                 "commit",
-                "-m", "local changes"
+                "-m", message
             })
             .WithWorkingDirectory(RootFolder.Path)
             .WithStandardOutputPipe(StdOutPipe)
@@ -592,5 +613,38 @@ internal class GitRepo
         Logger.LogDebug("Finished");
         return cmdResult.StandardOutput;
 
+    }
+
+    public async Task StashStaged()
+    {
+        var gitStashCmd = Cli.Wrap("git")
+            .WithArguments(new[]
+            {
+                "stash",
+                "save",
+                "--staged",
+                "--message",
+                "Temporary Semtex"
+            })
+            .WithWorkingDirectory(RootFolder.Path)
+            .WithStandardOutputPipe(StdOutPipe)
+            .WithStandardErrorPipe(StdErrPipe);
+        Logger.LogDebug("Executing {GitCommitCmd}", gitStashCmd);
+        await gitStashCmd.ExecuteAsync();
+
+    }
+
+    public async Task StashPop()
+    {
+        var gitStashCmd = Cli.Wrap("git")
+            .WithArguments(new[]
+            {
+                "stash",
+                "pop",
+            })
+            .WithWorkingDirectory(RootFolder.Path)
+            .WithStandardOutputPipe(StdOutPipe)
+            .WithStandardErrorPipe(StdErrPipe);
+        await gitStashCmd.ExecuteAsync();
     }
 }

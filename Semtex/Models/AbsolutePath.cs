@@ -14,6 +14,11 @@ public record AbsolutePath
     {
         return new AbsolutePath(System.IO.Path.Join(Path, relativePath));
     }
+    
+    public bool Exists()
+    {
+        return System.IO.Path.Exists(Path);
+    }
 
     public string GetRelativePath(string childPath)
     {

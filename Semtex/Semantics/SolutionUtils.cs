@@ -229,7 +229,7 @@ internal sealed class SolutionUtils
             var projectAssetsPath = Path.Join(Directory.GetParent(path.Path)!.FullName, "obj/project.assets.json");
             if (Path.Exists(projectAssetsPath))
             {
-                Logger.LogDebug("Project Assets File already exists so skipping restore on {Path}", path);
+                Logger.LogTrace("Project Assets File already exists so skipping restore on {Path}", path);
                 continue;
             }
 
