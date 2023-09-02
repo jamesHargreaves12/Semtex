@@ -425,7 +425,7 @@ internal class GitRepo
         await gitDiffCommand.ExecuteAsync();
         Logger.LogDebug("Finished diff");
     }
-    
+
     public async Task ApplyPatchToStaging(AbsolutePath patchFilepath)
     {
         var gitDiffCommand = Cli.Wrap("git")
@@ -442,7 +442,7 @@ internal class GitRepo
         await gitDiffCommand.ExecuteAsync();
         Logger.LogDebug("Finished diff");
     }
-    
+
     public async Task ApplyPatchToWorkingDir(AbsolutePath patchFilepath)
     {
         var gitDiffCommand = Cli.Wrap("git")

@@ -300,7 +300,7 @@ public sealed class Commands
 
         switch (semanticChangesBuilder.Length, unsemanticChangesBuilder.Length)
         {
-            case (>0,>0):
+            case ( > 0, > 0):
                 Logger.LogInformation("To apply these changes as new (and separate) commits use the following commands:");
                 Logger.LogInformation("");
                 Logger.LogInformation(behaviouralCommand);
@@ -308,14 +308,14 @@ public sealed class Commands
                 Logger.LogInformation("");
                 Logger.LogInformation("If you wish to checkout the change set before commiting, stash your current changes and run: git apply <path>.patch");
                 break;
-            case (>0,0):
+            case ( > 0, 0):
                 Logger.LogInformation("To apply this change as a new commit use the following command:");
                 Logger.LogInformation("");
                 Logger.LogInformation(behaviouralCommand);
                 Logger.LogInformation("");
                 Logger.LogInformation("If you wish to checkout the change set before commiting, stash your current changes and run: git apply <path>.patch");
                 break;
-            case (0,>0):
+            case (0, > 0):
                 Logger.LogInformation("To apply this change as a new commit use the following command:");
                 Logger.LogInformation("");
                 Logger.LogInformation(readabilityCommand);
@@ -338,7 +338,7 @@ public sealed class Commands
         await ghostRepo.Checkout(userRepoBaseCommit).ConfigureAwait(false);
         await ghostRepo.ApplyPatch(PatchFileLookup(commitType));
         await ghostRepo.AddAllAndCommit(message);
-        
+
         // Now transfer the commit from the ghost repo back to the users repo.
         var newCommitSha = await ghostRepo.GetCurrentCommitSha().ConfigureAwait(false);
         await ghostRepo.CreateBundleFile(bundlePath);

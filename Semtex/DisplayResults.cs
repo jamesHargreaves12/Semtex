@@ -10,7 +10,7 @@ public static class DisplayResults
         var resultSummary = new StringBuilder();
         var commitDisplayName = commitDisplayTitle ?? await gitRepo.GetCommitOnelineDisplay(result.CommitHash).ConfigureAwait(false);
 
-        resultSummary.AppendLine($"Summary of {commitDisplayName} ({result.ElapsedMilliseconds/1000.0:F1}s)");
+        resultSummary.AppendLine($"Summary of {commitDisplayName} ({result.ElapsedMilliseconds / 1000.0:F1}s)");
 
         var semEquiv = result.FileModels
             .Where(f => f.Status == Status.SemanticallyEquivalent)
