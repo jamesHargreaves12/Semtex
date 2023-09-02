@@ -136,6 +136,7 @@ public sealed class Commands
     internal static async Task Split(string repoPath, string baseCommit, IncludeUncommittedChanges includeUncommitted,
         string? projectMap, bool failFast)
     {
+        // TODO Check if empty
         var (gitRepo, localRepoHead) = await CreateGitRepoWithLocalChangesCommitted(new AbsolutePath(repoPath), includeUncommitted).ConfigureAwait(false);
         // Check that git push has been run TODO
         if (baseCommit == "HEAD")
@@ -252,6 +253,7 @@ public sealed class Commands
             File.Delete(unsemanticFilepath.Path);
 
         var applyBuilder = new StringBuilder();
+        // TODO Make sure I delete these files every time.
 
         if (semanticChangesBuilder.Length > 0)
         {
