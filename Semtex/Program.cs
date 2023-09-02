@@ -41,7 +41,7 @@ Command GetCheckCommand(){
     checkCommand.AddOption(verbosityOption);
     checkCommand.SetHandler(async (repo, target, source, allAncestors, analyzerConfigPath, projFilter, explicitProjectMap, verbosity) =>
     {
-        SemtexLog.InitializeLogging(verbosity, shouldLogToFile, outputPath);
+        SemtexLog.InitializeLogging(verbosity, shouldLogToFile, outputPath, verbosity == LogLevel.Information);
         var analyzerConfigPathTyped = analyzerConfigPath == null ? null : new AbsolutePath(analyzerConfigPath);
         var explicitProjectMapTyped = explicitProjectMap == null ? null : new AbsolutePath(explicitProjectMap);
 
@@ -77,7 +77,7 @@ Command GetComputeProjectMappingCommand()
     projMappingCommand.AddOption(verbosityOption);
     projMappingCommand.SetHandler(async (slnPath, outPath, verbosity) =>
     {
-        SemtexLog.InitializeLogging(verbosity, shouldLogToFile, outputPath);
+        SemtexLog.InitializeLogging(verbosity, shouldLogToFile, outputPath,verbosity == LogLevel.Information);
         await Commands.ComputeProjectMapping(new AbsolutePath(slnPath), outPath).ConfigureAwait(false);
     }, slnPathArg, outPathArg,verbosityOption);
     return projMappingCommand;
@@ -100,7 +100,7 @@ Command GetSplitCommand()
 
     splitCommand.SetHandler(async (repoPath, baseValue, includeUncommited, projectMap, verbosity) =>
     {
-        SemtexLog.InitializeLogging(verbosity, shouldLogToFile, logPath);
+        SemtexLog.InitializeLogging(verbosity, shouldLogToFile, logPath,verbosity == LogLevel.Information);
         await Commands.Split(repoPath, baseValue, includeUncommited, projectMap).ConfigureAwait(false);
     }, repoArg, baseArg,includeUncommittedOption,projectMapOption,verbosityOption);
     return splitCommand;
@@ -121,7 +121,7 @@ Command GetSplitRemoteCommand()
     splitCommand.AddOption(verbosityOption);
     splitCommand.SetHandler(async (repo, target, baseCommit, projectMap, verbosity) =>
     {
-        SemtexLog.InitializeLogging(verbosity, shouldLogToFile, outputPath);
+        SemtexLog.InitializeLogging(verbosity, shouldLogToFile, outputPath,verbosity == LogLevel.Information);
         await Commands.SplitRemote(repo, target, baseCommit, projectMap).ConfigureAwait(false);
     }, repoArg, targetArg, baseOption, projectMapOption,verbosityOption);
     return splitCommand;

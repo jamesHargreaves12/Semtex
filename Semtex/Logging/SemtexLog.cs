@@ -8,8 +8,9 @@ internal static class SemtexLog
     // This is trash.
     public static ILoggerFactory LoggerFactory = null!;
 
-    public static void InitializeLogging(LogLevel verbosity, bool shouldLogToFile, string logDirectory)
+    public static void InitializeLogging(LogLevel verbosity, bool shouldLogToFile, string logDirectory, bool simpleMode)
     {
+        SemtexConsoleFormatter.SimpleMode = simpleMode;
         const string timestampFormat = "HH:mm:ss.fff";
         var logPath = $"{logDirectory}/{DateTime.Now:yyyy-M-d_HH-mm-ss}.txt";
         var logFolder = Directory.GetParent(logPath)!.ToString();

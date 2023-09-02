@@ -38,7 +38,6 @@ public sealed class CheckSemanticEquivalence
             Logger.LogDebug("Skipping commit {Target} as it has no c# diffs",target);
             return await GetFileModels(gitRepo, diffConfig, SimplifiedSolutionSummary.Empty(), SimplifiedSolutionSummary.Empty(), new Dictionary<AbsolutePath, HashSet<MethodIdentifier>>())
                 .ConfigureAwait(false);
-
         }
 
         Logger.LogDebug("{Count} C# files need to be checked for differences", diffConfig.SourceCsFilepaths.Count);
@@ -98,7 +97,7 @@ public sealed class CheckSemanticEquivalence
             {
                 var srcSummary = new SimplifiedSolutionSummary(srcSolution, new HashSet<ProjectId>(), srcUnsimplified);
                 var tgtSummary = new SimplifiedSolutionSummary(targetSolution, new HashSet<ProjectId>(), targetUnsimplified);
-                return await GetFileModels(gitRepo, diffConfig,srcSummary, tgtSummary, sourceChangedMethods).ConfigureAwait(false);
+                return await GetFileModels(gitRepo, diffConfig, srcSummary, tgtSummary, sourceChangedMethods).ConfigureAwait(false);
             }
 
             sourceFilesToSimplify = sourceFilesToSimplify.Where(fp => !srcUnsimplified.IsUnsimplified(fp)).ToHashSet();
