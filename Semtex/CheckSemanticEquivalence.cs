@@ -13,31 +13,38 @@ namespace Semtex;
 public sealed class CheckSemanticEquivalence
 {
     private static readonly ILogger<CheckSemanticEquivalence> Logger = SemtexLog.LoggerFactory.CreateLogger<CheckSemanticEquivalence>();
+
     internal static async Task<CommitModel> CheckSemanticallyEquivalent(GitRepo gitRepo, string target,
         AbsolutePath? analyzerConfigPath, AbsolutePath? projFilter, AbsolutePath? projectMappingFilepath, bool failFast)
     {
-        var source = $"{target}~1";
         var stopWatch = Stopwatch.StartNew();
+        var source = $"{target}~1";
+        Logger.LogInformation("Processing git config...");
         // Use git diff to give us the set of files to consider.
         var diffConfig = await GetDiffConfig(gitRepo, target, source).ConfigureAwait(false);
+        var fileModels = await CheckSemanticallyEquivalentInternal(gitRepo, diffConfig, source, target, analyzerConfigPath, projFilter, projectMappingFilepath, failFast).ConfigureAwait(false);
+        return new CommitModel(target, fileModels, stopWatch.ElapsedMilliseconds, diffConfig)
+        {
+            CommitHash = target
+        };
 
+    }
+    
+    internal static async Task<List<FileModel>> CheckSemanticallyEquivalentInternal(GitRepo gitRepo, DiffConfig diffConfig, string source, string target,
+        AbsolutePath? analyzerConfigPath, AbsolutePath? projFilter, AbsolutePath? projectMappingFilepath, bool failFast)
+    {
         if (diffConfig.SourceCsFilepaths.Count == 0)
         {
             Logger.LogDebug("Skipping commit {Target} as it has no c# diffs",target);
-            var fileModels = await GetFileModels(gitRepo, diffConfig, SimplifiedSolutionSummary.Empty(), SimplifiedSolutionSummary.Empty(), new Dictionary<AbsolutePath, HashSet<MethodIdentifier>>())
+            return await GetFileModels(gitRepo, diffConfig, SimplifiedSolutionSummary.Empty(), SimplifiedSolutionSummary.Empty(), new Dictionary<AbsolutePath, HashSet<MethodIdentifier>>())
                 .ConfigureAwait(false);
 
-            return new CommitModel(target, fileModels, stopWatch.ElapsedMilliseconds, diffConfig)
-            {
-                CommitHash = target
-            };
         }
 
         Logger.LogDebug("{Count} C# files need to be checked for differences", diffConfig.SourceCsFilepaths.Count);
 
         try
         {
-            Logger.LogInformation("Setting up Solution...");
             var sourceLineChangeMapping = new Dictionary<AbsolutePath, List<LineDiff>>();
             var targetLineChangeMapping = new Dictionary<AbsolutePath, List<LineDiff>>();
             // If the git diff is R100 then we don't need to bother simplifying as both sides will match.
@@ -75,14 +82,24 @@ public sealed class CheckSemanticEquivalence
             }
 
             Logger.LogDebug("We have a method filter for {Percentage}% of methods ({ChangedCount} files)",(int)(sourceChangedMethodsMap.Count/(float)sourceFilesToSimplify.Count), sourceChangedMethodsMap.Count);
+
             // Setup the solutions
+            Logger.LogInformation("Setting up LHS Solution...");
             await gitRepo.Checkout(target).ConfigureAwait(false);
             var targetProjFinder = GetProjFinder(gitRepo.RootFolder, projectMappingFilepath);
             var (targetSolution, targetUnsimplified, targetProjectIds) = await GetSolution(targetFilesToSimplify, projFilter, targetProjFinder).ConfigureAwait(false);
             
+            Logger.LogInformation("Setting up RHS Solution...");
             await gitRepo.Checkout(source).ConfigureAwait(false);
             var sourceProjFinder = GetProjFinder(gitRepo.RootFolder, projectMappingFilepath);
             var (srcSolution, srcUnsimplified, sourceProjectIds) = await GetSolution(sourceFilesToSimplify, projFilter, sourceProjFinder).ConfigureAwait(false);
+
+            if (sourceProjectIds.Count == 0 || targetProjectIds.Count == 0)
+            {
+                var srcSummary = new SimplifiedSolutionSummary(srcSolution, new HashSet<ProjectId>(), srcUnsimplified);
+                var tgtSummary = new SimplifiedSolutionSummary(targetSolution, new HashSet<ProjectId>(), targetUnsimplified);
+                return await GetFileModels(gitRepo, diffConfig,srcSummary, tgtSummary, sourceChangedMethods).ConfigureAwait(false);
+            }
 
             sourceFilesToSimplify = sourceFilesToSimplify.Where(fp => !srcUnsimplified.IsUnsimplified(fp)).ToHashSet();
             targetFilesToSimplify = targetFilesToSimplify.Where(fp => !targetUnsimplified.IsUnsimplified(fp)).ToHashSet();
@@ -118,10 +135,7 @@ public sealed class CheckSemanticEquivalence
             simplifiedSrcSln.Workspace.Dispose();
             simplifiedTargetSln.Workspace.Dispose();
             
-            return new CommitModel(target, result, stopWatch.ElapsedMilliseconds, diffConfig)
-            {
-                CommitHash = target
-            };
+            return result;
         }
         catch (SemtexCompileException e)
         {
@@ -149,17 +163,13 @@ public sealed class CheckSemanticEquivalence
                 new HashSet<AbsolutePath>(),
                 diffConfig.TargetCsFilepaths.ToHashSet()
             );
-            var result = await GetFileModels(
+            return await GetFileModels(
                 gitRepo,
                 diffConfig,
                 new SimplifiedSolutionSummary(null, new HashSet<ProjectId>(), srcUnexpectErrorSummary),
                 new SimplifiedSolutionSummary(null, new HashSet<ProjectId>(),tgtUnexpectedErrorSummary),
                 new Dictionary<AbsolutePath, HashSet<MethodIdentifier>>()
             ).ConfigureAwait(false);
-            return new CommitModel(target, result, stopWatch.ElapsedMilliseconds, diffConfig)
-            {
-                CommitHash = target
-            };
         }
         
     }
