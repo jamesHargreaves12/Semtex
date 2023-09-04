@@ -2,12 +2,13 @@
 
 Remove the Git friction that is discouraging you from making improvements to your C# codebase. 
 
-Semtex segregates any changes into two categories — behavioral changes and readability improvements. This separation simplifies the code review process and helps maintain the focus and intent of each commit.
+Semtex segregates any changes into two categories — behavioral changes and quality improvements. This separation simplifies the code review process and helps maintain the focus and intent of each commit.
 
 ## Usage
 
 ### Make your code review's life easier
-Run the following command to partition your staged changes into two patches: one containing changes that affect runtime behavior, and another for changes focused on improving code readability.
+Run the following command to partition your staged changes into two patches: one for changes that affect runtime
+behaviour, and another for changes focused on improving code maintainability.
 ```sh
 semtex split
 ```
@@ -15,9 +16,9 @@ To commit only those changes that effect the runtime behaviour of you applicatio
 ```sh
 semtex commit Behavioural <commit message>
 ```
-For committing changes that improve readability, replace Behavioral with Readability:
+For committing changes focused on the increasing the quality of your codebase, replace Behavioral with Quality:
 ```sh
-semtex commit Behavioural <commit message>
+semtex commit Quality <commit message>
 ```
 
 -------

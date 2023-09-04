@@ -272,7 +272,7 @@ public sealed class Commands
         Logger.LogInformation(resultStr);
 
         var semanticFilepath = PatchFileLookup(CommitType.Behavioural);
-        var unsemanticFilepath = PatchFileLookup(CommitType.Readability);
+        var unsemanticFilepath = PatchFileLookup(CommitType.Quality);
 
         if (semanticFilepath.Exists())
             File.Delete(semanticFilepath.Path);
@@ -298,7 +298,7 @@ public sealed class Commands
         }
 
         const string behaviouralCommand = @"semtex commit Behavioural ""<Commit message>""";
-        const string readabilityCommand = @"semtex commit Readability ""<Commit message>""";
+        const string qualityCommand = @"semtex commit Quality ""<Commit message>""";
 
         switch (semanticChangesBuilder.Length, unsemanticChangesBuilder.Length)
         {
@@ -306,7 +306,7 @@ public sealed class Commands
                 Logger.LogInformation("To apply these changes as new (and separate) commits use the following commands:");
                 Logger.LogInformation("");
                 Logger.LogInformation(behaviouralCommand);
-                Logger.LogInformation(readabilityCommand);
+                Logger.LogInformation(qualityCommand);
                 Logger.LogInformation("");
                 Logger.LogInformation("If you wish to checkout the change set before commiting, stash your current changes and run: git apply <path>.patch");
                 break;
@@ -320,7 +320,7 @@ public sealed class Commands
             case (0, > 0):
                 Logger.LogInformation("To apply this change as a new commit use the following command:");
                 Logger.LogInformation("");
-                Logger.LogInformation(readabilityCommand);
+                Logger.LogInformation(qualityCommand);
                 Logger.LogInformation("");
                 Logger.LogInformation("If you wish to checkout the change set before commiting, stash your current changes and run: git apply <path>.patch");
                 break;
@@ -361,7 +361,7 @@ public sealed class Commands
         return commitType switch
         {
             CommitType.Behavioural => ScratchSpacePath.Join("change_behaviour.patch"),
-            CommitType.Readability => ScratchSpacePath.Join("improve_readability.patch"),
+            CommitType.Quality => ScratchSpacePath.Join("improve_quality.patch"),
             _ => throw new ArgumentOutOfRangeException(nameof(commitType), commitType, null)
         };
     }
