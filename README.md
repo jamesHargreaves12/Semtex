@@ -1,17 +1,17 @@
 # Semtex
 Remove the Git friction that is discouraging you from making improvements to your C# codebase. 
 
-Semtex aims to simplify the code review process for C# projects by intelligently categorizing your changes into those
-that affect runtime behavior and those that increase the maintainability of your codebase. This is achieved by
-leveraging the rich semantic information available in the C# language and compiler.
+Semtex simplifies the code review process for C# projects by dividing up your changes. It segregates
+diffs that affect the runtime behaviour from those that make your codebase easier to maintain.
+This is accomplished by harnessing the rich semantic information available in the C# language and compiler.
 
 - 🏎️ <b>Accelerate Code Reviews</b>: Make the review process quicker and more focused.
 - 🛠️ <b>Enables Incremental Improvements</b>: Make continual improvements without burdening your code reviewers.
 - 📉 <b>Minimize Risk</b>: Lower the chances of introducing unexpected errors into your production systems.
 
 ## Quick Start
-### Make your code reviews life easier
-Run the following command to partition your staged changes into two parts: one containing changes that affect runtime 
+### Make your code review's life easier
+Run the following command to split your changes in two: one half containing changes that affect runtime 
 behavior, and another focused on improving code quality.
 ```sh
 semtex split
