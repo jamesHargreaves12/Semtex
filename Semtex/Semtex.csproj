@@ -9,6 +9,14 @@
         <PackAsTool>true</PackAsTool>
         <ToolCommandName>Semtex</ToolCommandName>
         <PackageOutputPath>./nupkg</PackageOutputPath>
+        <PackageId>semtex</PackageId>
+        <Title>Semtex</Title>
+        <Authors>James Hargreaves</Authors>
+        <PackageReadmeFile>README.md</PackageReadmeFile>
+        <PackageProjectUrl>https://github.com/jamesHargreaves12/Semtex</PackageProjectUrl>
+        <License>MIT</License>
+        <PackageTags>Review;Code review;Semantic;Behavioural;Readability;Quality</PackageTags>
+        <SignAssembly>true</SignAssembly>
     </PropertyGroup>
 
     <ItemGroup>
@@ -30,5 +38,7 @@
       <ProjectReference Include="..\RoslynatorRcsCodeFixes\RoslynatorRcsCodeFixes.csproj" />
       <ProjectReference Include="..\RoslynCsCodeFixes\RoslynCsCodeFixes.csproj" />
     </ItemGroup>
-
+    <ItemGroup>
+        <None Include="README.md" Pack="true" PackagePath="" />
+    </ItemGroup>
 </Project>
