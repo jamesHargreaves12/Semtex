@@ -6,6 +6,9 @@
         <Nullable>enable</Nullable>
         <RootNamespace>Semtex</RootNamespace>
         <TargetFramework>net7.0</TargetFramework>
+        <PackAsTool>true</PackAsTool>
+        <ToolCommandName>Semtex</ToolCommandName>
+        <PackageOutputPath>./nupkg</PackageOutputPath>
     </PropertyGroup>
 
     <ItemGroup>
@@ -28,9 +31,4 @@
       <ProjectReference Include="..\RoslynCsCodeFixes\RoslynCsCodeFixes.csproj" />
     </ItemGroup>
 
-    <ItemGroup>
-        <None Include=".analyzerconfig">
-            <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-        </None>
-    </ItemGroup>
 </Project>
