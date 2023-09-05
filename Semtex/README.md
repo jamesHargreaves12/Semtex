@@ -1,4 +1,5 @@
 # Semtex
+[![NuGet](https://img.shields.io/nuget/v/semtex.svg)](https://www.nuget.org/packages/semtex/)
 
 Remove the Git friction that is discouraging you from making improvements to your C# codebase. 
 
