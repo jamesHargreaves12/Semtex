@@ -17,6 +17,7 @@
         <License>MIT</License>
         <PackageTags>Review;Code review;Semantic;Behavioural;Readability;Quality</PackageTags>
         <SignAssembly>true</SignAssembly>
+        <Version>1.1.0</Version>
     </PropertyGroup>
 
     <ItemGroup>

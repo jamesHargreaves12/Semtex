@@ -153,7 +153,7 @@ internal class GitRepo
     internal static async Task<GitRepo> Clone(string repo, AbsolutePath rootFolder)
     {
         Logger.LogDebug("Cloning {Repo} at into {RootFolder}", repo, rootFolder.Path);
-        List<string> errors = null;
+        List<string>? errors = null;
         var errorPipe = PipeTarget.ToDelegate(s =>
         {
             errors ??= new List<string>();
