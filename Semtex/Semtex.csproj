@@ -7,7 +7,7 @@
         <RootNamespace>Semtex</RootNamespace>
         <TargetFramework>net7.0</TargetFramework>
         <PackAsTool>true</PackAsTool>
-        <ToolCommandName>Semtex</ToolCommandName>
+        <ToolCommandName>semtex</ToolCommandName>
         <PackageOutputPath>./nupkg</PackageOutputPath>
         <PackageId>semtex</PackageId>
         <Title>Semtex</Title>

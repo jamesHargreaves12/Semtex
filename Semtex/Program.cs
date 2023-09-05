@@ -18,7 +18,7 @@ const bool shouldLogToFile = true;
 #else
 const bool shouldLogToFile = false;
 var outputPath = "";
-var logPath = $"";
+var logPath = "";
 #endif
 
 // If true then any errors that are unhandled within the solution simplification will crash program. If false then the
@@ -72,7 +72,7 @@ Command GetSplitRemoteCommand()
     var splitCommand = new Command("split-remote", "Split a specific commit from a remote repository into two patch files: one for behavioural changes and one for quality improvements.");
     var repoArg = new Argument<string>("repo-url", "Origin url of Git repository, including protocol (https, ssh, etc.).");
     var targetArg = new Argument<string>("target", "Branch or SHA containing the changes you want to split.");
-    var baseOption = new Option<string>("--base", () => "master", "Specify the base branch or SHA for comparison.");
+    var baseOption = new Option<string?>("--base", "Specify the base branch or SHA for comparison. The default value is the parent commit of target.");
     var projectMapOption = new Option<string?>("--project-map-file", "Use this option if your codebase does not follow the standard hierarchical project layout. Refer to the compute-project-file-map command for generating this file.");
     var verbosityOption = new Option<LogLevel>("--verbosity", () => LogLevel.Information, "Set the logging verbosity level");
     splitCommand.AddArgument(repoArg);
@@ -84,7 +84,7 @@ Command GetSplitRemoteCommand()
     splitCommand.SetHandler(async (repo, target, baseCommit, projectMap, verbosity) =>
     {
         SemtexLog.InitializeLogging(verbosity, shouldLogToFile, outputPath, verbosity == LogLevel.Information);
-        await Commands.SplitRemote(repo, target, baseCommit, projectMap, failFast).ConfigureAwait(false);
+        await Commands.SplitRemote(repo, target, baseCommit ?? $"{target}~1", projectMap, failFast).ConfigureAwait(false);
     }, repoArg, targetArg, baseOption, projectMapOption, verbosityOption);
     return splitCommand;
 }
@@ -94,20 +94,19 @@ Command GetCheckCommand()
     var checkCommand = new Command("check", "Analyze the specified remote repository and branch/commit to identify changes that will affect the program's runtime behaviour.");
     var repoArg = new Argument<string>("repo-url", "Origin url of Git repository, including protocol (https, ssh, etc.).");
     var targetArg = new Argument<string>("target", "Branch or SHA containing the changes.");
-    var sourceOption = new Option<string>("--base", () => "origin/master", "What the target change set is checked against.");
+    var baseOption = new Option<string?>("--base", "Specify the base branch or SHA for comparison. The default value is the parent commit of target.");
     var projFilterOption = new Option<string?>("--project-filter", "Only consider changes in a specific project. Useful for debugging. ");
     var allAncestorsOption = new Option<bool>("--all-ancestors", () => false, "Analyze the previous 250 ancestors of the given commit. If this option is used, --base is ignored.");
     var projectMapOption = new Option<string?>("--project-map-file", "Use this option if your codebase does not follow the standard hierarchical project layout. Refer to the compute-project-file-map command for generating this file.");
-    // TODO Test this
     var verbosityOption = new Option<LogLevel>("--verbosity", () => LogLevel.Information, "Set the logging verbosity level.");
     checkCommand.AddArgument(repoArg);
     checkCommand.AddArgument(targetArg);
-    checkCommand.AddOption(sourceOption);
+    checkCommand.AddOption(baseOption);
     checkCommand.AddOption(allAncestorsOption);
     checkCommand.AddOption(projFilterOption);
     checkCommand.AddOption(projectMapOption);
     checkCommand.AddOption(verbosityOption);
-    checkCommand.SetHandler(async (repo, target, source, allAncestors, projFilter, explicitProjectMap, verbosity) =>
+    checkCommand.SetHandler(async (repo, target, baseCommit, allAncestors, projFilter, explicitProjectMap, verbosity) =>
     {
         SemtexLog.InitializeLogging(verbosity, shouldLogToFile, outputPath, verbosity == LogLevel.Information);
         AbsolutePath? analyzerConfigPathTyped = null; // For now this is not supported
@@ -116,21 +115,21 @@ Command GetCheckCommand()
         bool passedCheck;
         if (allAncestors)
         {
-            if (source is not "origin/master")
+            if (baseCommit is not null)
                 throw new ArgumentException("You can set both --all-ancestors and --base");
 
             passedCheck = await Commands.RunAllAncestors(repo, target, analyzerConfigPathTyped, projFilter, explicitProjectMapTyped, new AbsolutePath(outputPath), failFast).ConfigureAwait(false);
         }
         else
         {
-            passedCheck = await Commands.Run(repo, target, source, analyzerConfigPathTyped, projFilter, explicitProjectMapTyped, failFast).ConfigureAwait(false);
+            passedCheck = await Commands.Run(repo, target, baseCommit ?? $"{target}~1", analyzerConfigPathTyped, projFilter, explicitProjectMapTyped, failFast).ConfigureAwait(false);
         }
 
         if (!passedCheck)
         {
             returnCode = 1;
         }
-    }, repoArg, targetArg, sourceOption, allAncestorsOption, projFilterOption, projectMapOption, verbosityOption);
+    }, repoArg, targetArg, baseOption, allAncestorsOption, projFilterOption, projectMapOption, verbosityOption);
     return checkCommand;
 }
 

@@ -1,5 +1,6 @@
 using CliWrap;
 using CliWrap.Buffered;
+using CliWrap.Exceptions;
 using Microsoft.Extensions.Logging;
 using Semtex.Logging;
 using Semtex.Models;
@@ -152,6 +153,13 @@ internal class GitRepo
     internal static async Task<GitRepo> Clone(string repo, AbsolutePath rootFolder)
     {
         Logger.LogDebug("Cloning {Repo} at into {RootFolder}", repo, rootFolder.Path);
+        List<string> errors = null;
+        var errorPipe = PipeTarget.ToDelegate(s =>
+        {
+            errors ??= new List<string>();
+            errors.Add(s);
+            Logger.LogDebug(FormatOutputString(s));
+        });
         var gitCloneCmd = Cli.Wrap("git")
             .WithArguments(new[]
             {
@@ -160,11 +168,28 @@ internal class GitRepo
                 rootFolder.Path
             })
             .WithStandardOutputPipe(StdOutPipe)
-            .WithStandardErrorPipe(StdErrPipe);
-        Logger.LogDebug("Executing {GitCloneCmd}", gitCloneCmd);
-        await gitCloneCmd.ExecuteAsync();
-        Logger.LogDebug("Finished Clone");
-        return new GitRepo(rootFolder, repo);
+            .WithStandardErrorPipe(errorPipe);
+        
+        try
+        {
+            Logger.LogDebug("Executing {GitCloneCmd}", gitCloneCmd);
+            await gitCloneCmd.ExecuteAsync();
+            Logger.LogDebug("Finished Clone");
+            return new GitRepo(rootFolder, repo);
+        }
+        catch (Exception)
+        {
+            Logger.LogError("Failed to clone repo - command used: {GitCloneCmd}", gitCloneCmd);
+            Logger.LogError("Please check that the repo exists and is accessible from this machine");
+            Logger.LogError("Full output:");
+            
+            foreach (var err in errors ?? new List<string>())
+            {
+                Logger.LogError(err);
+            }
+            Thread.Sleep(50);
+            throw;
+        }
     }
 
     internal async Task<(HashSet<AbsolutePath> modifiedFilepaths, HashSet<AbsolutePath> addedFilepaths, HashSet<AbsolutePath> removedFilepaths, HashSet<(AbsolutePath Source, AbsolutePath Target, int Similarity)> renamedFilepaths)> DiffFiles(string sourceSha, string targetSha)
@@ -728,5 +753,27 @@ internal class GitRepo
         Logger.LogDebug("Executing {Cmd}", gitResetCmd);
         var result = await gitResetCmd.ExecuteBufferedAsync();
         return result.StandardOutput.Trim().Length > 0;
+    }
+
+    public async Task<bool> DoesBranchExist(string target)
+    {
+        try
+        {
+            var gitResetCmd = Cli.Wrap("git")
+                .WithArguments(new[]
+                {
+                    "rev-parse", target
+                })
+                .WithWorkingDirectory(RootFolder.Path)
+                .WithStandardOutputPipe(StdOutPipe)
+                .WithStandardErrorPipe(StdErrPipe);
+            Logger.LogDebug("Executing {Cmd}", gitResetCmd);
+            var result = await gitResetCmd.ExecuteBufferedAsync();
+            return result.StandardOutput.Trim().Length > 0;
+        }
+        catch (CommandExecutionException)
+        {
+            return false;
+        }
     }
 }

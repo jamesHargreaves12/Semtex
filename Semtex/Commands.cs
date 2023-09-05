@@ -15,7 +15,7 @@ public sealed class Commands
 
     private static readonly ILogger<Commands> Logger = SemtexLog.LoggerFactory.CreateLogger<Commands>();
 
-    internal static async Task<bool> Run(string repoPathOrUrl, string target, string source,
+    internal static async Task<bool> Run(string repoPathOrUrl, string target, string baseCommit,
         AbsolutePath? analyzerConfigPath, string? relativeProjFilter, AbsolutePath? explicitProjectFileMap,
         bool failFast)
     {
@@ -30,13 +30,23 @@ public sealed class Commands
             gitRepo = await GitRepo.CreateGitRepoFromUrl(repoPathOrUrl).ConfigureAwait(false);
         }
 
+        if (!await gitRepo.DoesBranchExist(target))
+        {
+            throw new ArgumentException($"target ({target}) not found in repo {gitRepo.RemoteUrl}");
+        }
+        
+        if (!await gitRepo.DoesBranchExist(baseCommit))
+        {
+            throw new ArgumentException($"base ({baseCommit}) not found in repo {gitRepo.RemoteUrl}");
+        }
+
         await gitRepo.AssertClean().ConfigureAwait(false);
 
         await gitRepo.CheckoutAndPull(target).ConfigureAwait(false);
 
         var projFilter = relativeProjFilter == null ? null : gitRepo.RootFolder.Join(relativeProjFilter);
 
-        var commits = await gitRepo.ListCommitShasBetween(source, target).ConfigureAwait(false);
+        var commits = await gitRepo.ListCommitShasBetween(baseCommit, target).ConfigureAwait(false);
 
         var results = new List<CommitModel>();
         foreach (var c in commits)
@@ -139,10 +149,16 @@ public sealed class Commands
         // Setup a repo in the scratch space at the same base commit.
         // apply the patch.
         var userRepo = await GitRepo.SetupFromExistingFolder(new AbsolutePath(repoPath)).ConfigureAwait(false);
+        
+        if (!await userRepo.DoesBranchExist(baseCommit))
+        {
+            throw new ArgumentException($"base ({baseCommit}) not found in repo {userRepo.RemoteUrl}");
+        }
+
         var userRepoBaseCommit = await userRepo.GetCurrentCommitSha().ConfigureAwait(false);
         var ghostRepo = await GitRepo.CreateGitRepoFromUrl(userRepo.RemoteUrl).ConfigureAwait(false);
 
-        if (!await ghostRepo.IsAvailable(userRepoBaseCommit))
+        if (!await ghostRepo.DoesBranchExist(userRepoBaseCommit))
         {
             Logger.LogError("Unable to find current commit on remote repository. Please ensure you have run `git push` and try again. Exiting");
             return;
@@ -184,11 +200,26 @@ public sealed class Commands
     {
         var gitRepo = await GitRepo.CreateGitRepoFromUrl(repoUrl).ConfigureAwait(false);
 
+        if (!await gitRepo.DoesBranchExist(target))
+        {
+            throw new ArgumentException($"target ({target}) not found in repo {gitRepo.RemoteUrl}");
+        }
+        
+        if (!await gitRepo.DoesBranchExist(baseCommit))
+        {
+            throw new ArgumentException($"base ({baseCommit}) not found in repo {gitRepo.RemoteUrl}");
+        }
 
         baseCommit = await gitRepo.GetMergeBase(target, baseCommit).ConfigureAwait(false);
 
         // Generate a patch so that we are only comparing a single commit.
         var patchText = await gitRepo.Diff(baseCommit, target).ConfigureAwait(false);
+        if (patchText.Length == 0)
+        {
+            Logger.LogInformation("No changes found. Exiting");
+            return;
+        }
+
         var projectMapPath = projectMap is null ? null : new AbsolutePath(projectMap);
 
         await SplitPatch(gitRepo, baseCommit, patchText, projectMapPath, failFast).ConfigureAwait(false);
