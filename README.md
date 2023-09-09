@@ -12,7 +12,7 @@ This is accomplished by harnessing the rich semantic information available in th
 - 📉 <b>Minimize Risk</b>: Lower the chances of introducing unexpected errors into your production systems.
 
 Testing on a number of open-source projects indicates that you can expect over 25% of C# file changes to
-contain changes that do not alter the behavior.*
+contain changes that do not alter the behavior.[1]
 
 ## Quick Start
 ### Make your code review's life easier
@@ -71,4 +71,4 @@ dotnet tool install semtex --global
 Happy coding! Let Semtex remove the Git friction so you can focus on improving your codebase.
 
 
-* Blog post coming soon with full details.
+[1] Blog post coming soon with full details.
