@@ -17,7 +17,7 @@ var logPath = $"{outputPath}/Logs";
 const bool shouldLogToFile = true;
 #else
 const bool shouldLogToFile = false;
-var outputPath = "";
+var outputPath = Directory.GetCurrentDirectory();
 var logPath = "";
 #endif
 
@@ -117,7 +117,6 @@ Command GetCheckCommand()
         {
             if (baseCommit is not null)
                 throw new ArgumentException("You can set both --all-ancestors and --base");
-
             passedCheck = await Commands.RunAllAncestors(repo, target, analyzerConfigPathTyped, projFilter, explicitProjectMapTyped, new AbsolutePath(outputPath), failFast).ConfigureAwait(false);
         }
         else

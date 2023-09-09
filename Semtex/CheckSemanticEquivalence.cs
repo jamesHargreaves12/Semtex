@@ -9,7 +9,59 @@ using Semtex.Models;
 using Semtex.Rewriters;
 
 namespace Semtex;
+#if NETCOREAPP3_1
+// This is a hack to make stuff work - kill once netcoreapp3.1 no longer supported
+class PriorityQueue<T,T2>
+{
+    private readonly SortedDictionary<int, Queue<T>> _dictionary = new SortedDictionary<int, Queue<T>>();
 
+    public void Enqueue(T item, int priority)
+    {
+        if (!_dictionary.ContainsKey(priority))
+        {
+            _dictionary[priority] = new Queue<T>();
+        }
+
+        _dictionary[priority].Enqueue(item);
+    }
+
+    public (T,int) Dequeue()
+    {
+        if (_dictionary.Count == 0)
+        {
+            throw new InvalidOperationException("The priority queue is empty.");
+        }
+
+        var (key, highestPriorityQueue) = _dictionary.First();
+        T item = highestPriorityQueue.Dequeue();
+
+        if (highestPriorityQueue.Count == 0)
+        {
+            _dictionary.Remove(_dictionary.First().Key);
+        }
+
+        return (item, key);
+    }
+
+    public bool TryDequeue(out T? value, out int key)
+    {
+        if (IsEmpty())
+        {
+            value = default(T);
+            key = default(int);
+            return false;
+        }
+
+        (value, key) = Dequeue();
+        return true;
+    }
+
+    public bool IsEmpty()
+    {
+        return _dictionary.Count == 0;
+    }
+}
+#endif
 public sealed class CheckSemanticEquivalence
 {
     private static readonly ILogger<CheckSemanticEquivalence> Logger = SemtexLog.LoggerFactory.CreateLogger<CheckSemanticEquivalence>();

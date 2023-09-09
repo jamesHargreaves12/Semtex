@@ -13,7 +13,7 @@ behavior, and another focused on improving code quality.
 ```sh
 semtex split
 ```
-To commit only those changes that effect the runtime behaviour of you application use:
+To commit only those changes that effect the runtime behaviour of your application use:
 ```sh
 semtex commit Behavioural <commit message>
 ```

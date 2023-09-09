@@ -5,7 +5,8 @@
         <ImplicitUsings>enable</ImplicitUsings>
         <Nullable>enable</Nullable>
         <RootNamespace>Semtex</RootNamespace>
-        <TargetFramework>net7.0</TargetFramework>
+        <TargetFrameworks>netcoreapp3.1;net6.0;net7.0</TargetFrameworks>
+        <LangVersion>11</LangVersion>
         <PackAsTool>true</PackAsTool>
         <ToolCommandName>semtex</ToolCommandName>
         <PackageOutputPath>./nupkg</PackageOutputPath>

@@ -227,7 +227,7 @@ internal sealed class SolutionUtils
         foreach (var path in projectPaths)
         {
             var projectAssetsPath = Path.Join(Directory.GetParent(path.Path)!.FullName, "obj/project.assets.json");
-            if (Path.Exists(projectAssetsPath))
+            if (File.Exists(projectAssetsPath))
             {
                 Logger.LogTrace("Project Assets File already exists so skipping restore on {Path}", path);
                 continue;
@@ -405,10 +405,10 @@ internal sealed class SolutionUtils
             return projects.Single();
 
         var monikerPairs = projects.Select(proj => (ProjectNameParser.GetMoniker(proj.Name), proj));
-        var result = monikerPairs.MaxBy(pair =>
+        var result = monikerPairs.OrderByDescending(pair =>
                 (Array.IndexOf(FrameworkPreferenceOrder, pair.Item1.Split("-")[0]), // index in the framework list above ignoring environment specific modifiers
                     pair.Item1.Contains("-") ? 0 : 1) // non environment specific should be higher.
-        ).proj;
+        ).First().proj;
         Logger.LogDebug("Multiple versions of project, chose {Name}", result.Name);
         return result;
     }

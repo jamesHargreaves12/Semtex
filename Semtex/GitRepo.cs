@@ -7,13 +7,22 @@ using Semtex.Models;
 
 namespace Semtex;
 
-internal record LineDiff(int Start, int Count)
+internal record LineDiff
 {
+    public readonly int Start;
+    public readonly int Count;
+
+    public LineDiff(int start, int count)
+    {
+        Start = start;
+        Count = count;
+    }
+
     private int End => Start + Count;
 
     public bool Contains(LineDiff other)
     {
-        return Start <= other.Start && End >= other.End;
+        return Start <= other.Count && End >= other.End;
     }
 }
 

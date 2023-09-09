@@ -14,7 +14,7 @@ public class CommitModel
         DiffConfig = diffConfig;
     }
 
-    public required string CommitHash { get; init; }
+    public string CommitHash { get; set; }
     public bool SemanticallyEquivalent => FileModels.All(f => SafeStatuses.Contains(f.Status));
     public List<FileModel> FileModels { get; }
     public long ElapsedMilliseconds { get; }

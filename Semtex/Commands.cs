@@ -20,7 +20,7 @@ public sealed class Commands
         bool failFast)
     {
         GitRepo gitRepo;
-        if (Path.Exists(repoPathOrUrl))
+        if (Directory.Exists(repoPathOrUrl))
         {
             var localChangesRepo = await GitRepo.SetupFromExistingFolder(new AbsolutePath(repoPathOrUrl)).ConfigureAwait(false);
             gitRepo = await GitRepo.CreateGitRepoFromUrl(localChangesRepo.RemoteUrl).ConfigureAwait(false);
@@ -76,7 +76,7 @@ public sealed class Commands
         string? relativeProjFilter, AbsolutePath? projectMappingFilepath, AbsolutePath outputPath, bool failFast)
     {
         GitRepo gitRepo;
-        if (Path.Exists(repoPathOrUrl))
+        if (File.Exists(repoPathOrUrl))
         {
             var localChangesRepo = await GitRepo.SetupFromExistingFolder(new AbsolutePath(repoPathOrUrl)).ConfigureAwait(false);
             gitRepo = await GitRepo.CreateGitRepoFromUrl(localChangesRepo.RemoteUrl).ConfigureAwait(false);
@@ -305,10 +305,10 @@ public sealed class Commands
         var semanticFilepath = PatchFileLookup(CommitType.Behavioural);
         var unsemanticFilepath = PatchFileLookup(CommitType.Quality);
 
-        if (semanticFilepath.Exists())
+        if (File.Exists(semanticFilepath.Path))
             File.Delete(semanticFilepath.Path);
 
-        if (unsemanticFilepath.Exists())
+        if (File.Exists(unsemanticFilepath.Path))
             File.Delete(unsemanticFilepath.Path);
 
         var applyBuilder = new StringBuilder();
