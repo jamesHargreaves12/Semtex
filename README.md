@@ -4,12 +4,15 @@
 Remove the Git friction that is discouraging you from making improvements to your C# codebase. 
 
 Semtex simplifies the code review process for C# projects by dividing up your changes. It segregates
-diffs that affect the runtime behaviour from those that make your codebase easier to maintain.
+diffs that affect the runtime behavior from those that make your codebase easier to maintain.
 This is accomplished by harnessing the rich semantic information available in the C# language and compiler.
 
 - 🏎️ <b>Accelerate Code Reviews</b>: Make the review process quicker and more focused.
 - 🛠️ <b>Enables Incremental Improvements</b>: Make continual improvements without burdening your code reviewers.
 - 📉 <b>Minimize Risk</b>: Lower the chances of introducing unexpected errors into your production systems.
+
+Testing on a number of open-source projects indicates that you can expect over 25% of C# file changes to
+contain changes that do not alter the behavior.
 
 ## Quick Start
 ### Make your code review's life easier
@@ -18,7 +21,7 @@ behavior, and another focused on improving code quality.
 ```sh
 semtex split
 ```
-To commit only those changes that effect the runtime behaviour of you application use:
+To commit only those changes that effect the runtime behavior of your application use:
 ```sh
 semtex commit Behavioural <commit message>
 ```
