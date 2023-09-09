@@ -16,7 +16,7 @@ contain changes that do not alter the behavior.[1]
 
 ## Quick Start
 ### Make your code review's life easier
-Run the following command to split your changes in two: one half containing changes that affect runtime 
+Run the following command to split your staged changes in two: one half containing changes that affect runtime 
 behavior, and another focused on improving code quality.
 ```sh
 semtex split
