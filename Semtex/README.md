@@ -4,7 +4,7 @@ Git presents all textual diffs in the same way. A change that could break your p
 
 
 ## Quick Start
-### Make your code review's life easier
+### Make your code reviewer's life easier
 Run the following command to split your staged changes in two: one half containing changes that affect runtime
 behaviour, and another focused on improving code quality.
 ```sh
