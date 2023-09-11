@@ -1,6 +1,6 @@
 # Semtex
 
-Git treats all textual diffs in the same way. A change that could break your production system looks identical to a safe refactoring. Semtex splits up your diffs into those that affect the runtime behaviour and those that don't.
+Git presents all textual diffs in the same way. A change that could break your production system looks identical to a safe refactoring. Semtex splits up your diffs into those that affect the runtime behaviour and those that don't.
 
 
 ## Quick Start
