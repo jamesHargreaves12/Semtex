@@ -1,10 +1,7 @@
 # Semtex
 
-Remove the Git friction that is discouraging you from making improvements to your C# codebase. 
+Git treats all textual diffs in the same way. A change that could break your production system looks identical to a safe refactoring. Semtex splits up your diffs into those that affect the runtime behaviour and those that don't.
 
-Semtex simplifies the code review process for C# projects by dividing up your changes. It segregates
-diffs that affect the runtime behaviour from those that make your codebase easier to maintain. This separation 
-simplifies the code review process and helps maintain the focus and intent of each commit.
 
 ## Quick Start
 ### Make your code review's life easier
