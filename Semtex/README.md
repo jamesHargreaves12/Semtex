@@ -9,7 +9,7 @@ simplifies the code review process and helps maintain the focus and intent of ea
 ## Quick Start
 ### Make your code review's life easier
 Run the following command to split your staged changes in two: one half containing changes that affect runtime
-behavior, and another focused on improving code quality.
+behaviour, and another focused on improving code quality.
 ```sh
 semtex split
 ```
@@ -25,7 +25,7 @@ semtex commit Quality <commit message>
 -------
  
 ### Evaluate the Impact of a Commit
-Generate a summary that highlights portions of an existing commit that impact runtime behavior:
+Generate a summary that highlights portions of an existing commit that impact runtime behaviour:
 ```sh
 semtex check https://github.com/repo.git <commit>
 ```
