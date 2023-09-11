@@ -6,8 +6,8 @@ Git treats all textual diffs in the same way. A change that could break your pro
 Segregating the changes makes the whole change easier to review. If a change is known not to impact the production system then it is trivial to review. A change that does impact runtime behaviour, should be kept small and focused.
 
 - 📉 <b>Minimise Risk</b> by focusing your reviewer's attention on diffs that have the potential to introduce errors.
-- 🛠️ <b>Enables Incremental Improvements</b> to be made as they are spotted rather than waiting till you have committed your current change.
 - 🏎️ <b>Accelerate Code Reviews</b> as it is easier to review something that you know won't impact the runtime behaviour.
+- 🛠️ <b>Enables Incremental Improvements</b> to be made as they are spotted rather than waiting till you have committed your current change.
 
 
 Testing on a number of open-source projects indicates that you can expect over 25% of C# file changes to
