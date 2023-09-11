@@ -1,8 +1,6 @@
 # Semtex
 [![NuGet](https://img.shields.io/nuget/v/semtex.svg)](https://www.nuget.org/packages/semtex/)
 
-Remove the Git friction that is discouraging you from making improvements to your C# codebase. 
-
 Git treats all textual diffs in the same way. A change that could break your production system looks identical to a safe refactoring. Semtex splits up your diffs into those that affect the runtime behaviour and those that don't. 
 
 Segregating the changes makes the whole change easier to review. If a change is known not to impact the production system then it is trivial to review. A change that does impact runtime behaviour, should be kept small and focused.
@@ -65,9 +63,5 @@ Try Semtex today by installing the tool with the following command:
 ```sh
 dotnet tool install semtex --global
 ```
-
------ 
-Happy coding! Let Semtex remove the Git friction so you can focus on improving your codebase.
-
 
 [1] Blog post coming soon with full details.
