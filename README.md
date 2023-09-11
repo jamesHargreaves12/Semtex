@@ -7,7 +7,7 @@ Segregating the changes makes the whole change easier to review. A change that i
 
 - 📉 <b>Minimise Risk</b> by focusing your reviewer's attention on diffs that have the potential to introduce errors.
 - 🏎️ <b>Accelerate Code Reviews</b> as it is easier to review something that you know won't impact the runtime behaviour.
-- 🛠️ <b>Enables Incremental Improvements</b> to be made as they are spotted rather than waiting until you have committed your current change. It is not desirable to add friction to changes that make things easier for the next person! 
+- 🛠️ <b>Enables Incremental Improvements</b> to be made as they are spotted rather than waiting until you have committed your current change. These changes are important to the next person who wants to understand this code! 
 
 
 Testing on a number of open-source projects indicates that you can expect over 25% of C# file changes to
