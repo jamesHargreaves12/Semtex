@@ -3,7 +3,7 @@
 
 Git treats all textual diffs in the same way. A change that could break your production system looks identical to a safe refactoring. Semtex splits up your diffs into those that affect the runtime behaviour and those that don't. 
 
-Segregating the changes makes the whole change easier to review. If a change is known not to impact the production system then it is trivial to review. A change that does impact runtime behaviour, should be kept small and focused.
+Segregating the changes makes the whole change easier to review. A change that is known not to impact the production system is trivial to review. A change that does impact runtime behaviour, should be kept small and focused.
 
 - 📉 <b>Minimise Risk</b> by focusing your reviewer's attention on diffs that have the potential to introduce errors.
 - 🏎️ <b>Accelerate Code Reviews</b> as it is easier to review something that you know won't impact the runtime behaviour.
