@@ -1,7 +1,7 @@
 # Semtex
 [![NuGet](https://img.shields.io/nuget/v/semtex.svg)](https://www.nuget.org/packages/semtex/)
 
-Git treats all textual diffs in the same way. A change that could break your production system looks identical to a safe refactoring. Semtex splits up your diffs into those that affect the runtime behaviour and those that don't. 
+Git presents all textual diffs in the same way. A change that could break your production system looks identical to a safe refactoring. Semtex splits up your diffs into those that affect the runtime behaviour and those that don't. 
 
 Segregating the changes makes the whole change easier to review. A change that is known not to impact the production system is trivial to review. A change that does impact runtime behaviour, should be kept small and focused.
 
